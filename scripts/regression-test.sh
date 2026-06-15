@@ -1,0 +1,617 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+API_PYTHON="$ROOT_DIR/apps/api/.venv/bin/python"
+TEST_ROOT="$(mktemp -d)"
+AUTH_DB="$TEST_ROOT/auth.db"
+EMPTY_DB="$TEST_ROOT/empty.db"
+MIGRATION_DB="$TEST_ROOT/migration.db"
+BASE_PORT="${TEST_PORT:-18010}"
+API_PID=""
+
+cleanup() {
+  local exit_code=$?
+  stop_api
+  rm -rf "$TEST_ROOT"
+  exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+stop_api() {
+  if [[ -n "${API_PID:-}" ]]; then
+    kill "$API_PID" 2>/dev/null || true
+    wait "$API_PID" 2>/dev/null || true
+    API_PID=""
+  fi
+}
+
+start_api() {
+  local mode="$1"
+  local seed="$2"
+  local database="$3"
+  local port="$4"
+  local log_file="$TEST_ROOT/api-$port.log"
+
+  stop_api
+  (
+    cd "$ROOT_DIR"
+    ENVIRONMENT=test \
+    AUTH_MODE="$mode" \
+    SEED_DEMO_DATA="$seed" \
+    DATABASE_URL="sqlite:///$database" \
+    SECRET_KEY="chave-regressao-local" \
+    "$API_PYTHON" -m uvicorn apps.api.app.main:app \
+      --host 127.0.0.1 --port "$port" --log-level warning
+  ) >"$log_file" 2>&1 &
+  API_PID=$!
+
+  for _ in {1..60}; do
+    if curl -fsS "http://127.0.0.1:$port/api/health" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 0.25
+  done
+
+  cat "$log_file"
+  echo "A API não iniciou na porta $port."
+  exit 1
+}
+
+login_status() {
+  local port="$1"
+  local username="$2"
+  local password="$3"
+  curl -sS -o "$TEST_ROOT/login-body.json" -w '%{http_code}' \
+    -X POST "http://127.0.0.1:$port/api/auth/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$username\",\"password\":\"$password\"}"
+}
+
+if [[ ! -x "$API_PYTHON" ]]; then
+  echo "Ambiente Python não encontrado. Execute ./iniciar-local.sh uma vez."
+  exit 1
+fi
+
+"$API_PYTHON" -c "import uvicorn" >/dev/null
+
+echo "[1/8] Validando helpers de formulário e grupos LDAP..."
+ENVIRONMENT=test "$API_PYTHON" - <<'PY'
+from apps.api.app.catalog_forms import normalize_form_schema, validate_form_data
+from apps.api.app.ldap_service import role_from_groups
+
+schema = normalize_form_schema({
+    "fields": [
+        {"key": "email", "label": "E-mail", "type": "email", "max_length": "inválido"},
+        {"key": "date", "label": "Data", "type": "date"},
+    ]
+})
+assert schema["fields"][0]["max_length"] == 500
+
+for values in (
+    {"email": "email-invalido", "date": "2026-06-15"},
+    {"email": "usuario@cabofrio.rj.gov.br", "date": "2026-02-30"},
+):
+    try:
+        validate_form_data(schema, values)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("valor inválido aceito pelo formulário dinâmico")
+
+assert role_from_groups(["CN=GG_TI_ADMIN,OU=Grupos,DC=cabofrio,DC=local"]) == "admin"
+assert role_from_groups(["CN=GG_TI_ADMINISTRADORES,OU=Grupos,DC=cabofrio,DC=local"]) == "requester"
+print("Helpers: OK")
+PY
+
+echo "[2/8] Validando migração não destrutiva do schema legado..."
+MIGRATION_DB="$MIGRATION_DB" DATABASE_URL="sqlite:///$MIGRATION_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
+import os
+import sqlite3
+
+from sqlalchemy import inspect
+
+from apps.api.app.database import engine, ensure_schema_compatibility
+
+with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
+    connection.execute("CREATE TABLE tickets (id INTEGER PRIMARY KEY, title VARCHAR(220) NOT NULL)")
+
+ensure_schema_compatibility()
+columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
+expected = {"form_data", "form_schema_snapshot", "service_id"}
+assert expected <= columns, f"colunas ausentes após migração: {expected - columns}"
+print("Migração legada: OK")
+PY
+
+echo "[3/8] Validando autenticação local e criação explícita do seed..."
+start_api local true "$AUTH_DB" "$BASE_PORT"
+[[ "$(login_status "$BASE_PORT" servidor 123456)" == "200" ]]
+
+echo "[4/8] Confirmando que senha local é rejeitada em modo LDAP..."
+start_api ldap false "$AUTH_DB" "$((BASE_PORT + 1))"
+[[ "$(login_status "$((BASE_PORT + 1))" admin admin123)" == "401" ]]
+
+echo "[5/8] Confirmando autenticação local em modo híbrido..."
+start_api hybrid false "$AUTH_DB" "$((BASE_PORT + 2))"
+[[ "$(login_status "$((BASE_PORT + 2))" servidor 123456)" == "200" ]]
+
+echo "[6/8] Confirmando seed desabilitado em banco vazio..."
+start_api local false "$EMPTY_DB" "$((BASE_PORT + 3))"
+[[ "$(login_status "$((BASE_PORT + 3))" servidor 123456)" == "401" ]]
+stop_api
+EMPTY_DB="$EMPTY_DB" "$API_PYTHON" - <<'PY'
+import os
+import sqlite3
+
+with sqlite3.connect(os.environ["EMPTY_DB"]) as connection:
+    count = connection.execute("select count(*) from users").fetchone()[0]
+    assert count == 0, f"seed desabilitado criou {count} usuário(s)"
+PY
+
+echo "[7/8] Executando regressão funcional completa..."
+start_api hybrid false "$AUTH_DB" "$((BASE_PORT + 2))"
+API_URL="http://127.0.0.1:$((BASE_PORT + 2))/api" TEST_DB="$AUTH_DB" "$API_PYTHON" - <<'PY'
+import json
+import os
+import re
+import sqlite3
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+BASE = os.environ["API_URL"]
+DB_PATH = os.environ["TEST_DB"]
+ZONE_PATTERN = re.compile(r"(Z|[+-]\d{2}:\d{2})$")
+
+
+def call(method, path, token=None, payload=None, params=None):
+    if params:
+        path = f"{path}?{urlencode(params)}"
+    headers = {}
+    body = None
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        body = json.dumps(payload).encode()
+    request = Request(BASE + path, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request) as response:
+            raw = response.read()
+            return response.status, json.loads(raw) if raw else None
+    except HTTPError as exc:
+        raw = exc.read()
+        return exc.code, json.loads(raw) if raw else None
+
+
+def expect(actual, expected, label):
+    if actual != expected:
+        raise AssertionError(f"{label}: esperado {expected!r}, recebido {actual!r}")
+
+
+def login(username, password="123456"):
+    status, result = call("POST", "/auth/login", payload={"username": username, "password": password})
+    expect(status, 200, f"login {username}")
+    return result["access_token"], result["user"]
+
+
+def assert_explicit_zone(value, label):
+    if not value or not ZONE_PATTERN.search(value):
+        raise AssertionError(f"{label} não possui fuso explícito: {value!r}")
+
+
+requester, requester_user = login("servidor")
+helpdesk, _ = login("helpdesk1")
+technician, _ = login("tecnico")
+admin, admin_user = login("admin", "admin123")
+
+# Usuário inativo permanece bloqueado.
+with sqlite3.connect(DB_PATH) as connection:
+    connection.execute("update users set active = 0 where username = 'marcelo'")
+    connection.commit()
+status, _ = call("POST", "/auth/login", payload={"username": "marcelo", "password": "123456"})
+expect(status, 401, "usuário inativo")
+with sqlite3.connect(DB_PATH) as connection:
+    connection.execute("update users set active = 1 where username = 'marcelo'")
+    connection.commit()
+
+# Inventário completo é restrito; opções de abertura são mínimas e do próprio usuário.
+status, _ = call("GET", "/assets", requester)
+expect(status, 403, "solicitante sem inventário completo")
+status, options = call("GET", "/assets/ticket-options", requester)
+expect(status, 200, "opções resumidas de equipamento")
+if not options:
+    raise AssertionError("solicitante deveria possuir equipamentos vinculados")
+allowed_keys = {"id", "name", "asset_type", "patrimony"}
+for option in options:
+    expect(set(option), allowed_keys, "campos expostos na opção de equipamento")
+if any(option["asset_type"] == "network" for option in options):
+    raise AssertionError("equipamento de rede de outro usuário foi exposto")
+
+status, full_inventory = call("GET", "/assets", helpdesk)
+expect(status, 200, "helpdesk consulta inventário completo")
+if not full_inventory or "ip_address" not in full_inventory[0]:
+    raise AssertionError("inventário administrativo não contém os dados completos")
+foreign_asset = next(item for item in full_inventory if item.get("assigned_user_id") != requester_user["id"])
+
+status, catalog = call("GET", "/catalog", requester)
+expect(status, 200, "catálogo")
+printer_service = next(item for item in catalog if item["name"] == "Instalar impressora")
+software_service = next(item for item in catalog if item["name"] == "Instalar sistema")
+general_service = next(item for item in catalog if item["name"] == "Solicitação geral")
+if not printer_service["form_schema"]["fields"] or not isinstance(printer_service["form_schema"]["fields"][0], dict):
+    raise AssertionError("form_schema não foi normalizado")
+
+status, _ = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": general_service["id"],
+        "description": "Tentativa de vincular equipamento de outro usuário.",
+        "asset_id": foreign_asset["id"],
+        "form_data": {},
+    },
+)
+expect(status, 403, "equipamento de outro usuário rejeitado")
+
+# Campos administrativos continuam proibidos na abertura.
+status, _ = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": printer_service["id"],
+        "description": "Tentativa com campos administrativos.",
+        "title": "Título injetado",
+        "priority": "critical",
+        "form_data": {"local": "SEDECON"},
+    },
+)
+expect(status, 422, "abertura rejeita título e prioridade")
+
+# Campos obrigatórios e chaves desconhecidas são validados pelo backend.
+status, _ = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": printer_service["id"],
+        "description": "Solicitação sem campo dinâmico obrigatório.",
+        "form_data": {},
+    },
+)
+expect(status, 422, "campo dinâmico obrigatório")
+status, _ = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": general_service["id"],
+        "description": "Solicitação com campo adicional indevido.",
+        "form_data": {"campo_inexistente": "valor"},
+    },
+)
+expect(status, 422, "campo dinâmico desconhecido")
+
+own_asset_id = options[0]["id"]
+status, ticket = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": printer_service["id"],
+        "description": "Teste automatizado das regras do chamado.",
+        "location": "SEDECON - SEGTEA",
+        "asset_id": own_asset_id,
+        "form_data": {
+            "local": "SEDECON - SEGTEA",
+            "computer": "ADSEGTEA004",
+            "printer_model": "Brother DCP-L2540DW",
+        },
+    },
+)
+expect(status, 201, "abertura válida")
+expect(ticket["title"], printer_service["name"], "título vem do catálogo")
+expect(ticket["priority"], "medium", "prioridade inicial")
+expect(ticket["service_id"], printer_service["id"], "referência histórica ao serviço")
+expect(ticket["form_data"]["local"], "SEDECON - SEGTEA", "respostas estruturadas")
+if not ticket["form_schema_snapshot"]["fields"]:
+    raise AssertionError("schema histórico do formulário não foi preservado")
+if set(ticket["asset"]) != allowed_keys:
+    raise AssertionError("detalhe do solicitante expôs dados sensíveis do equipamento")
+for field_name in ("created_at", "updated_at", "due_at"):
+    assert_explicit_zone(ticket[field_name], f"chamado.{field_name}")
+
+status, software_ticket = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": software_service["id"],
+        "description": "Instalação necessária para manipular arquivos do setor.",
+        "form_data": {"software_name": "7-Zip", "license": "Não sei informar"},
+    },
+)
+expect(status, 201, "criação com formulário dinâmico")
+expect(software_ticket["form_data"]["software_name"], "7-Zip", "persistência de campo dinâmico")
+
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", requester, {"priority": "critical"})
+expect(status, 403, "solicitante não altera chamado")
+
+status, users = call("GET", "/users", helpdesk)
+expect(status, 200, "helpdesk consulta responsáveis")
+tech_id = next(item["id"] for item in users if item["username"] == "tecnico")
+
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", helpdesk, {"status": "valor_invalido"})
+expect(status, 422, "status inválido")
+status, updated = call(
+    "PATCH",
+    f"/tickets/{ticket['id']}",
+    helpdesk,
+    {"status": "assigned", "priority": "high", "assignee_id": tech_id},
+)
+expect(status, 200, "triagem do helpdesk")
+events = [item for item in updated["comments"] if item["event_type"] == "update"]
+expect(len(events), 3, "eventos administrativos")
+if not all("Maiana Ignácio" in item["body"] and not item["internal"] for item in events):
+    raise AssertionError("eventos devem ter autoria e ser públicos")
+
+status, note = call(
+    "POST",
+    f"/tickets/{ticket['id']}/comments",
+    helpdesk,
+    {"body": "Nota interna de validação.", "internal": True},
+)
+expect(status, 201, "helpdesk cria nota interna")
+assert_explicit_zone(note["created_at"], "comentário.created_at")
+
+status, requester_view = call("GET", f"/tickets/{ticket['id']}", requester)
+expect(status, 200, "solicitante acompanha chamado")
+expect(sum(1 for item in requester_view["comments"] if item["internal"]), 0, "notas internas filtradas")
+expect(sum(1 for item in requester_view["comments"] if item["event_type"] == "update"), 3, "eventos visíveis")
+
+status, _ = call("GET", f"/tickets/{ticket['id']}", technician)
+expect(status, 200, "técnico acessa chamado atribuído")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"priority": "critical"})
+expect(status, 403, "técnico não altera prioridade")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "in_progress"})
+expect(status, 200, "técnico altera status permitido")
+
+_, page = call("GET", "/tickets", helpdesk, params={"page_size": 100})
+foreign_ticket = next(
+    item for item in page["items"]
+    if item.get("assignee") and item["assignee"]["id"] != tech_id
+)
+status, _ = call(
+    "POST",
+    f"/tickets/{foreign_ticket['id']}/comments",
+    technician,
+    {"body": "Comentário indevido.", "internal": True},
+)
+expect(status, 403, "técnico não comenta em chamado alheio")
+
+# Cria volume suficiente para validar páginas distintas e totais agregados.
+for index in range(23):
+    status, _ = call(
+        "POST",
+        "/tickets",
+        requester,
+        {
+            "service_id": general_service["id"],
+            "description": f"Chamado de paginação número {index:02d}.",
+            "form_data": {"details": f"Lote de teste {index:02d}"},
+        },
+    )
+    expect(status, 201, f"criação para paginação {index}")
+
+status, first_page = call("GET", "/tickets", requester, params={"page": 1, "page_size": 5})
+expect(status, 200, "primeira página")
+status, second_page = call("GET", "/tickets", requester, params={"page": 2, "page_size": 5})
+expect(status, 200, "segunda página")
+expect(first_page["page"], 1, "número da primeira página")
+expect(second_page["page"], 2, "número da segunda página")
+expect(first_page["page_size"], 5, "tamanho da página")
+if first_page["total"] < 25:
+    raise AssertionError("total paginado não considera todos os registros visíveis")
+if {item["id"] for item in first_page["items"]} & {item["id"] for item in second_page["items"]}:
+    raise AssertionError("páginas retornaram registros repetidos")
+
+status, new_page = call("GET", "/tickets", requester, params={"status": "new", "page_size": 5})
+expect(status, 200, "filtro paginado")
+expect(new_page["summary"]["new"], new_page["total"], "resumo agregado de novos")
+expect(new_page["summary"]["waiting_user"], 0, "resumo respeita filtro de status")
+if new_page["summary"]["new"] <= len(new_page["items"]):
+    raise AssertionError("resumo foi calculado somente com a página carregada")
+
+for item in first_page["items"]:
+    assert_explicit_zone(item["created_at"], "lista.created_at")
+    assert_explicit_zone(item["updated_at"], "lista.updated_at")
+
+print("Regressão funcional: OK")
+
+# Administração: permissões, usuários, catálogo, inventário e auditoria.
+status, _ = call(
+    "POST",
+    "/admin/users",
+    helpdesk,
+    {
+        "username": "sempermissao",
+        "full_name": "Usuário sem permissão",
+        "email": "sempermissao@cabofrio.rj.gov.br",
+        "password": "SenhaTeste123",
+        "role": "requester",
+        "secretariat": "Prefeitura de Cabo Frio",
+        "department": "Teste",
+        "phone": "",
+        "active": True,
+    },
+)
+expect(status, 403, "helpdesk não gerencia usuários")
+
+status, created_user = call(
+    "POST",
+    "/admin/users",
+    admin,
+    {
+        "username": "teste.admin",
+        "full_name": "Usuário Administrativo de Teste",
+        "email": "teste.admin@cabofrio.rj.gov.br",
+        "password": "SenhaTeste123",
+        "role": "requester",
+        "secretariat": "Prefeitura de Cabo Frio",
+        "department": "Validação",
+        "phone": "",
+        "active": True,
+    },
+)
+expect(status, 201, "administrador cria usuário local")
+status, _ = call(
+    "POST",
+    "/admin/users",
+    admin,
+    {
+        "username": "teste.admin",
+        "full_name": "Usuário Duplicado",
+        "email": "duplicado@cabofrio.rj.gov.br",
+        "password": "SenhaTeste123",
+        "role": "requester",
+        "secretariat": "Prefeitura de Cabo Frio",
+        "department": "Validação",
+        "phone": "",
+        "active": True,
+    },
+)
+expect(status, 409, "usuário duplicado rejeitado")
+status, updated_user = call(
+    "PATCH",
+    f"/admin/users/{created_user['id']}",
+    admin,
+    {"role": "technician", "department": "ADCETEI", "active": False},
+)
+expect(status, 200, "administrador atualiza usuário")
+expect(updated_user["role"], "technician", "perfil do usuário atualizado")
+expect(updated_user["active"], False, "usuário bloqueado")
+status, _ = call("POST", "/auth/login", payload={"username": "teste.admin", "password": "SenhaTeste123"})
+expect(status, 401, "usuário bloqueado não autentica")
+status, _ = call("PATCH", f"/admin/users/{admin_user['id']}", admin, {"active": False})
+expect(status, 409, "administrador não desativa a própria conta")
+
+status, created_asset = call(
+    "POST",
+    "/admin/assets",
+    admin,
+    {
+        "name": "NOTEBOOK-TESTE-ADM",
+        "asset_type": "computer",
+        "manufacturer": "Fabricante",
+        "model": "Modelo",
+        "serial_number": "SERIAL-ADMIN-001",
+        "patrimony": "PAT-ADMIN-001",
+        "status": "stock",
+        "location": "Estoque ADCETEI",
+        "ip_address": "",
+        "operating_system": "",
+        "assigned_user_id": None,
+    },
+)
+expect(status, 201, "administrador cadastra equipamento")
+status, updated_asset = call(
+    "PATCH",
+    f"/admin/assets/{created_asset['id']}",
+    admin,
+    {"status": "active", "assigned_user_id": requester_user["id"]},
+)
+expect(status, 200, "administrador atualiza equipamento")
+expect(updated_asset["status"], "active", "status do equipamento atualizado")
+status, _ = call(
+    "PATCH",
+    f"/admin/assets/{created_asset['id']}",
+    admin,
+    {"status": None},
+)
+expect(status, 422, "campo obrigatório nulo rejeitado")
+
+status, created_service = call(
+    "POST",
+    "/admin/catalog",
+    admin,
+    {
+        "name": "Serviço administrativo de teste",
+        "category": "Validação",
+        "description": "Serviço criado pela regressão.",
+        "icon": "support_agent",
+        "color": "#1f5eff",
+        "active": True,
+        "form_schema": {
+            "fields": [
+                {
+                    "key": "detalhes",
+                    "label": "Detalhes",
+                    "type": "textarea",
+                    "required": True,
+                    "placeholder": "Informe os detalhes",
+                    "options": [],
+                    "max_length": 500,
+                }
+            ]
+        },
+    },
+)
+expect(status, 201, "administrador cria serviço")
+status, updated_service = call(
+    "PATCH",
+    f"/admin/catalog/{created_service['id']}",
+    admin,
+    {"active": False, "description": "Serviço arquivado pela regressão."},
+)
+expect(status, 200, "administrador atualiza serviço")
+expect(updated_service["active"], False, "serviço arquivado")
+
+status, roles = call("GET", "/admin/roles", admin)
+expect(status, 200, "administrador consulta perfis")
+technician_role = next(item for item in roles if item["role"] == "technician")
+original_permissions = technician_role["permissions"]
+temporary_permissions = sorted(set(original_permissions + ["users.view"]))
+status, changed_role = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"permissions": temporary_permissions, "ldap_group": "GG_TI_TECNICOS_TESTE"},
+)
+expect(status, 200, "administrador altera permissões")
+expect("users.view" in changed_role["permissions"], True, "permissão adicionada")
+status, _ = call("GET", "/users", technician)
+expect(status, 200, "permissão alterada aplicada sem novo login")
+status, dependent_role = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"permissions": ["assets.manage"]},
+)
+expect(status, 200, "dependência de permissão aceita")
+expect("assets.view" in dependent_role["permissions"], True, "dependência de visualização aplicada")
+status, _ = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"ldap_group": next(item for item in roles if item["role"] == "helpdesk")["ldap_group"]},
+)
+expect(status, 409, "grupo LDAP duplicado rejeitado")
+status, _ = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"permissions": original_permissions, "ldap_group": technician_role["ldap_group"]},
+)
+expect(status, 200, "perfil técnico restaurado")
+
+status, audit = call("GET", "/admin/audit", admin, params={"limit": 100})
+expect(status, 200, "administrador consulta auditoria")
+audited_entities = {item["entity_type"] for item in audit}
+if not {"user", "asset", "catalog", "role"} <= audited_entities:
+    raise AssertionError(f"auditoria incompleta: {audited_entities}")
+
+print("[8/8] Administração e permissões: OK")
+print("Regressão da API: OK")
+PY

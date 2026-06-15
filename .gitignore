@@ -1,0 +1,49 @@
+# Segredos
+.env
+.env.*
+!.env.example
+!.env.vm.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Node e Next.js
+node_modules/
+.next/
+dist/
+build/
+coverage/
+tsconfig.tsbuildinfo
+
+# Bancos, logs e backups
+*.db
+*.sqlite
+*.sqlite3
+*.log
+backups/
+
+# Certificados e chaves
+certs/
+certificates/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Ferramentas e sistema
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+.codex/
+.agents/
+
+# Pacotes temporários
+*.zip
+*.tar
+*.gz
