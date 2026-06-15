@@ -60,9 +60,9 @@ O ambiente desta revisão não possui o executável Docker. Por isso, o Compose 
 
 O `scripts/regression-test.sh` usa bancos temporários e valida:
 
-1. login local em `AUTH_MODE=local`;
-2. rejeição de `admin/admin123` em `AUTH_MODE=ldap`;
-3. login local em `AUTH_MODE=hybrid`;
+1. login por usuário e por e-mail em `AUTH_MODE=email`;
+2. rejeição de cadastro com `usuario@cabofrio.rj.gov.br`;
+3. bloqueio de login para conta com e-mail não verificado;
 4. usuário inativo bloqueado;
 5. seed habilitado e desabilitado explicitamente;
 6. solicitante sem acesso a `/api/assets`;
@@ -78,7 +78,7 @@ O `scripts/regression-test.sh` usa bancos temporários e valida:
 16. normalização de limite de tamanho malformado;
 17. persistência estruturada das respostas;
 18. preservação do serviço e schema usados na abertura;
-19. correspondência exata de grupos LDAP;
+19. validação do padrão institucional de e-mail;
 20. título automático e prioridade inicial;
 21. ocultação de notas internas;
 22. eventos administrativos públicos;
@@ -90,7 +90,7 @@ O `scripts/regression-test.sh` usa bancos temporários e valida:
 28. criação e arquivamento de serviço;
 29. configuração dinâmica de permissões;
 30. dependências automáticas entre permissões;
-31. rejeição de grupo LDAP duplicado;
+31. reconfiguração de permissões sem vínculo com diretório;
 32. auditoria administrativa;
 33. rejeição de valores nulos em campos obrigatórios;
 34. negação de operações administrativas para perfis sem permissão.
@@ -123,10 +123,10 @@ O Compose final:
 
 ## Limitações e riscos restantes
 
-- LDAP não foi testado contra o domínio real da Prefeitura; foi validada a separação de modos e a rejeição de senha local em modo LDAP.
+- AD/LDAP não faz parte do fluxo operacional atual; a validação cobre cadastro por e-mail institucional e autenticação local.
 - A alteração de schema usa compatibilidade automática, não versionamento formal. Adotar Alembic antes de novas mudanças de banco.
 - O JWT não possui refresh token; sessão expirada exige novo login.
 - Configurar HTTPS, proxy reverso, backup, logs, monitoramento e política de rotação de chave antes da implantação.
 - Definir `SEED_DEMO_DATA=false` e remover contas demonstrativas no ambiente real.
-- Revisar grupos LDAP e certificados LDAPS com a infraestrutura municipal.
+- Configurar SMTP e `PUBLIC_APP_URL` corretos antes da homologação com usuários reais.
 - O teste E2E automatizado em navegador ainda não faz parte do projeto.

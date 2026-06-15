@@ -14,6 +14,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const publicRoutes = ["/login", "/criar-conta", "/confirmar-email", "/verifique-email"];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -58,8 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") router.replace("/login");
-    if (!loading && user && pathname === "/login") router.replace("/dashboard");
+    const isPublicRoute = publicRoutes.includes(pathname);
+    if (!loading && !user && !isPublicRoute) router.replace("/login");
+    if (!loading && user && isPublicRoute) router.replace("/dashboard");
   }, [loading, user, pathname, router]);
 
   const login = async (username: string, password: string) => {

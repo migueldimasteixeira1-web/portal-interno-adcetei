@@ -59,6 +59,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
+  register: (payload: { full_name: string; email: string; password: string }) =>
+    request<{ message: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
+  verifyEmail: (token: string) =>
+    request<{ message: string }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }),
+  resendVerification: (email: string) =>
+    request<{ message: string }>("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) }),
   me: () => request<User>("/auth/me"),
   dashboard: () => request<DashboardData>("/dashboard"),
   tickets: (params: Record<string, string | number | undefined> = {}) => {
@@ -81,6 +87,8 @@ export const api = {
     request<User>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
   updateUser: (id: number, payload: Record<string, unknown>) =>
     request<User>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  resendUserVerification: (id: number) =>
+    request<User>(`/admin/users/${id}/resend-verification`, { method: "POST" }),
   assets: (params: Record<string, string> = {}) => {
     const query = new URLSearchParams(params);
     return request<Asset[]>(`/assets?${query.toString()}`);
@@ -103,5 +111,4 @@ export const api = {
     const query = new URLSearchParams(params);
     return request<AuditLog[]>(`/admin/audit?${query.toString()}`);
   },
-  syncAdDemo: () => request<{ message: string; processed: number }>("/integrations/ad/sync-demo", { method: "POST" }),
 };

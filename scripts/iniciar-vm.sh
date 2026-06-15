@@ -23,7 +23,6 @@ read_env() {
 
 SECRET_KEY="$(read_env SECRET_KEY)"
 POSTGRES_PASSWORD="$(read_env POSTGRES_PASSWORD)"
-AUTH_MODE="$(read_env AUTH_MODE)"
 if (( ${#SECRET_KEY} < 32 )); then
   echo "SECRET_KEY deve ter pelo menos 32 caracteres."
   exit 1
@@ -32,17 +31,10 @@ if (( ${#POSTGRES_PASSWORD} < 12 )); then
   echo "POSTGRES_PASSWORD deve ter pelo menos 12 caracteres."
   exit 1
 fi
-if [[ ! "$AUTH_MODE" =~ ^(local|ldap|hybrid)$ ]]; then
-  echo "AUTH_MODE deve ser local, ldap ou hybrid."
+AUTH_MODE="$(read_env AUTH_MODE)"
+if [[ "${AUTH_MODE:-email}" != "email" ]]; then
+  echo "AUTH_MODE deve ser email."
   exit 1
-fi
-if [[ "$AUTH_MODE" != "local" ]]; then
-  for variable in LDAP_SERVER LDAP_BIND_DN LDAP_BIND_PASSWORD LDAP_BASE_DN LDAP_USER_FILTER; do
-    if [[ -z "$(read_env "$variable")" ]]; then
-      echo "$variable é obrigatório no modo $AUTH_MODE."
-      exit 1
-    fi
-  done
 fi
 
 docker compose config --quiet

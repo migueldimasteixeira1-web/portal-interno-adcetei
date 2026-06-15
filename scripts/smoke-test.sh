@@ -26,7 +26,7 @@ fi
 (
   cd "$ROOT_DIR"
   ENVIRONMENT=test \
-  AUTH_MODE=local \
+  AUTH_MODE=email \
   SEED_DEMO_DATA=true \
   DATABASE_URL="sqlite:///$TEST_DB" \
   SECRET_KEY="chave-temporaria-do-smoke-test" \

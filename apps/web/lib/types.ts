@@ -11,6 +11,7 @@ export interface User {
   phone: string;
   source: string;
   active: boolean;
+  email_verified_at?: string | null;
   permissions: string[];
   last_login_at?: string | null;
 }
@@ -134,7 +135,6 @@ export interface RoleConfig {
   role: Role;
   label: string;
   description: string;
-  ldap_group: string;
   permissions: string[];
   updated_at: string;
 }

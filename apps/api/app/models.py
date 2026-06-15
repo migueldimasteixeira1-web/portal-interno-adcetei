@@ -26,6 +26,11 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_verification_token_hash: Mapped[str] = mapped_column(String(128), default="")
+    email_verification_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    password_reset_token_hash: Mapped[str] = mapped_column(String(128), default="")
+    password_reset_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     requested_tickets: Mapped[list[Ticket]] = relationship(
         back_populates="requester", foreign_keys="Ticket.requester_id"

@@ -1,12 +1,14 @@
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from .auth import hash_password
+from .auth import generate_public_token, hash_password, hash_token, validate_institutional_email
 from .catalog_forms import normalize_form_schema
 from .database import get_db
+from .email_service import send_verification_email
 from .models import Asset, AuditLog, RoleConfig, ServiceCatalog, User
 from .permissions import ALL_PERMISSIONS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
 from .schemas import (
@@ -25,6 +27,7 @@ from .schemas import (
     UserUpdate,
 )
 from .time_utils import utc_now
+from .config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["administração"])
 
@@ -117,6 +120,22 @@ def catalog_payload(service: ServiceCatalog) -> dict[str, Any]:
     }
 
 
+def verification_url(token: str) -> str:
+    return f"{settings.public_app_url.rstrip('/')}/confirmar-email?token={token}"
+
+
+def set_email_verification_token(user: User) -> str:
+    token = generate_public_token()
+    user.email_verification_token_hash = hash_token(token)
+    user.email_verification_expires_at = utc_now() + timedelta(minutes=settings.email_verification_expire_minutes)
+    return token
+
+
+def send_user_verification(user: User) -> None:
+    token = set_email_verification_token(user)
+    send_verification_email(user.email, user.full_name, verification_url(token))
+
+
 @router.post("/users", response_model=UserOut, status_code=201)
 def create_user(
     payload: UserCreate,
@@ -124,7 +143,7 @@ def create_user(
     actor: User = Depends(require_permission("users.manage")),
 ):
     username = payload.username.strip().lower()
-    email = str(payload.email).strip().lower()
+    email = validate_institutional_email(str(payload.email))
     ensure_unique_user(db, username, email)
     user = User(
         username=username,
@@ -137,6 +156,7 @@ def create_user(
         phone=payload.phone.strip(),
         source="local",
         active=payload.active,
+        email_verified_at=utc_now() if payload.email_verified else None,
     )
     db.add(user)
     db.flush()
@@ -147,7 +167,7 @@ def create_user(
         "user",
         user.id,
         f"{actor.full_name} criou o usuário {user.full_name}.",
-        {"username": user.username, "role": user.role, "active": user.active},
+        {"username": user.username, "role": user.role, "active": user.active, "email_verified": bool(user.email_verified_at)},
     )
     db.commit()
     db.refresh(user)
@@ -167,17 +187,12 @@ def update_user(
     data = payload.model_dump(exclude_unset=True)
     reject_null_fields(
         data,
-        {"full_name", "email", "role", "secretariat", "department", "phone", "active"},
+        {"full_name", "email", "role", "secretariat", "department", "phone", "active", "email_verified"},
     )
     ensure_last_admin(db, user, data)
     if actor.id == user.id and data.get("active") is False:
         raise HTTPException(status_code=409, detail="Você não pode desativar sua própria conta")
-    if user.source == "ldap" and ("role" in data or "password" in data):
-        raise HTTPException(
-            status_code=409,
-            detail="Perfil e senha de usuário LDAP são controlados pelo diretório",
-        )
-    target_email = str(data.get("email", user.email)).strip().lower()
+    target_email = validate_institutional_email(str(data["email"])) if "email" in data else user.email
     ensure_unique_user(db, user.username, target_email, user.id)
 
     changes: dict[str, Any] = {}
@@ -186,10 +201,21 @@ def update_user(
             value = data[field]
             if isinstance(value, str):
                 value = value.strip()
+            if field == "email":
+                value = validate_institutional_email(str(value))
             old = getattr(user, field)
             if old != value:
                 setattr(user, field, value)
                 changes[field] = {"from": old, "to": value}
+    if "email_verified" in data:
+        old_verified = bool(user.email_verified_at)
+        new_verified = bool(data["email_verified"])
+        if old_verified != new_verified:
+            user.email_verified_at = utc_now() if new_verified else None
+            if new_verified:
+                user.email_verification_token_hash = ""
+                user.email_verification_expires_at = None
+            changes["email_verified"] = {"from": old_verified, "to": new_verified}
     if data.get("password"):
         user.password_hash = hash_password(data["password"])
         changes["password"] = {"changed": True}
@@ -206,6 +232,38 @@ def update_user(
         )
         db.commit()
         db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/resend-verification", response_model=UserOut)
+def resend_user_verification(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_permission("users.manage")),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if user.email_verified_at:
+        raise HTTPException(status_code=409, detail="Este e-mail já está verificado")
+    if not user.active:
+        raise HTTPException(status_code=409, detail="Ative a conta antes de reenviar a verificação")
+    try:
+        send_user_verification(user)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
+    add_audit(
+        db,
+        actor,
+        "resend_verification",
+        "user",
+        user.id,
+        f"{actor.full_name} reenviou a verificação de e-mail para {user.full_name}.",
+        {"email": user.email},
+    )
+    db.commit()
+    db.refresh(user)
     return user
 
 
@@ -393,7 +451,7 @@ def update_role(
     if not config:
         raise HTTPException(status_code=404, detail="Perfil não encontrado")
     data = payload.model_dump(exclude_unset=True)
-    reject_null_fields(data, {"description", "ldap_group", "permissions"})
+    reject_null_fields(data, {"description", "permissions"})
     if role == "admin" and "permissions" in data:
         data["permissions"] = sorted(ALL_PERMISSIONS)
     if "permissions" in data:
@@ -401,15 +459,6 @@ def update_role(
         if invalid:
             raise HTTPException(status_code=422, detail=f"Permissão inválida: {invalid[0]}")
         data["permissions"] = normalize_permissions(data["permissions"])
-    if data.get("ldap_group"):
-        duplicate_group = db.scalar(
-            select(RoleConfig).where(
-                func.lower(RoleConfig.ldap_group) == data["ldap_group"].strip().casefold(),
-                RoleConfig.role != role,
-            )
-        )
-        if duplicate_group:
-            raise HTTPException(status_code=409, detail="Este grupo LDAP já está vinculado a outro perfil")
     changes: dict[str, Any] = {}
     for field, value in data.items():
         if isinstance(value, str):

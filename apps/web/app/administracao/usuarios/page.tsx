@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleOff, Pencil, Search, ShieldCheck, UserCheck, UserPlus, Users } from "lucide-react";
+import { CircleOff, MailCheck, MailWarning, Pencil, RefreshCcw, Search, UserCheck, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
@@ -23,6 +23,7 @@ type UserDraft = {
   department: string;
   phone: string;
   active: boolean;
+  email_verified: boolean;
 };
 
 const emptyDraft: UserDraft = {
@@ -35,6 +36,7 @@ const emptyDraft: UserDraft = {
   department: "",
   phone: "",
   active: true,
+  email_verified: true,
 };
 
 export default function UsersPage() {
@@ -92,6 +94,7 @@ export default function UsersPage() {
       department: item.department,
       phone: item.phone,
       active: item.active,
+      email_verified: Boolean(item.email_verified_at),
     });
     setError("");
     setDialogOpen(true);
@@ -110,11 +113,10 @@ export default function UsersPage() {
           department: draft.department,
           phone: draft.phone,
           active: draft.active,
+          email_verified: draft.email_verified,
         };
-        if (editing.source === "local") {
-          payload.role = draft.role;
-          if (draft.password) payload.password = draft.password;
-        }
+        payload.role = draft.role;
+        if (draft.password) payload.password = draft.password;
         await api.updateUser(editing.id, payload);
         setMessage("Usuário atualizado com sucesso.");
       } else {
@@ -130,6 +132,18 @@ export default function UsersPage() {
     }
   };
 
+  const resendVerification = async (item: User) => {
+    setError("");
+    setMessage("");
+    try {
+      await api.resendUserVerification(item.id);
+      setMessage("Verificação reenviada para o e-mail institucional.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível reenviar a verificação");
+    }
+  };
+
   if (loading) return <LoadingScreen label="Carregando usuários..." />;
   if (!canView) return <AccessDenied />;
 
@@ -138,16 +152,16 @@ export default function UsersPage() {
       <PageHeader
         eyebrow="Administração"
         title="Usuários e acessos"
-        subtitle="Gerencie contas locais, bloqueios e perfis. Usuários LDAP recebem o perfil conforme o grupo configurado."
-        actions={canManage ? <Button onClick={openCreate}><UserPlus size={16} />Novo usuário local</Button> : undefined}
+        subtitle="Gerencie contas locais, bloqueios, verificação de e-mail e perfis atribuídos manualmente."
+        actions={canManage ? <Button onClick={openCreate}><UserPlus size={16} />Novo usuário</Button> : undefined}
       />
       {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && !dialogOpen && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
-        <MetricCard label="Usuários cadastrados" value={users.length} icon={<Users size={17} />} hint="Contas locais e de diretório" tone="blue" />
+        <MetricCard label="Usuários cadastrados" value={users.length} icon={<Users size={17} />} hint="Contas locais do portal" tone="blue" />
         <MetricCard label="Contas ativas" value={users.filter((item) => item.active).length} icon={<UserCheck size={17} />} hint="Acesso permitido" tone="green" />
-        <MetricCard label="Equipe de TI" value={users.filter((item) => item.role !== "requester").length} icon={<ShieldCheck size={17} />} hint="Administração e atendimento" tone="indigo" />
+        <MetricCard label="E-mails verificados" value={users.filter((item) => item.email_verified_at).length} icon={<MailCheck size={17} />} hint="Prontos para login" tone="indigo" />
       </div>
 
       <Toolbar className="mb-4">
@@ -167,16 +181,16 @@ export default function UsersPage() {
         <SectionHeader title={`${filtered.length} usuário(s)`} description="Contas não são excluídas: desative o acesso para preservar o histórico." />
         <div className="overflow-x-auto soft-scrollbar">
           <table className="data-table min-w-[940px]">
-            <thead><tr><th>Usuário</th><th>Perfil</th><th>Lotação</th><th>Origem</th><th>Status</th>{canManage && <th>Ações</th>}</tr></thead>
+            <thead><tr><th>Usuário</th><th>Perfil</th><th>Lotação</th><th>Verificação</th><th>Status</th>{canManage && <th>Ações</th>}</tr></thead>
             <tbody>
               {filtered.map((item) => (
                 <tr key={item.id}>
                   <td><div className="flex items-center gap-2.5"><UserAvatar name={item.full_name} /><div><p className="font-semibold text-[#1a2332]">{item.full_name}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{item.username} · {item.email}</p></div></div></td>
                   <td><Badge className="border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]">{roleLabels[item.role]}</Badge></td>
                   <td><p className="font-medium text-[#1a2332]">{item.department}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{item.secretariat}</p></td>
-                  <td className="text-[#5c6b7e]">{item.source === "ldap" ? "Active Directory" : "Cadastro local"}</td>
+                  <td><Badge className={item.email_verified_at ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#fcd9a8] bg-[#fffbeb] text-[#92400e]"}>{item.email_verified_at ? <MailCheck size={13} /> : <MailWarning size={13} />}{item.email_verified_at ? "Verificado" : "Pendente"}</Badge></td>
                   <td><Badge className={item.active ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]"}>{item.active ? "Ativo" : "Bloqueado"}</Badge></td>
-                  {canManage && <td><Button variant="ghost" size="sm" onClick={() => openEdit(item)}><Pencil size={15} />Editar</Button></td>}
+                  {canManage && <td><div className="flex flex-wrap gap-1.5"><Button variant="ghost" size="sm" onClick={() => openEdit(item)}><Pencil size={15} />Editar</Button>{!item.email_verified_at && <Button variant="ghost" size="sm" onClick={() => resendVerification(item)}><RefreshCcw size={15} />Reenviar</Button>}</div></td>}
                 </tr>
               ))}
             </tbody>
@@ -190,8 +204,8 @@ export default function UsersPage() {
         onOpenChange={setDialogOpen}
         onConfirm={save}
         loading={saving}
-        title={editing ? "Editar usuário" : "Criar usuário local"}
-        description={editing?.source === "ldap" ? "Dados de diretório podem ser atualizados novamente no próximo login. Perfil e senha são controlados pelo AD." : "Preencha os dados e confirme para salvar."}
+        title={editing ? "Editar usuário" : "Criar usuário"}
+        description="Perfis de Helpdesk, Técnico e Administrador são atribuídos manualmente por administradores."
         confirmLabel="Salvar usuário"
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -199,15 +213,16 @@ export default function UsersPage() {
           <Field label="Nome completo"><Input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} /></Field>
           <Field label="E-mail"><Input type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></Field>
           <Field label="Perfil">
-            <Select disabled={editing?.source === "ldap"} value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}>
+            <Select value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}>
               {Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </Select>
           </Field>
           <Field label="Secretaria"><Input value={draft.secretariat} onChange={(e) => setDraft({ ...draft, secretariat: e.target.value })} /></Field>
           <Field label="Setor"><Input value={draft.department} onChange={(e) => setDraft({ ...draft, department: e.target.value })} /></Field>
           <Field label="Telefone"><Input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></Field>
-          {editing?.source !== "ldap" && <Field label={editing ? "Nova senha (opcional)" : "Senha"} help="Mínimo de 10 caracteres."><Input type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} /></Field>}
+          <Field label={editing ? "Nova senha (opcional)" : "Senha"} help="Mínimo de 10 caracteres."><Input type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} /></Field>
           <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />Conta ativa</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.email_verified} onChange={(e) => setDraft({ ...draft, email_verified: e.target.checked })} />E-mail verificado</label>
         </div>
         {error && <Alert tone="danger" className="mt-4">{error}</Alert>}
       </ConfirmDialog>

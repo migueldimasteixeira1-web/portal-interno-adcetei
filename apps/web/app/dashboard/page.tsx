@@ -94,7 +94,7 @@ export default function DashboardPage() {
     { href: "/inventario", label: "Inventário", description: "Equipamentos e vínculos", icon: Boxes, permission: "assets.view" },
     { href: "/administracao/usuarios", label: "Usuários", description: "Contas e acessos", icon: Users, permission: "users.view" },
     { href: "/administracao/catalogo", label: "Catálogo", description: "Serviços e formulários", icon: BookOpen, permission: "catalog.manage" },
-    { href: "/administracao/perfis", label: "Perfis", description: "Permissões e grupos LDAP", icon: Settings2, permission: "roles.manage" },
+    { href: "/administracao/perfis", label: "Perfis", description: "Permissões por perfil", icon: Settings2, permission: "roles.manage" },
     { href: "/administracao/auditoria", label: "Auditoria", description: "Histórico administrativo", icon: History, permission: "audit.view" },
   ].filter((item) => user?.permissions.includes(item.permission));
 

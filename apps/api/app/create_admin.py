@@ -7,6 +7,7 @@ from sqlalchemy import select
 from .auth import hash_password
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility
 from .models import User
+from .time_utils import utc_now
 
 
 def main() -> None:
@@ -40,6 +41,7 @@ def main() -> None:
                 secretariat="Prefeitura de Cabo Frio",
                 source="local",
                 active=True,
+                email_verified_at=utc_now(),
             )
         )
         db.commit()

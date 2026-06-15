@@ -25,8 +25,7 @@ Portal Interno ADCETEI
     ├── catálogo
     ├── equipamentos
     ├── perfis e permissões
-    ├── auditoria
-    └── integração LDAP preparada
+    └── auditoria
 ```
 
 Essa organização mantém a operação simples e permite separar regras sem introduzir microsserviços prematuramente.
@@ -69,7 +68,7 @@ Status e prioridades usam texto e ícones, além de cor. Métricas possuem acent
 - JWT;
 - SQLite local;
 - PostgreSQL no Docker;
-- LDAP3 para integração com Active Directory.
+- SMTP para verificação de e-mail institucional.
 
 ## Autorização administrativa
 
@@ -81,19 +80,19 @@ As ações são protegidas por permissões persistidas em `role_configs`, e não
 
 Mudanças em usuários, equipamentos, catálogo e perfis são registradas em `audit_logs`. Exclusões destrutivas não são usadas: contas são bloqueadas, serviços são arquivados e equipamentos são baixados.
 
-O mapeamento LDAP é configurado por perfil. Grupos duplicados são rejeitados e a prioridade de avaliação é administrador, helpdesk, técnico e solicitante.
-
 ## Autenticação
 
-O fluxo é determinado exclusivamente por `AUTH_MODE`:
+O fluxo atual usa `AUTH_MODE=email` e autenticação local:
 
 ```text
-local  -> consulta senha local
-ldap   -> consulta somente LDAP
-hybrid -> tenta senha local e depois LDAP
+cadastro público -> e-mail institucional -> token de verificação -> senha local -> JWT
 ```
 
-Em modo LDAP, a senha local nunca é verificada antes do diretório. Usuários provisionados pelo LDAP são criados ou atualizados no banco local somente após autenticação válida. Usuários inativos permanecem bloqueados.
+O cadastro público aceita somente `usuario@secretaria.cabofrio.rj.gov.br`, validado no frontend como orientação e no backend como fonte de verdade. Contas públicas sempre nascem como solicitante e com `email_verified_at` nulo.
+
+O token de verificação é aleatório, salvo apenas como hash SHA-256, possui expiração e é invalidado após uso. Em ambiente sem SMTP configurado, apenas ambientes locais registram o link no log; homologação e produção retornam falha clara de envio.
+
+O login aceita e-mail institucional e senha. Usuários inativos, não verificados ou com senha incorreta não recebem JWT. Administradores atribuem manualmente os perfis Helpdesk, Técnico e Administrador.
 
 ## Seed
 
@@ -198,7 +197,7 @@ navegador -> gateway:80 -> web:3000
                        -> api:8000 -> database:5432
 ```
 
-API e PostgreSQL ficam sem portas públicas. Senhas, chave JWT, modo de autenticação e LDAP são definidos pelo `.env` da VM e não permanecem fixos no Compose.
+API e PostgreSQL ficam sem portas públicas. Senhas, chave JWT, SMTP, URL pública e política de e-mail institucional são definidos pelo `.env` da VM e não permanecem fixos no Compose.
 
 O seed e os atalhos de login são independentes:
 
