@@ -196,6 +196,7 @@ def update_user(
     ensure_unique_user(db, user.username, target_email, user.id)
 
     changes: dict[str, Any] = {}
+    email_changed = False
     for field in ("full_name", "email", "role", "secretariat", "department", "phone", "active"):
         if field in data:
             value = data[field]
@@ -207,9 +208,23 @@ def update_user(
             if old != value:
                 setattr(user, field, value)
                 changes[field] = {"from": old, "to": value}
+                if field == "email":
+                    email_changed = True
+    if email_changed:
+        old_verified = bool(user.email_verified_at)
+        user.email_verified_at = None
+        user.email_verification_token_hash = ""
+        user.email_verification_expires_at = None
+        changes["email_verified"] = {
+            "from": old_verified,
+            "to": False,
+            "reason": "email_changed",
+        }
     if "email_verified" in data:
         old_verified = bool(user.email_verified_at)
         new_verified = bool(data["email_verified"])
+        if email_changed and new_verified:
+            new_verified = False
         if old_verified != new_verified:
             user.email_verified_at = utc_now() if new_verified else None
             if new_verified:

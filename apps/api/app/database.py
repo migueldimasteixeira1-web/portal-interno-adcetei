@@ -22,7 +22,16 @@ def ensure_schema_compatibility() -> None:
     with engine.begin() as connection:
         if "email_verified_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP"))
-            connection.execute(text("UPDATE users SET email_verified_at = COALESCE(created_at, CURRENT_TIMESTAMP)"))
+            connection.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET email_verified_at = COALESCE(created_at, CURRENT_TIMESTAMP)
+                    WHERE lower(email) LIKE '%@%.cabofrio.rj.gov.br'
+                      AND lower(email) NOT LIKE '%@cabofrio.rj.gov.br'
+                    """
+                )
+            )
         if "email_verification_token_hash" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN email_verification_token_hash VARCHAR(128) DEFAULT ''"))
         if "email_verification_expires_at" not in user_columns:

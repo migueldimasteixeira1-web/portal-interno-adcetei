@@ -2,9 +2,10 @@ import argparse
 import getpass
 import os
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import func, or_, select
 
-from .auth import hash_password
+from .auth import hash_password, validate_institutional_email
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility
 from .models import User
 from .time_utils import utc_now
@@ -23,18 +24,27 @@ def main() -> None:
         raise SystemExit("As senhas não conferem.")
     if len(password) < 10:
         raise SystemExit("Use uma senha com pelo menos 10 caracteres.")
+    try:
+        email = validate_institutional_email(args.email)
+    except HTTPException as exc:
+        raise SystemExit(exc.detail) from None
+    username = args.username.strip().lower()
 
     Base.metadata.create_all(bind=engine)
     ensure_schema_compatibility()
     with SessionLocal() as db:
-        existing = db.scalar(select(User).where(User.username == args.username))
+        existing = db.scalar(
+            select(User).where(
+                or_(func.lower(User.username) == username.casefold(), func.lower(User.email) == email.casefold())
+            )
+        )
         if existing:
-            raise SystemExit(f'O usuário "{args.username}" já existe.')
+            raise SystemExit("Já existe uma conta com este usuário ou e-mail.")
         db.add(
             User(
-                username=args.username,
+                username=username,
                 full_name=args.full_name,
-                email=args.email,
+                email=email,
                 password_hash=hash_password(password),
                 role="admin",
                 department="ADCETEI",
@@ -46,7 +56,7 @@ def main() -> None:
         )
         db.commit()
 
-    print(f'Administrador "{args.username}" criado com sucesso.')
+    print(f'Administrador "{username}" criado com sucesso.')
 
 
 if __name__ == "__main__":

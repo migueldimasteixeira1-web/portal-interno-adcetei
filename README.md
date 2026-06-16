@@ -94,10 +94,10 @@ Disponíveis somente quando `SEED_DEMO_DATA=true`:
 
 | Perfil | Usuário | Senha |
 |---|---|---|
-| Administrador | `admin` | `admin123` |
-| Helpdesk | `helpdesk1` | `123456` |
-| Técnico | `tecnico` | `123456` |
-| Solicitante | `servidor` | `123456` |
+| Administrador | `admin@adcetei.cabofrio.rj.gov.br` | `admin123` |
+| Helpdesk | `maiana.ignacio@adcetei.cabofrio.rj.gov.br` | `123456` |
+| Técnico | `lucas.martins@adcetei.cabofrio.rj.gov.br` | `123456` |
+| Solicitante | `kathlelyn.abreu@sedec.cabofrio.rj.gov.br` | `123456` |
 
 ## Segurança do inventário
 

@@ -60,40 +60,41 @@ O ambiente desta revisão não possui o executável Docker. Por isso, o Compose 
 
 O `scripts/regression-test.sh` usa bancos temporários e valida:
 
-1. login por usuário e por e-mail em `AUTH_MODE=email`;
+1. rejeição de login por usuário e autenticação somente por e-mail institucional em `AUTH_MODE=email`;
 2. rejeição de cadastro com `usuario@cabofrio.rj.gov.br`;
 3. bloqueio de login para conta com e-mail não verificado;
-4. usuário inativo bloqueado;
-5. seed habilitado e desabilitado explicitamente;
-6. solicitante sem acesso a `/api/assets`;
-7. endpoint resumido sem IP, serial ou sistema operacional;
-8. rejeição de equipamento pertencente a outro usuário;
-9. paginação com páginas distintas;
-10. resumo agregado maior que a página carregada;
-11. filtros aplicados aos totais;
-12. criação com campos dinâmicos;
-13. rejeição de campo obrigatório ausente;
-14. rejeição de campo desconhecido;
-15. rejeição de e-mail e data inválidos;
-16. normalização de limite de tamanho malformado;
-17. persistência estruturada das respostas;
-18. preservação do serviço e schema usados na abertura;
-19. validação do padrão institucional de e-mail;
-20. título automático e prioridade inicial;
-21. ocultação de notas internas;
-22. eventos administrativos públicos;
-23. permissões do técnico;
-24. datas com `Z` ou offset explícito.
-25. criação, edição e bloqueio de usuário local;
-26. proteção do último administrador ativo;
-27. cadastro e edição de equipamento;
-28. criação e arquivamento de serviço;
-29. configuração dinâmica de permissões;
-30. dependências automáticas entre permissões;
-31. reconfiguração de permissões sem vínculo com diretório;
-32. auditoria administrativa;
-33. rejeição de valores nulos em campos obrigatórios;
-34. negação de operações administrativas para perfis sem permissão.
+4. bloqueio de sessão já emitida quando o e-mail deixa de estar verificado;
+5. usuário inativo bloqueado;
+6. seed habilitado e desabilitado explicitamente;
+7. solicitante sem acesso a `/api/assets`;
+8. endpoint resumido sem IP, serial ou sistema operacional;
+9. rejeição de equipamento pertencente a outro usuário;
+10. paginação com páginas distintas;
+11. resumo agregado maior que a página carregada;
+12. filtros aplicados aos totais;
+13. criação com campos dinâmicos;
+14. rejeição de campo obrigatório ausente;
+15. rejeição de campo desconhecido;
+16. rejeição de e-mail e data inválidos;
+17. normalização de limite de tamanho malformado;
+18. persistência estruturada das respostas;
+19. preservação do serviço e schema usados na abertura;
+20. validação do padrão institucional de e-mail;
+21. título automático e prioridade inicial;
+22. ocultação de notas internas;
+23. eventos administrativos públicos;
+24. permissões do técnico;
+25. datas com `Z` ou offset explícito.
+26. criação, edição e bloqueio de usuário local;
+27. proteção do último administrador ativo;
+28. cadastro e edição de equipamento;
+29. criação e arquivamento de serviço;
+30. configuração dinâmica de permissões;
+31. dependências automáticas entre permissões;
+32. reconfiguração de permissões sem vínculo com diretório;
+33. auditoria administrativa;
+34. rejeição de valores nulos em campos obrigatórios;
+35. negação de operações administrativas para perfis sem permissão.
 
 ## Migração testada
 

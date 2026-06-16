@@ -80,6 +80,18 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user or not user.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário indisponível")
+    try:
+        validate_institutional_email(user.email)
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta conta precisa usar um e-mail institucional válido para entrar.",
+        ) from exc
+    if not user.email_verified_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Confirme seu e-mail institucional antes de entrar no portal.",
+        )
     return user
 
 

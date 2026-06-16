@@ -31,11 +31,11 @@ fi
   DATABASE_URL="sqlite:///$TEST_DB" \
   SECRET_KEY="chave-temporaria-do-smoke-test" \
   "$API_PYTHON" -m uvicorn apps.api.app.main:app \
-    --host 127.0.0.1 --port "$PORT" --log-level warning
+    --host 127.0.0.1 --port "$PORT" --log-level info
 ) >"$TEST_ROOT/api.log" 2>&1 &
 API_PID=$!
 
-for _ in {1..60}; do
+for _ in {1..300}; do
   if curl -fsS "$API_URL/health" >/dev/null 2>&1; then
     break
   fi
@@ -50,7 +50,7 @@ curl -fsS "$API_URL/health" >/dev/null || {
 
 TOKEN=$(curl -fsS -X POST "$API_URL/auth/login" \
   -H 'Content-Type: application/json' \
-  -d '{"username":"servidor","password":"123456"}' | "$API_PYTHON" -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+  -d '{"username":"kathlelyn.abreu@sedec.cabofrio.rj.gov.br","password":"123456"}' | "$API_PYTHON" -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 CATALOG=$(curl -fsS "$API_URL/catalog" -H "Authorization: Bearer $TOKEN")
 SERVICE_ID=$(echo "$CATALOG" | "$API_PYTHON" -c "import sys,json; data=json.load(sys.stdin); print(next(item['id'] for item in data if item['name']=='Solicitação geral'))")

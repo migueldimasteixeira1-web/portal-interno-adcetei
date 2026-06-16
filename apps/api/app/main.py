@@ -293,18 +293,22 @@ def health():
 
 @app.post("/api/auth/login", response_model=LoginOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
-    identifier = payload.username.strip().lower()
-    user = db.scalar(
-        select(User).where(
-            or_(func.lower(User.email) == identifier, func.lower(User.username) == identifier)
-        )
-    )
+    identifier = validate_institutional_email(payload.username)
+    user = db.scalar(select(User).where(func.lower(User.email) == identifier))
 
     if user and not user.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário ou senha inválidos")
 
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário ou senha inválidos")
+
+    try:
+        validate_institutional_email(user.email)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta conta precisa usar um e-mail institucional válido para entrar.",
+        ) from None
 
     if not user.email_verified_at:
         raise HTTPException(
