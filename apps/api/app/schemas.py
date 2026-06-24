@@ -18,12 +18,13 @@ class UserOut(BaseModel):
     phone: str
     source: str
     active: bool
+    email_verified_at: Optional[datetime] = None
     permissions: list[str] = Field(default_factory=list)
     last_login_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer("last_login_at")
-    def serialize_last_login_at(self, value: datetime | None) -> str | None:
+    @field_serializer("last_login_at", "email_verified_at")
+    def serialize_user_datetimes(self, value: datetime | None) -> str | None:
         return iso_utc(value)
 
 
@@ -36,6 +37,27 @@ class LoginOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class RegisterIn(BaseModel):
+    full_name: str = Field(min_length=3, max_length=180)
+    email: EmailStr
+    password: str = Field(min_length=10, max_length=128)
+    model_config = ConfigDict(extra="forbid")
+
+
+class MessageOut(BaseModel):
+    message: str
+
+
+class VerifyEmailIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResendVerificationIn(BaseModel):
+    email: EmailStr
+    model_config = ConfigDict(extra="forbid")
 
 
 class AssetOut(BaseModel):
@@ -94,6 +116,7 @@ class UserCreate(BaseModel):
     department: str = Field(default="Não informado", max_length=150)
     phone: str = Field(default="", max_length=40)
     active: bool = True
+    email_verified: bool = True
     model_config = ConfigDict(extra="forbid")
 
 
@@ -106,6 +129,7 @@ class UserUpdate(BaseModel):
     department: Optional[str] = Field(default=None, max_length=150)
     phone: Optional[str] = Field(default=None, max_length=40)
     active: Optional[bool] = None
+    email_verified: Optional[bool] = None
     model_config = ConfigDict(extra="forbid")
 
 
@@ -165,7 +189,6 @@ class RoleConfigOut(BaseModel):
     role: RoleName
     label: str
     description: str
-    ldap_group: str
     permissions: list[str]
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -177,7 +200,6 @@ class RoleConfigOut(BaseModel):
 
 class RoleConfigUpdate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=300)
-    ldap_group: Optional[str] = Field(default=None, max_length=180)
     permissions: Optional[list[str]] = None
     model_config = ConfigDict(extra="forbid")
 

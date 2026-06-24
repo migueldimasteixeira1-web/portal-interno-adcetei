@@ -1,20 +1,20 @@
 # Portal Interno ADCETEI
 
-Portal interno da Prefeitura de Cabo Frio para abertura, triagem e acompanhamento de chamados técnicos, com inventário básico, catálogo de serviços, usuários e preparação para Active Directory.
+Portal interno da Prefeitura de Cabo Frio para abertura, triagem e acompanhamento de chamados técnicos, com inventário básico, catálogo de serviços, usuários e cadastro por e-mail institucional verificado.
 
 ## Administração
 
 A interface administrativa permite:
 
 - criar, editar, bloquear e reativar contas locais;
-- consultar contas provisionadas pelo LDAP sem alterar senha ou perfil controlados pelo diretório;
+- marcar e-mails como verificados ou reenviar verificação em casos excepcionais;
 - cadastrar, editar, vincular e baixar equipamentos sem apagar o histórico;
 - criar, editar, arquivar e reativar serviços do catálogo;
 - configurar campos dinâmicos dos formulários de abertura;
-- definir permissões de cada perfil e mapear seus grupos do Active Directory;
+- definir permissões de cada perfil;
 - consultar a auditoria de alterações em usuários, equipamentos, catálogo e perfis.
 
-As permissões são verificadas novamente pela API. Permissões de gerenciamento incluem automaticamente a permissão de consulta necessária, e grupos LDAP não podem ser repetidos entre perfis. O último administrador ativo não pode ser removido ou bloqueado.
+As permissões são verificadas novamente pela API. Permissões de gerenciamento incluem automaticamente a permissão de consulta necessária. O último administrador ativo não pode ser removido ou bloqueado.
 
 ## Stack
 
@@ -23,7 +23,7 @@ As permissões são verificadas novamente pela API. Permissões de gerenciamento
 - FastAPI, SQLAlchemy e Pydantic;
 - SQLite no ambiente local;
 - PostgreSQL no Docker;
-- JWT com autenticação local, LDAP ou híbrida.
+- JWT com senha local e verificação obrigatória de e-mail institucional.
 
 O projeto usa um monólito modular. Não há dependência de MUI.
 
@@ -47,15 +47,32 @@ O script cria a venv quando necessário, instala dependências e executa o Uvico
 
 Copie e adapte `apps/api/.env.example`.
 
-### Modos de autenticação
+### Autenticação institucional
 
-| `AUTH_MODE` | Comportamento |
-|---|---|
-| `local` | Valida exclusivamente usuários e senhas locais. |
-| `ldap` | Consulta exclusivamente o LDAP. Senhas locais, inclusive `admin/admin123`, não são aceitas. |
-| `hybrid` | Permite autenticação local e, quando necessário, autenticação LDAP. |
+O portal usa `AUTH_MODE=email`. O cadastro público aceita somente e-mails no formato:
 
-Usuários inativos são bloqueados em todos os modos. Falhas no diretório retornam uma mensagem de autenticação sem detalhes internos da conexão LDAP.
+```text
+usuario@secretaria.cabofrio.rj.gov.br
+```
+
+Exemplos válidos incluem `miguel.teixeira@adcetei.cabofrio.rj.gov.br` e `joao.silva@educacao.cabofrio.rj.gov.br`. E-mails `@cabofrio.rj.gov.br`, pessoais ou de outros domínios são recusados.
+
+Novas contas públicas nascem como `Solicitante`, sem e-mail verificado. O usuário só consegue entrar depois de confirmar o link enviado por SMTP. Helpdesk, Técnico e Administrador continuam sendo atribuídos manualmente por um administrador.
+
+Variáveis principais:
+
+```env
+AUTH_MODE=email
+INSTITUTIONAL_EMAIL_PATTERN=^[^@\s]+@[a-z0-9-]+\.cabofrio\.rj\.gov\.br$
+EMAIL_VERIFICATION_EXPIRE_MINUTES=60
+PUBLIC_APP_URL=http://localhost:3000
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=
+SMTP_USE_TLS=true
+```
 
 ### Dados de demonstração
 
@@ -77,10 +94,10 @@ Disponíveis somente quando `SEED_DEMO_DATA=true`:
 
 | Perfil | Usuário | Senha |
 |---|---|---|
-| Administrador | `admin` | `admin123` |
-| Helpdesk | `helpdesk1` | `123456` |
-| Técnico | `tecnico` | `123456` |
-| Solicitante | `servidor` | `123456` |
+| Administrador | `admin@adcetei.cabofrio.rj.gov.br` | `admin123` |
+| Helpdesk | `maiana.ignacio@adcetei.cabofrio.rj.gov.br` | `123456` |
+| Técnico | `lucas.martins@adcetei.cabofrio.rj.gov.br` | `123456` |
+| Solicitante | `kathlelyn.abreu@sedec.cabofrio.rj.gov.br` | `123456` |
 
 ## Segurança do inventário
 
@@ -221,7 +238,8 @@ Antes de iniciar, substitua no `.env`:
 - `POSTGRES_PASSWORD`;
 - `SECRET_KEY`;
 - `CORS_ORIGINS` pelo IP ou DNS da VM;
-- configurações LDAP, quando forem usadas.
+- `PUBLIC_APP_URL` pelo endereço público do portal;
+- configurações SMTP para envio de verificação.
 
 Use pelo menos 12 caracteres na senha do PostgreSQL e 32 caracteres na `SECRET_KEY`. O script interrompe a implantação quando encontra placeholders ou segredos fracos.
 
@@ -232,7 +250,7 @@ Com `SEED_DEMO_DATA=false`, crie o primeiro administrador:
 ```bash
 docker compose exec api python -m app.create_admin \
   --full-name "Administrador ADCETEI" \
-  --email "administrador@cabofrio.rj.gov.br"
+  --email "administrador@adcetei.cabofrio.rj.gov.br"
 ```
 
 Para uma homologação isolada, também é possível habilitar temporariamente:
@@ -263,11 +281,11 @@ Os arquivos são gravados em `backups/` com permissão restrita. Para ambiente d
 
 ### Produção
 
-O Compose entregue é adequado para homologação em rede controlada. Antes de uso definitivo, publique o gateway atrás de HTTPS, configure certificados LDAPS, backup externo, monitoramento e política de atualização.
+O Compose entregue é adequado para homologação em rede controlada. Antes de uso definitivo, publique o gateway atrás de HTTPS, configure SMTP, backup externo, monitoramento e política de atualização.
 
 ## Limitações atuais
 
-- a integração LDAP real depende das credenciais e grupos do domínio;
+- AD/LDAP ficou fora do fluxo operacional atual e pode ser reavaliado apenas como integração futura;
 - ainda não há Alembic;
 - não há renovação silenciosa de JWT;
 - ainda não há teste E2E automatizado em navegador;

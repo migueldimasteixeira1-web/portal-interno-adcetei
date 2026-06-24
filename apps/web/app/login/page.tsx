@@ -2,21 +2,22 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Building2, Headphones, KeyRound, ShieldCheck, TicketCheck } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { SESSION_MESSAGE_KEY } from "@/lib/api";
 
 const demoUsers = [
-  ["servidor", "Servidor"],
-  ["helpdesk1", "Helpdesk"],
-  ["tecnico", "Técnico"],
-  ["admin", "Administrador"],
+  ["kathlelyn.abreu@sedec.cabofrio.rj.gov.br", "Servidor"],
+  ["maiana.ignacio@adcetei.cabofrio.rj.gov.br", "Helpdesk"],
+  ["lucas.martins@adcetei.cabofrio.rj.gov.br", "Técnico"],
+  ["admin@adcetei.cabofrio.rj.gov.br", "Administrador"],
 ];
 const showDemoUsers = process.env.NEXT_PUBLIC_SHOW_DEMO_USERS !== "false";
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [username, setUsername] = useState(showDemoUsers ? "servidor" : "");
+  const [username, setUsername] = useState(showDemoUsers ? demoUsers[0][0] : "");
   const [password, setPassword] = useState(showDemoUsers ? "123456" : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -100,14 +101,14 @@ export default function LoginPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">Identificação</p>
             <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">Entre no portal</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Use suas credenciais institucionais para acessar o ambiente interno.</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Use seu e-mail institucional verificado e sua senha local para acessar o ambiente interno.</p>
           </div>
 
           <form onSubmit={submit} className="mt-5 space-y-4">
             {sessionMessage && <Alert tone="warning">{sessionMessage}</Alert>}
             {error && <Alert tone="danger">{error}</Alert>}
-            <Field label="Usuário">
-              <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus />
+            <Field label="E-mail institucional">
+              <Input type="email" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="email" autoFocus />
             </Field>
             <Field label="Senha">
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
@@ -117,6 +118,13 @@ export default function LoginPage() {
               {loading ? "Validando acesso..." : "Entrar"}
             </Button>
           </form>
+
+          <div className="mt-4 text-center text-sm text-[var(--muted)]">
+            Ainda não tem acesso?{" "}
+            <Link href="/criar-conta" className="font-semibold text-[var(--primary)] hover:underline">
+              Criar conta
+            </Link>
+          </div>
 
           {showDemoUsers && <div className="mt-7 border-t border-[var(--border-subtle)] pt-5">
             <div className="mb-3 flex items-center justify-between">
@@ -131,7 +139,7 @@ export default function LoginPage() {
                   className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2 text-left text-xs font-medium text-[var(--muted)] transition hover:border-[var(--primary)] hover:bg-[var(--blue-50)] hover:text-[var(--primary)]"
                   onClick={() => {
                     setUsername(user);
-                    setPassword(user === "admin" ? "admin123" : "123456");
+                    setPassword(user.startsWith("admin@") ? "admin123" : "123456");
                   }}
                 >
                   {label}

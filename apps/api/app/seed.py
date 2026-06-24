@@ -13,14 +13,14 @@ def seed_database(db: Session) -> None:
         return
 
     users = [
-        User(username="admin", full_name="Miguel Dimas", email="admin@cabofrio.rj.gov.br", password_hash=hash_password("admin123"), role="admin", department="Desenvolvimento e Sistemas", source="local"),
-        User(username="helpdesk1", full_name="Maiana Ignácio", email="maiana.ignacio@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="helpdesk", department="Central de Atendimento"),
-        User(username="helpdesk2", full_name="Herika Raquel", email="herika.raquel@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="helpdesk", department="Central de Atendimento"),
-        User(username="helpdesk3", full_name="Paulo Vitor", email="paulo.vitor@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="helpdesk", department="Central de Atendimento"),
-        User(username="tecnico", full_name="Lucas Pereira Martins", email="lucas.martins@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", department="Infraestrutura"),
-        User(username="servidor", full_name="Kathlelyn Cristina Santos de Abreu", email="kathlelyn.abreu@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="requester", secretariat="Secretaria de Desenvolvimento da Cidade", department="SEGTEA"),
-        User(username="marcelo", full_name="Marcelo Godiano dos Santos", email="marcelo.santos@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="requester", secretariat="Secretaria de Administração", department="Recursos Humanos"),
-        User(username="thamires", full_name="Thamires de Jesus Gonçalves", email="thamires.goncalves@cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="requester", secretariat="Secretaria de Fazenda", department="Atendimento"),
+        User(username="admin", full_name="Miguel Dimas", email="admin@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("admin123"), role="admin", department="Desenvolvimento e Sistemas", source="local", email_verified_at=utc_now()),
+        User(username="helpdesk1", full_name="Maiana Ignácio", email="maiana.ignacio@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="helpdesk", department="Central de Atendimento", email_verified_at=utc_now()),
+        User(username="helpdesk2", full_name="Herika Raquel", email="herika.raquel@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="helpdesk", department="Central de Atendimento", email_verified_at=utc_now()),
+        User(username="helpdesk3", full_name="Paulo Vitor", email="paulo.vitor@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="helpdesk", department="Central de Atendimento", email_verified_at=utc_now()),
+        User(username="tecnico", full_name="Lucas Pereira Martins", email="lucas.martins@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", department="Infraestrutura", email_verified_at=utc_now()),
+        User(username="servidor", full_name="Kathlelyn Cristina Santos de Abreu", email="kathlelyn.abreu@sedec.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="requester", secretariat="Secretaria de Desenvolvimento da Cidade", department="SEGTEA", email_verified_at=utc_now()),
+        User(username="marcelo", full_name="Marcelo Godiano dos Santos", email="marcelo.santos@administracao.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="requester", secretariat="Secretaria de Administração", department="Recursos Humanos", email_verified_at=utc_now()),
+        User(username="thamires", full_name="Thamires de Jesus Gonçalves", email="thamires.goncalves@fazenda.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="requester", secretariat="Secretaria de Fazenda", department="Atendimento", email_verified_at=utc_now()),
     ]
     db.add_all(users)
     db.flush()

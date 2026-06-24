@@ -42,11 +42,11 @@ start_api() {
     DATABASE_URL="sqlite:///$database" \
     SECRET_KEY="chave-regressao-local" \
     "$API_PYTHON" -m uvicorn apps.api.app.main:app \
-      --host 127.0.0.1 --port "$port" --log-level warning
+      --host 127.0.0.1 --port "$port" --log-level info
   ) >"$log_file" 2>&1 &
   API_PID=$!
 
-  for _ in {1..60}; do
+  for _ in {1..300}; do
     if curl -fsS "http://127.0.0.1:$port/api/health" >/dev/null 2>&1; then
       return
     fi
@@ -75,10 +75,10 @@ fi
 
 "$API_PYTHON" -c "import uvicorn" >/dev/null
 
-echo "[1/8] Validando helpers de formulário e grupos LDAP..."
+echo "[1/9] Validando helpers de formulário e e-mail institucional..."
 ENVIRONMENT=test "$API_PYTHON" - <<'PY'
 from apps.api.app.catalog_forms import normalize_form_schema, validate_form_data
-from apps.api.app.ldap_service import role_from_groups
+from apps.api.app.auth import validate_institutional_email
 
 schema = normalize_form_schema({
     "fields": [
@@ -99,12 +99,18 @@ for values in (
     else:
         raise AssertionError("valor inválido aceito pelo formulário dinâmico")
 
-assert role_from_groups(["CN=GG_TI_ADMIN,OU=Grupos,DC=cabofrio,DC=local"]) == "admin"
-assert role_from_groups(["CN=GG_TI_ADMINISTRADORES,OU=Grupos,DC=cabofrio,DC=local"]) == "requester"
+assert validate_institutional_email("Miguel.Teixeira@ADCETEI.CABOFRIO.RJ.GOV.BR") == "miguel.teixeira@adcetei.cabofrio.rj.gov.br"
+for email in ("usuario@cabofrio.rj.gov.br", "usuario@gmail.com", "usuario@adcetei.gov.br"):
+    try:
+        validate_institutional_email(email)
+    except Exception:
+        pass
+    else:
+        raise AssertionError(f"e-mail institucional inválido aceito: {email}")
 print("Helpers: OK")
 PY
 
-echo "[2/8] Validando migração não destrutiva do schema legado..."
+echo "[2/9] Validando migração não destrutiva do schema legado..."
 MIGRATION_DB="$MIGRATION_DB" DATABASE_URL="sqlite:///$MIGRATION_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
 import os
 import sqlite3
@@ -114,30 +120,92 @@ from sqlalchemy import inspect
 from apps.api.app.database import engine, ensure_schema_compatibility
 
 with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
+    connection.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(120), email VARCHAR(180), created_at TIMESTAMP)")
+    connection.execute("INSERT INTO users (id, username, email, created_at) VALUES (1, 'admin', 'admin@adcetei.cabofrio.rj.gov.br', CURRENT_TIMESTAMP)")
+    connection.execute("INSERT INTO users (id, username, email, created_at) VALUES (2, 'legado', 'legado@cabofrio.rj.gov.br', CURRENT_TIMESTAMP)")
     connection.execute("CREATE TABLE tickets (id INTEGER PRIMARY KEY, title VARCHAR(220) NOT NULL)")
 
 ensure_schema_compatibility()
 columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
 expected = {"form_data", "form_schema_snapshot", "service_id"}
 assert expected <= columns, f"colunas ausentes após migração: {expected - columns}"
+user_columns = {column["name"] for column in inspect(engine).get_columns("users")}
+expected_user_columns = {"email_verified_at", "email_verification_token_hash", "email_verification_expires_at", "password_reset_token_hash", "password_reset_expires_at"}
+assert expected_user_columns <= user_columns, f"colunas de usuário ausentes: {expected_user_columns - user_columns}"
+with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
+    rows = dict(connection.execute("select username, email_verified_at from users").fetchall())
+    assert rows["admin"], "e-mail institucional legado deveria ser preservado como verificado"
+    assert rows["legado"] is None, "e-mail legado fora do padrão não deve ser verificado automaticamente"
 print("Migração legada: OK")
 PY
 
-echo "[3/8] Validando autenticação local e criação explícita do seed..."
-start_api local true "$AUTH_DB" "$BASE_PORT"
-[[ "$(login_status "$BASE_PORT" servidor 123456)" == "200" ]]
+echo "[3/9] Validando autenticação por e-mail e criação explícita do seed..."
+start_api email true "$AUTH_DB" "$BASE_PORT"
+[[ "$(login_status "$BASE_PORT" servidor 123456)" == "422" ]]
+[[ "$(login_status "$BASE_PORT" kathlelyn.abreu@sedec.cabofrio.rj.gov.br 123456)" == "200" ]]
+[[ "$(login_status "$BASE_PORT" usuario@cabofrio.rj.gov.br 123456)" == "422" ]]
 
-echo "[4/8] Confirmando que senha local é rejeitada em modo LDAP..."
-start_api ldap false "$AUTH_DB" "$((BASE_PORT + 1))"
-[[ "$(login_status "$((BASE_PORT + 1))" admin admin123)" == "401" ]]
+echo "[4/9] Confirmando rejeição de cadastro fora do padrão institucional..."
+status=$(curl -sS -o "$TEST_ROOT/register-body.json" -w '%{http_code}' \
+  -X POST "http://127.0.0.1:$BASE_PORT/api/auth/register" \
+  -H 'Content-Type: application/json' \
+  -d '{"full_name":"Usuário Teste","email":"usuario@cabofrio.rj.gov.br","password":"senha-segura-123"}')
+[[ "$status" == "422" ]]
 
-echo "[5/8] Confirmando autenticação local em modo híbrido..."
-start_api hybrid false "$AUTH_DB" "$((BASE_PORT + 2))"
-[[ "$(login_status "$((BASE_PORT + 2))" servidor 123456)" == "200" ]]
+echo "[5/9] Confirmando que conta não verificada não entra..."
+DATABASE_URL="sqlite:///$AUTH_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
+import os
+from apps.api.app.auth import hash_password
+from apps.api.app.database import SessionLocal
+from apps.api.app.models import User
 
-echo "[6/8] Confirmando seed desabilitado em banco vazio..."
-start_api local false "$EMPTY_DB" "$((BASE_PORT + 3))"
-[[ "$(login_status "$((BASE_PORT + 3))" servidor 123456)" == "401" ]]
+with SessionLocal() as db:
+    db.add(
+        User(
+            username="pendente",
+            full_name="Conta Pendente",
+            email="conta.pendente@adcetei.cabofrio.rj.gov.br",
+            password_hash=hash_password("senha-segura-123"),
+            role="requester",
+            secretariat="Prefeitura de Cabo Frio",
+            department="Não informado",
+            source="email",
+            active=True,
+        )
+    )
+    db.commit()
+PY
+[[ "$(login_status "$BASE_PORT" conta.pendente@adcetei.cabofrio.rj.gov.br senha-segura-123)" == "403" ]]
+
+echo "[6/9] Confirmando conta legada com e-mail fora do padrão bloqueada..."
+DATABASE_URL="sqlite:///$AUTH_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
+from apps.api.app.auth import hash_password
+from apps.api.app.database import SessionLocal
+from apps.api.app.models import User
+from apps.api.app.time_utils import utc_now
+
+with SessionLocal() as db:
+    db.add(
+        User(
+            username="legado",
+            full_name="Usuário Legado",
+            email="legado@cabofrio.rj.gov.br",
+            password_hash=hash_password("senha-segura-123"),
+            role="requester",
+            secretariat="Prefeitura de Cabo Frio",
+            department="Não informado",
+            source="local",
+            active=True,
+            email_verified_at=utc_now(),
+        )
+    )
+    db.commit()
+PY
+[[ "$(login_status "$BASE_PORT" legado@cabofrio.rj.gov.br senha-segura-123)" == "422" ]]
+
+echo "[7/9] Confirmando seed desabilitado em banco vazio..."
+start_api email false "$EMPTY_DB" "$((BASE_PORT + 3))"
+[[ "$(login_status "$((BASE_PORT + 3))" kathlelyn.abreu@sedec.cabofrio.rj.gov.br 123456)" == "401" ]]
 stop_api
 EMPTY_DB="$EMPTY_DB" "$API_PYTHON" - <<'PY'
 import os
@@ -148,8 +216,17 @@ with sqlite3.connect(os.environ["EMPTY_DB"]) as connection:
     assert count == 0, f"seed desabilitado criou {count} usuário(s)"
 PY
 
-echo "[7/8] Executando regressão funcional completa..."
-start_api hybrid false "$AUTH_DB" "$((BASE_PORT + 2))"
+echo "[8/9] Confirmando que create_admin recusa e-mail inválido..."
+CREATE_ADMIN_DB="$TEST_ROOT/create-admin.db"
+set +e
+CREATE_OUTPUT=$(cd "$ROOT_DIR" && ENVIRONMENT=test SEED_DEMO_DATA=false DATABASE_URL="sqlite:///$CREATE_ADMIN_DB" PORTAL_ADMIN_PASSWORD="SenhaAdmin123" "$API_PYTHON" -m apps.api.app.create_admin --full-name "Admin Teste" --email "admin@cabofrio.rj.gov.br" 2>&1)
+CREATE_STATUS=$?
+set -e
+[[ "$CREATE_STATUS" != "0" ]]
+[[ "$CREATE_OUTPUT" == *"Use seu e-mail institucional"* ]]
+
+echo "[9/9] Executando regressão funcional completa..."
+start_api email false "$AUTH_DB" "$((BASE_PORT + 2))"
 API_URL="http://127.0.0.1:$((BASE_PORT + 2))/api" TEST_DB="$AUTH_DB" "$API_PYTHON" - <<'PY'
 import json
 import os
@@ -200,16 +277,16 @@ def assert_explicit_zone(value, label):
         raise AssertionError(f"{label} não possui fuso explícito: {value!r}")
 
 
-requester, requester_user = login("servidor")
-helpdesk, _ = login("helpdesk1")
-technician, _ = login("tecnico")
-admin, admin_user = login("admin", "admin123")
+requester, requester_user = login("kathlelyn.abreu@sedec.cabofrio.rj.gov.br")
+helpdesk, _ = login("maiana.ignacio@adcetei.cabofrio.rj.gov.br")
+technician, _ = login("lucas.martins@adcetei.cabofrio.rj.gov.br")
+admin, admin_user = login("admin@adcetei.cabofrio.rj.gov.br", "admin123")
 
 # Usuário inativo permanece bloqueado.
 with sqlite3.connect(DB_PATH) as connection:
     connection.execute("update users set active = 0 where username = 'marcelo'")
     connection.commit()
-status, _ = call("POST", "/auth/login", payload={"username": "marcelo", "password": "123456"})
+status, _ = call("POST", "/auth/login", payload={"username": "marcelo.santos@administracao.cabofrio.rj.gov.br", "password": "123456"})
 expect(status, 401, "usuário inativo")
 with sqlite3.connect(DB_PATH) as connection:
     connection.execute("update users set active = 1 where username = 'marcelo'")
@@ -438,7 +515,7 @@ status, _ = call(
     {
         "username": "sempermissao",
         "full_name": "Usuário sem permissão",
-        "email": "sempermissao@cabofrio.rj.gov.br",
+        "email": "sempermissao@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",
         "role": "requester",
         "secretariat": "Prefeitura de Cabo Frio",
@@ -456,7 +533,7 @@ status, created_user = call(
     {
         "username": "teste.admin",
         "full_name": "Usuário Administrativo de Teste",
-        "email": "teste.admin@cabofrio.rj.gov.br",
+        "email": "teste.admin@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",
         "role": "requester",
         "secretariat": "Prefeitura de Cabo Frio",
@@ -466,6 +543,29 @@ status, created_user = call(
     },
 )
 expect(status, 201, "administrador cria usuário local")
+status, login_result = call("POST", "/auth/login", payload={"username": "teste.admin@adcetei.cabofrio.rj.gov.br", "password": "SenhaTeste123"})
+expect(status, 200, "usuário administrativo verificado autentica")
+created_user_token = login_result["access_token"]
+status, email_changed_user = call(
+    "PATCH",
+    f"/admin/users/{created_user['id']}",
+    admin,
+    {"email": "teste.admin2@adcetei.cabofrio.rj.gov.br", "email_verified": True},
+)
+expect(status, 200, "alteração administrativa de e-mail")
+expect(email_changed_user["email"], "teste.admin2@adcetei.cabofrio.rj.gov.br", "e-mail administrativo atualizado")
+expect(email_changed_user["email_verified_at"], None, "alteração de e-mail reseta verificação")
+status, _ = call("GET", "/auth/me", created_user_token)
+expect(status, 403, "token emitido antes da alteração de e-mail perde acesso")
+status, created_user = call(
+    "PATCH",
+    f"/admin/users/{created_user['id']}",
+    admin,
+    {"email_verified": True},
+)
+expect(status, 200, "marcação administrativa explícita de e-mail verificado")
+if not created_user["email_verified_at"]:
+    raise AssertionError("marcação explícita não verificou o e-mail")
 status, _ = call(
     "POST",
     "/admin/users",
@@ -473,7 +573,7 @@ status, _ = call(
     {
         "username": "teste.admin",
         "full_name": "Usuário Duplicado",
-        "email": "duplicado@cabofrio.rj.gov.br",
+        "email": "duplicado@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",
         "role": "requester",
         "secretariat": "Prefeitura de Cabo Frio",
@@ -492,7 +592,7 @@ status, updated_user = call(
 expect(status, 200, "administrador atualiza usuário")
 expect(updated_user["role"], "technician", "perfil do usuário atualizado")
 expect(updated_user["active"], False, "usuário bloqueado")
-status, _ = call("POST", "/auth/login", payload={"username": "teste.admin", "password": "SenhaTeste123"})
+status, _ = call("POST", "/auth/login", payload={"username": "teste.admin2@adcetei.cabofrio.rj.gov.br", "password": "SenhaTeste123"})
 expect(status, 401, "usuário bloqueado não autentica")
 status, _ = call("PATCH", f"/admin/users/{admin_user['id']}", admin, {"active": False})
 expect(status, 409, "administrador não desativa a própria conta")
@@ -577,7 +677,7 @@ status, changed_role = call(
     "PATCH",
     "/admin/roles/technician",
     admin,
-    {"permissions": temporary_permissions, "ldap_group": "GG_TI_TECNICOS_TESTE"},
+    {"permissions": temporary_permissions},
 )
 expect(status, 200, "administrador altera permissões")
 expect("users.view" in changed_role["permissions"], True, "permissão adicionada")
@@ -595,14 +695,7 @@ status, _ = call(
     "PATCH",
     "/admin/roles/technician",
     admin,
-    {"ldap_group": next(item for item in roles if item["role"] == "helpdesk")["ldap_group"]},
-)
-expect(status, 409, "grupo LDAP duplicado rejeitado")
-status, _ = call(
-    "PATCH",
-    "/admin/roles/technician",
-    admin,
-    {"permissions": original_permissions, "ldap_group": technician_role["ldap_group"]},
+    {"permissions": original_permissions},
 )
 expect(status, 200, "perfil técnico restaurado")
 
@@ -612,6 +705,6 @@ audited_entities = {item["entity_type"] for item in audit}
 if not {"user", "asset", "catalog", "role"} <= audited_entities:
     raise AssertionError(f"auditoria incompleta: {audited_entities}")
 
-print("[8/8] Administração e permissões: OK")
+print("Administração e permissões: OK")
 print("Regressão da API: OK")
 PY

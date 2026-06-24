@@ -3,7 +3,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .auth import get_current_user
-from .config import settings
 from .database import get_db
 from .models import RoleConfig, User
 
@@ -32,13 +31,13 @@ DEFAULT_ROLE_CONFIGS = {
     "admin": {
         "label": "Administrador",
         "description": "Acesso completo à operação e às configurações do portal.",
-        "ldap_group": settings.ldap_admin_group,
+        "ldap_group": "",
         "permissions": sorted(ALL_PERMISSIONS),
     },
     "helpdesk": {
         "label": "Helpdesk",
         "description": "Triagem, distribuição e acompanhamento geral dos chamados.",
-        "ldap_group": settings.ldap_helpdesk_group,
+        "ldap_group": "",
         "permissions": [
             "tickets.view_all",
             "tickets.triage",
@@ -50,7 +49,7 @@ DEFAULT_ROLE_CONFIGS = {
     "technician": {
         "label": "Técnico",
         "description": "Atendimento dos chamados atribuídos e consulta técnica.",
-        "ldap_group": settings.ldap_technician_group,
+        "ldap_group": "",
         "permissions": ["tickets.internal_notes", "assets.view"],
     },
     "requester": {
@@ -106,15 +105,3 @@ def require_permission(permission: str):
         return current_user
 
     return checker
-
-
-def ldap_role_mapping(db: Session) -> dict[str, str]:
-    mappings: dict[str, str] = {}
-    configs = {config.role: config for config in db.scalars(select(RoleConfig))}
-    for role in ("admin", "helpdesk", "technician", "requester"):
-        config = configs.get(role)
-        if not config:
-            continue
-        if config.ldap_group:
-            mappings[config.ldap_group.casefold()] = config.role
-    return mappings

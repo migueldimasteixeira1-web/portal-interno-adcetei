@@ -7,17 +7,25 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .admin_api import router as admin_router
-from .auth import create_access_token, get_current_user, verify_password
+from .auth import (
+    create_access_token,
+    generate_public_token,
+    get_current_user,
+    hash_password,
+    hash_token,
+    normalize_email,
+    validate_institutional_email,
+    verify_password,
+)
 from .catalog_forms import normalize_form_schema, validate_form_data
 from .config import settings
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility, get_db
 from .domain import OPEN_STATUSES, PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
-from .ldap_service import authenticate_ldap, role_from_groups
+from .email_service import send_verification_email
 from .models import Asset, ServiceCatalog, Ticket, TicketComment, User
 from .permissions import (
     ensure_role_configs,
     has_permission,
-    ldap_role_mapping,
     permissions_for_role,
     require_permission,
 )
@@ -30,14 +38,18 @@ from .schemas import (
     DashboardOut,
     LoginIn,
     LoginOut,
+    MessageOut,
+    RegisterIn,
+    ResendVerificationIn,
     TicketCreate,
     TicketDetailOut,
     TicketPageOut,
     TicketUpdate,
     UserOut,
+    VerifyEmailIn,
 )
 from .seed import seed_database
-from .time_utils import sao_paulo_day_bounds_utc, utc_now
+from .time_utils import ensure_utc, sao_paulo_day_bounds_utc, utc_now
 
 app = FastAPI(title=settings.app_name, version="0.3.0", docs_url="/docs")
 app.add_middleware(
@@ -145,6 +157,7 @@ def serialize_user(
         "phone": user.phone,
         "source": user.source,
         "active": user.active,
+        "email_verified_at": user.email_verified_at,
         "permissions": sorted(permissions_for_role(db, user.role)) if db and include_permissions else [],
         "last_login_at": user.last_login_at,
     }
@@ -234,6 +247,33 @@ def serialize_ticket(
     return data
 
 
+def verification_url(token: str) -> str:
+    base = settings.public_app_url.rstrip("/")
+    return f"{base}/confirmar-email?token={token}"
+
+
+def generate_username_from_email(db: Session, email: str) -> str:
+    base = email.split("@", 1)[0].replace("+", ".")[:100]
+    username = base
+    suffix = 2
+    while db.scalar(select(User.id).where(func.lower(User.username) == username.casefold())):
+        username = f"{base[:110]}{suffix}"
+        suffix += 1
+    return username
+
+
+def set_email_verification_token(user: User) -> str:
+    token = generate_public_token()
+    user.email_verification_token_hash = hash_token(token)
+    user.email_verification_expires_at = now_utc() + timedelta(minutes=settings.email_verification_expire_minutes)
+    return token
+
+
+def queue_verification_email(user: User) -> None:
+    token = set_email_verification_token(user)
+    send_verification_email(user.email, user.full_name, verification_url(token))
+
+
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
@@ -253,53 +293,28 @@ def health():
 
 @app.post("/api/auth/login", response_model=LoginOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
-    username = payload.username.strip().lower()
-    user = db.scalar(select(User).where(func.lower(User.username) == username))
-    authenticated = False
-    ldap_failed = False
+    identifier = validate_institutional_email(payload.username)
+    user = db.scalar(select(User).where(func.lower(User.email) == identifier))
 
     if user and not user.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário ou senha inválidos")
 
-    if settings.auth_mode in {"local", "hybrid"}:
-        authenticated = bool(user and verify_password(payload.password, user.password_hash))
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário ou senha inválidos")
 
-    if not authenticated and settings.auth_mode in {"ldap", "hybrid"}:
-        try:
-            ldap_user = authenticate_ldap(username, payload.password)
-        except Exception:
-            ldap_user = None
-            ldap_failed = True
-        if ldap_user:
-            if not user:
-                user = User(
-                    username=ldap_user.username,
-                    full_name=ldap_user.full_name,
-                    email=ldap_user.email,
-                    role=role_from_groups(ldap_user.groups, ldap_role_mapping(db)),
-                    department=ldap_user.department,
-                    secretariat=ldap_user.secretariat,
-                    phone=ldap_user.phone,
-                    source="ldap",
-                )
-                db.add(user)
-            else:
-                user.full_name = ldap_user.full_name
-                user.email = ldap_user.email
-                user.department = ldap_user.department
-                user.secretariat = ldap_user.secretariat
-                user.phone = ldap_user.phone
-                user.role = role_from_groups(ldap_user.groups, ldap_role_mapping(db))
-                user.source = "ldap"
-            authenticated = True
+    try:
+        validate_institutional_email(user.email)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta conta precisa usar um e-mail institucional válido para entrar.",
+        ) from None
 
-    if not authenticated or not user or not user.active:
-        detail = (
-            "Não foi possível autenticar pelo diretório. Verifique as credenciais ou tente novamente."
-            if settings.auth_mode == "ldap" and ldap_failed
-            else "Usuário ou senha inválidos"
+    if not user.email_verified_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Confirme seu e-mail institucional antes de entrar no portal.",
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
     user.last_login_at = now_utc()
     db.commit()
@@ -308,6 +323,74 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
         access_token=create_access_token(user),
         user=serialize_user(user, db, include_permissions=True),
     )
+
+
+@app.post("/api/auth/register", response_model=MessageOut, status_code=201)
+def register(payload: RegisterIn, db: Session = Depends(get_db)):
+    email = validate_institutional_email(str(payload.email))
+    existing = db.scalar(select(User).where(func.lower(User.email) == email.casefold()))
+    if existing:
+        if existing.active and not existing.email_verified_at:
+            try:
+                queue_verification_email(existing)
+            except Exception as exc:
+                db.rollback()
+                raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
+            db.commit()
+        return {"message": "Se o cadastro puder ser concluído, enviaremos um link de verificação para seu e-mail institucional."}
+
+    user = User(
+        username=generate_username_from_email(db, email),
+        full_name=payload.full_name.strip(),
+        email=email,
+        password_hash=hash_password(payload.password),
+        role="requester",
+        secretariat="Prefeitura de Cabo Frio",
+        department="Não informado",
+        source="email",
+        active=True,
+        email_verified_at=None,
+    )
+    db.add(user)
+    db.flush()
+    try:
+        queue_verification_email(user)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
+    db.commit()
+    return {"message": "Se o cadastro puder ser concluído, enviaremos um link de verificação para seu e-mail institucional."}
+
+
+@app.post("/api/auth/verify-email", response_model=MessageOut)
+def verify_email(payload: VerifyEmailIn, db: Session = Depends(get_db)):
+    token_hash = hash_token(payload.token)
+    user = db.scalar(select(User).where(User.email_verification_token_hash == token_hash))
+    expires_at = ensure_utc(user.email_verification_expires_at) if user else None
+    if not user or not expires_at or expires_at < now_utc():
+        raise HTTPException(status_code=400, detail="Link de verificação inválido ou expirado.")
+
+    user.email_verified_at = now_utc()
+    user.email_verification_token_hash = ""
+    user.email_verification_expires_at = None
+    db.commit()
+    return {"message": "E-mail confirmado com sucesso. Você já pode entrar no portal."}
+
+
+@app.post("/api/auth/resend-verification", response_model=MessageOut)
+def resend_verification(payload: ResendVerificationIn, db: Session = Depends(get_db)):
+    email = normalize_email(str(payload.email))
+    generic = {"message": "Se houver uma conta pendente para este e-mail, enviaremos um novo link de verificação."}
+    user = db.scalar(select(User).where(func.lower(User.email) == email.casefold()))
+    if not user or user.email_verified_at or not user.active:
+        return generic
+    try:
+        queue_verification_email(user)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
+    db.commit()
+    return generic
 
 
 @app.get("/api/auth/me", response_model=UserOut)
@@ -696,14 +779,3 @@ def dashboard(
         ],
         team_load=team_load,
     )
-
-
-@app.post("/api/integrations/ad/sync-demo")
-def sync_demo(current_user: User = Depends(require_permission("roles.manage"))):
-    return {
-        "status": "simulated",
-        "message": "No modo local, a sincronização é simulada. Configure AUTH_MODE=ldap e as variáveis LDAP para usar o AD real.",
-        "processed": 8,
-        "created": 0,
-        "updated": 8,
-    }

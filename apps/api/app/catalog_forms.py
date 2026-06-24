@@ -47,7 +47,7 @@ FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
         "label": "Conta de e-mail",
         "type": "email",
         "required": True,
-        "placeholder": "nome@cabofrio.rj.gov.br",
+        "placeholder": "nome@secretaria.cabofrio.rj.gov.br",
         "max_length": 180,
     },
     "error_message": {

@@ -15,15 +15,41 @@ class Base(DeclarativeBase):
 
 def ensure_schema_compatibility() -> None:
     inspector = inspect(engine)
-    if "tickets" not in inspector.get_table_names():
+    table_names = inspector.get_table_names()
+    if "users" not in table_names:
         return
-    columns = {column["name"] for column in inspector.get_columns("tickets")}
+    user_columns = {column["name"] for column in inspector.get_columns("users")}
     with engine.begin() as connection:
-        if "form_data" not in columns:
+        if "email_verified_at" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP"))
+            connection.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET email_verified_at = COALESCE(created_at, CURRENT_TIMESTAMP)
+                    WHERE lower(email) LIKE '%@%.cabofrio.rj.gov.br'
+                      AND lower(email) NOT LIKE '%@cabofrio.rj.gov.br'
+                    """
+                )
+            )
+        if "email_verification_token_hash" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verification_token_hash VARCHAR(128) DEFAULT ''"))
+        if "email_verification_expires_at" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verification_expires_at TIMESTAMP"))
+        if "password_reset_token_hash" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_token_hash VARCHAR(128) DEFAULT ''"))
+        if "password_reset_expires_at" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP"))
+
+    if "tickets" not in table_names:
+        return
+    ticket_columns = {column["name"] for column in inspector.get_columns("tickets")}
+    with engine.begin() as connection:
+        if "form_data" not in ticket_columns:
             connection.execute(text("ALTER TABLE tickets ADD COLUMN form_data JSON"))
-        if "form_schema_snapshot" not in columns:
+        if "form_schema_snapshot" not in ticket_columns:
             connection.execute(text("ALTER TABLE tickets ADD COLUMN form_schema_snapshot JSON"))
-        if "service_id" not in columns:
+        if "service_id" not in ticket_columns:
             connection.execute(text("ALTER TABLE tickets ADD COLUMN service_id INTEGER"))
 
 

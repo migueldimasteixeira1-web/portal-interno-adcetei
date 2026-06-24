@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import Literal
 from urllib.parse import quote_plus
 
 from pydantic import model_validator
@@ -19,16 +18,17 @@ class Settings(BaseSettings):
     postgres_password: str = ""
     cors_origins: str = "http://localhost:3000"
 
-    auth_mode: Literal["local", "ldap", "hybrid"] = "local"
+    auth_mode: str = "email"
+    institutional_email_pattern: str = r"^[^@\s]+@[a-z0-9-]+\.cabofrio\.rj\.gov\.br$"
+    email_verification_expire_minutes: int = 60
+    public_app_url: str = "http://localhost:3000"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_tls: bool = True
     seed_demo_data: bool | None = None
-    ldap_server: str = ""
-    ldap_bind_dn: str = ""
-    ldap_bind_password: str = ""
-    ldap_base_dn: str = ""
-    ldap_user_filter: str = "(sAMAccountName={username})"
-    ldap_helpdesk_group: str = "GG_TI_HELPDESK"
-    ldap_technician_group: str = "GG_TI_TECNICOS"
-    ldap_admin_group: str = "GG_TI_ADMIN"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -37,13 +37,14 @@ const environmentLabel = appEnvironment === "production"
   : appEnvironment === "staging"
     ? "Homologação"
     : "Ambiente local";
+const publicRoutes = ["/login", "/criar-conta", "/confirmar-email", "/verifique-email"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
   const [open, setOpen] = useState(false);
 
-  if (pathname === "/login") return <>{children}</>;
+  if (publicRoutes.includes(pathname)) return <>{children}</>;
   if (loading || !user) return <LoadingScreen label="Validando seu acesso..." />;
 
   const allowed = nav.filter((item) => {

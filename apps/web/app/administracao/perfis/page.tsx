@@ -1,12 +1,12 @@
 "use client";
 
-import { KeyRound, Save, ShieldCheck } from "lucide-react";
+import { Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import AccessDenied from "@/components/AccessDenied";
 import LoadingScreen from "@/components/LoadingScreen";
 import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/components/AuthProvider";
-import { Alert, Badge, Button, Card, Field, Input, SectionHeader, Textarea } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, SectionHeader, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { PermissionDefinition, RoleConfig } from "@/lib/types";
 
@@ -58,7 +58,6 @@ export default function RolesPage() {
     try {
       const updated = await api.updateRole(role.role, {
         description: role.description,
-        ldap_group: role.ldap_group,
         permissions: role.permissions,
       });
       updateRole(role.role, updated);
@@ -76,7 +75,7 @@ export default function RolesPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Segurança" title="Perfis e permissões" subtitle="Defina o que cada perfil pode fazer e qual grupo do Active Directory concede o acesso." />
+      <PageHeader eyebrow="Segurança" title="Perfis e permissões" subtitle="Defina o que cada perfil pode fazer no portal. A atribuição de perfis é manual pelos administradores." />
       {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
       <Alert tone="warning" className="mb-4">Alterações atingem todos os usuários daquele perfil. Permitir “Ver todos os chamados” para Solicitante expõe chamados de outros servidores.</Alert>
@@ -91,9 +90,6 @@ export default function RolesPage() {
             />
             <div className="space-y-4 p-4">
               <Field label="Descrição"><Textarea className="min-h-20" value={role.description} onChange={(e) => updateRole(role.role, { description: e.target.value })} /></Field>
-              <Field label="Grupo no Active Directory" help={role.role === "requester" ? "Deixe vazio: usuários sem grupo técnico serão solicitantes." : "Use o CN exato do grupo, por exemplo GG_TI_HELPDESK."}>
-                <Input value={role.ldap_group} onChange={(e) => updateRole(role.role, { ldap_group: e.target.value })} />
-              </Field>
               <div>
                 <p className="mb-2 text-sm font-semibold text-[#1a2332]">Permissões</p>
                 <div className="space-y-3">
@@ -120,12 +116,6 @@ export default function RolesPage() {
         ))}
       </div>
 
-      <Card className="mt-4 p-4">
-        <div className="flex items-start gap-3">
-          <KeyRound className="mt-0.5 text-[#1a5f9e]" size={18} />
-          <div><p className="font-semibold text-[#1a2332]">Regra do LDAP</p><p className="mt-1 text-sm leading-6 text-[#5c6b7e]">No próximo login, o portal lê os grupos do usuário e aplica o perfil correspondente. Contas LDAP não têm senha nem perfil editados manualmente no portal.</p></div>
-        </div>
-      </Card>
     </>
   );
 }
