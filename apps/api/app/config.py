@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_use_tls: bool = True
     seed_demo_data: bool | None = None
+    cups_enabled: bool = True
+    cups_backend: str = "local_commands"
+    cups_host: str = "localhost"
+    cups_port: int = 631
+    cups_scheme: str = "http"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

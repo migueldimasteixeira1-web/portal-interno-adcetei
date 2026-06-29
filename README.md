@@ -88,6 +88,23 @@ SEED_DEMO_DATA=true
 
 O `iniciar-local.sh` usa a configuração de `apps/api/.env` quando esse arquivo existir. Sem arquivo, os padrões locais mantêm os dados de demonstração habilitados.
 
+### Impressoras / CUPS
+
+O MVP do módulo Impressoras consulta somente o CUPS local da máquina onde o backend FastAPI está rodando. Não há conexão com o PrintServer de produção neste momento.
+
+```env
+CUPS_ENABLED=true
+CUPS_BACKEND=local_commands
+CUPS_HOST=localhost
+CUPS_PORT=631
+CUPS_SCHEME=http
+```
+
+- `local_commands`: usa comandos locais como `lpstat` e `lpoptions`, quando disponíveis;
+- `remote_ipp`: reservado para futura integração com o CUPS remoto da VM do PrintServer.
+
+Se a API estiver rodando dentro do Docker, `localhost` representa o container, não automaticamente o host. Esse MVP não tenta contornar isso; para testar o CUPS da máquina de desenvolvimento, rode o backend fora do Docker.
+
 ## Contas de demonstração
 
 Disponíveis somente quando `SEED_DEMO_DATA=true`:

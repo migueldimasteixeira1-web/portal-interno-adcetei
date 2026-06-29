@@ -77,6 +77,8 @@ As ações são protegidas por permissões persistidas em `role_configs`, e não
 - triagem inclui visão geral de chamados, usuários e inventário;
 - gestão de usuários inclui consulta de usuários;
 - gestão de equipamentos inclui consulta do inventário.
+- consulta de jobs de impressão inclui consulta de impressoras;
+- gestão de impressoras inclui consulta de impressoras e jobs.
 
 Mudanças em usuários, equipamentos, catálogo e perfis são registradas em `audit_logs`. Exclusões destrutivas não são usadas: contas são bloqueadas, serviços são arquivados e equipamentos são baixados.
 
@@ -126,6 +128,16 @@ Retorna dados completos, como IP, serial, sistema operacional, localização e u
 `GET /api/assets/ticket-options`
 
 Retorna somente os campos necessários para seleção. Solicitantes recebem exclusivamente ativos vinculados ao próprio usuário. A criação do chamado repete essa validação no backend para impedir manipulação manual do identificador.
+
+## Impressoras / CUPS
+
+O módulo `Impressoras / CUPS` é uma integração modular em `apps/api/app/modules/printers`.
+
+No MVP, `CUPS_BACKEND=local_commands` consulta apenas o CUPS local do processo FastAPI usando comandos do sistema como `lpstat`. Esse modo serve para desenvolvimento e validação local.
+
+`CUPS_BACKEND=remote_ipp` fica reservado para futura integração com a VM do PrintServer. O backend remoto ainda não executa consultas reais, para evitar conexão prematura com produção.
+
+Quando a API roda em Docker, `localhost` é o container. O MVP não tenta mapear o CUPS do host por montagem ou atalho de rede; essa decisão fica para a etapa de integração do PrintServer.
 
 ## Paginação
 

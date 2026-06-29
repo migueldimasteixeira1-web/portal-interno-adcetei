@@ -37,6 +37,11 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      CUPS_ENABLED: ${CUPS_ENABLED:-true}
+      CUPS_BACKEND: ${CUPS_BACKEND:-local_commands}
+      CUPS_HOST: ${CUPS_HOST:-localhost}
+      CUPS_PORT: ${CUPS_PORT:-631}
+      CUPS_SCHEME: ${CUPS_SCHEME:-http}
     expose:
       - "8000"
     depends_on:

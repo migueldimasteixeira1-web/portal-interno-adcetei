@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, PermissionDefinition, PrinterHealth, PrinterJobs, PrinterList, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -98,6 +98,9 @@ export const api = {
   updateAsset: (id: number, payload: Record<string, unknown>) =>
     request<Asset>(`/admin/assets/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   assetTicketOptions: () => request<AssetTicketOption[]>("/assets/ticket-options"),
+  printersHealth: () => request<PrinterHealth>("/printers/health"),
+  printers: () => request<PrinterList>("/printers"),
+  printerJobs: () => request<PrinterJobs>("/printers/jobs"),
   catalog: (includeInactive = false) => request<CatalogService[]>(`/catalog?include_inactive=${includeInactive}`),
   createCatalogService: (payload: Record<string, unknown>) =>
     request<CatalogService>("/admin/catalog", { method: "POST", body: JSON.stringify(payload) }),

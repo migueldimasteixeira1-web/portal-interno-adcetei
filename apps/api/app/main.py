@@ -23,6 +23,7 @@ from .database import Base, SessionLocal, engine, ensure_schema_compatibility, g
 from .domain import OPEN_STATUSES, PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
 from .email_service import send_verification_email
 from .models import Asset, ServiceCatalog, Ticket, TicketComment, User
+from .modules.printers.router import router as printers_router
 from .permissions import (
     ensure_role_configs,
     has_permission,
@@ -60,6 +61,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(admin_router)
+app.include_router(printers_router)
 
 FIELD_LABELS = {
     "status": "o status",

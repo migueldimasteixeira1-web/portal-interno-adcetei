@@ -71,11 +71,11 @@ export const portalModules: PortalNavItem[] = [
   {
     href: "/impressoras",
     label: "Impressoras",
-    description: "Integração planejada com CUPS, filas e recursos de impressão.",
+    description: "Consulta ao CUPS local, filas e status operacional de impressão.",
     icon: Printer,
     area: "modules",
-    status: "planned",
-    roles: ["admin", "helpdesk", "technician", "requester"],
+    status: "available",
+    permission: "printers.view",
   },
   {
     href: "/servicos-internos",

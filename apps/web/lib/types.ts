@@ -131,6 +131,46 @@ export interface DashboardData {
   team_load: Array<{ id: number; name: string; role: string; open: number }>;
 }
 
+export interface PrinterHealth {
+  enabled: boolean;
+  backend: string;
+  available: boolean;
+  server: string;
+  message: string;
+  checked_at: string;
+}
+
+export interface Printer {
+  name: string;
+  status: string;
+  status_label: string;
+  enabled: boolean;
+  accepting_jobs: boolean;
+  device_uri: string;
+  jobs_count: number;
+  is_default: boolean;
+  last_checked_at: string;
+}
+
+export interface PrinterJob {
+  id: string;
+  printer_name: string;
+  owner: string;
+  size_bytes?: number | null;
+  submitted_at: string;
+  raw: string;
+}
+
+export interface PrinterList {
+  printers: Printer[];
+  checked_at: string;
+}
+
+export interface PrinterJobs {
+  jobs: PrinterJob[];
+  checked_at: string;
+}
+
 export interface RoleConfig {
   role: Role;
   label: string;
