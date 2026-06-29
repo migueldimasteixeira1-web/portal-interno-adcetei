@@ -24,6 +24,13 @@ interface PendingAction {
   requiresTargetPrinter?: boolean;
 }
 
+interface RowAction {
+  key: string;
+  label: string;
+  tone?: "default" | "danger";
+  action: PendingAction;
+}
+
 function healthTone(health: PrinterHealth | null) {
   if (!health?.enabled) return "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]";
   if (health.available) return "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]";
@@ -77,11 +84,14 @@ export default function PrintersPage() {
   const [jobsError, setJobsError] = useState("");
   const [liveState, setLiveState] = useState<LiveState>("offline");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [openMenu, setOpenMenu] = useState("");
   const [reason, setReason] = useState("");
   const [targetPrinter, setTargetPrinter] = useState("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const can = (permission: string) => user?.permissions?.includes(permission);
+
+  const closeMenu = () => setOpenMenu("");
 
   const applySnapshot = (snapshot: PrinterEventSnapshot) => {
     setHealth(snapshot.health);
@@ -184,6 +194,7 @@ export default function PrintersPage() {
   }, [printers]);
 
   const openAction = (action: PendingAction) => {
+    closeMenu();
     setPendingAction(action);
     setReason("");
     setTargetPrinter("");
@@ -213,6 +224,64 @@ export default function PrintersPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const printerActions = (printer: PrinterType): RowAction[] => [
+    can("printers.queue.enable") && { key: "enable", label: "Habilitar", action: { target: "printer", action: "enable", entityId: printer.name, label: "Habilitar impressora", requiresReason: false } },
+    can("printers.queue.disable") && { key: "disable", label: "Desabilitar", action: { target: "printer", action: "disable", entityId: printer.name, label: "Desabilitar impressora", requiresReason: true } },
+    can("printers.queue.accept") && { key: "accept", label: "Aceitar jobs", action: { target: "printer", action: "accept", entityId: printer.name, label: "Aceitar jobs", requiresReason: false } },
+    can("printers.queue.reject") && { key: "reject", label: "Rejeitar jobs", action: { target: "printer", action: "reject", entityId: printer.name, label: "Rejeitar jobs", requiresReason: true } },
+    can("printers.queue.set_default") && { key: "set-default", label: "Definir como padrão", action: { target: "printer", action: "set-default", entityId: printer.name, label: "Definir como padrão", requiresReason: false } },
+    can("printers.queue.purge") && { key: "purge", label: "Limpar fila", tone: "danger", action: { target: "printer", action: "purge", entityId: printer.name, label: "Limpar fila", requiresReason: true } },
+  ].filter(Boolean) as RowAction[];
+
+  const jobActions = (job: PrinterJob): RowAction[] => [
+    can("printers.jobs.release") && { key: "release", label: "Liberar", action: { target: "job", action: "release", entityId: job.id, label: "Liberar job", requiresReason: false } },
+    can("printers.jobs.hold") && { key: "hold", label: "Reter", action: { target: "job", action: "hold", entityId: job.id, label: "Reter job", requiresReason: true } },
+    can("printers.jobs.restart") && { key: "restart", label: "Reiniciar", action: { target: "job", action: "restart", entityId: job.id, label: "Reiniciar job", requiresReason: true } },
+    can("printers.jobs.move") && { key: "move", label: "Mover", action: { target: "job", action: "move", entityId: job.id, label: "Mover job", requiresReason: true, requiresTargetPrinter: true } },
+    can("printers.jobs.cancel") && { key: "cancel", label: "Cancelar", tone: "danger", action: { target: "job", action: "cancel", entityId: job.id, label: "Cancelar job", requiresReason: true } },
+  ].filter(Boolean) as RowAction[];
+
+  const actionMenu = (id: string, actions: RowAction[]) => {
+    if (!actions.length) return <span className="inline-flex items-center gap-1 text-xs text-[#8b97a8]"><MoreHorizontal size={14} /> Sem ações</span>;
+    const open = openMenu === id;
+    return (
+      <div className="relative inline-flex">
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Abrir ações"
+          className="grid h-8 w-8 place-items-center rounded-md border border-[#d4dbe4] bg-white text-[#5c6b7e] transition hover:border-[#1a5f9e] hover:bg-[#f3f7fb] hover:text-[#1a5f9e]"
+          onClick={() => setOpenMenu(open ? "" : id)}
+        >
+          <MoreHorizontal size={17} />
+        </button>
+        {open && (
+          <>
+            <button type="button" className="fixed inset-0 z-20 cursor-default" aria-label="Fechar ações" onClick={closeMenu} />
+            <div role="menu" className="absolute right-0 top-9 z-30 w-52 overflow-hidden rounded-md border border-[#d4dbe4] bg-white py-1 shadow-[0_8px_24px_rgba(15,35,60,0.16)]">
+              {actions.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="menuitem"
+                  className={cn(
+                    "flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium transition hover:bg-[#f7f9fb]",
+                    item.tone === "danger" ? "text-[#b91c1c]" : "text-[#1a2332]",
+                  )}
+                  onClick={() => openAction(item.action)}
+                >
+                  {item.label}
+                  {item.action.requiresReason && <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8b97a8]">confirma</span>}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   if (loading) return <LoadingScreen label="Consultando CUPS local..." />;
@@ -286,7 +355,7 @@ export default function PrintersPage() {
                   <th>Recebendo jobs</th>
                   <th>URI do dispositivo</th>
                   <th>Jobs</th>
-                  <th>Ações</th>
+                  <th className="w-20 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,15 +369,8 @@ export default function PrintersPage() {
                     <td className="text-[#5c6b7e]">{printer.accepting_jobs ? "Sim" : "Não"}</td>
                     <td className="max-w-[300px] truncate text-[#5c6b7e]" title={printer.device_uri}>{printer.device_uri || "-"}</td>
                     <td className="font-semibold tabular-nums text-[#1a2332]">{printer.jobs_count}</td>
-                    <td>
-                      <div className="flex min-w-[260px] flex-wrap gap-1.5">
-                        {can("printers.queue.enable") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "printer", action: "enable", entityId: printer.name, label: "Habilitar impressora", requiresReason: false })}>Habilitar</Button>}
-                        {can("printers.queue.disable") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "printer", action: "disable", entityId: printer.name, label: "Desabilitar impressora", requiresReason: true })}>Desabilitar</Button>}
-                        {can("printers.queue.accept") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "printer", action: "accept", entityId: printer.name, label: "Aceitar jobs", requiresReason: false })}>Aceitar</Button>}
-                        {can("printers.queue.reject") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "printer", action: "reject", entityId: printer.name, label: "Rejeitar jobs", requiresReason: true })}>Rejeitar</Button>}
-                        {can("printers.queue.purge") && <Button size="sm" variant="danger" onClick={() => openAction({ target: "printer", action: "purge", entityId: printer.name, label: "Limpar fila", requiresReason: true })}>Limpar fila</Button>}
-                        {can("printers.queue.set_default") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "printer", action: "set-default", entityId: printer.name, label: "Definir como padrão", requiresReason: false })}>Padrão</Button>}
-                      </div>
+                    <td className="text-right">
+                      {actionMenu(`printer:${printer.name}`, printerActions(printer))}
                     </td>
                   </tr>
                 ))}
@@ -339,7 +401,7 @@ export default function PrintersPage() {
                   <th>Usuário</th>
                   <th>Tamanho</th>
                   <th>Enviado em</th>
-                  <th>Ações</th>
+                  <th className="w-20 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -350,15 +412,8 @@ export default function PrintersPage() {
                     <td className="text-[#5c6b7e]">{job.owner || "-"}</td>
                     <td className="text-[#5c6b7e]">{formatBytes(job.size_bytes)}</td>
                     <td className="text-[#5c6b7e]">{job.submitted_at || "-"}</td>
-                    <td>
-                      <div className="flex min-w-[260px] flex-wrap gap-1.5">
-                        {can("printers.jobs.cancel") && <Button size="sm" variant="danger" onClick={() => openAction({ target: "job", action: "cancel", entityId: job.id, label: "Cancelar job", requiresReason: true })}>Cancelar</Button>}
-                        {can("printers.jobs.hold") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "job", action: "hold", entityId: job.id, label: "Reter job", requiresReason: true })}>Reter</Button>}
-                        {can("printers.jobs.release") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "job", action: "release", entityId: job.id, label: "Liberar job", requiresReason: false })}>Liberar</Button>}
-                        {can("printers.jobs.restart") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "job", action: "restart", entityId: job.id, label: "Reiniciar job", requiresReason: true })}>Reiniciar</Button>}
-                        {can("printers.jobs.move") && <Button size="sm" variant="ghost" onClick={() => openAction({ target: "job", action: "move", entityId: job.id, label: "Mover job", requiresReason: true, requiresTargetPrinter: true })}>Mover</Button>}
-                        {!["printers.jobs.cancel", "printers.jobs.hold", "printers.jobs.release", "printers.jobs.restart", "printers.jobs.move"].some(can) && <span className="inline-flex items-center gap-1 text-xs text-[#8b97a8]"><MoreHorizontal size={14} /> Sem ações</span>}
-                      </div>
+                    <td className="text-right">
+                      {actionMenu(`job:${job.id}`, jobActions(job))}
                     </td>
                   </tr>
                 ))}
