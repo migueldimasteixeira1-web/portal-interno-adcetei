@@ -133,11 +133,13 @@ Retorna somente os campos necessários para seleção. Solicitantes recebem excl
 
 O módulo `Impressoras / CUPS` é uma integração modular em `apps/api/app/modules/printers`.
 
-No MVP, `CUPS_BACKEND=local_commands` consulta apenas o CUPS local do processo FastAPI usando comandos do sistema como `lpstat`. Esse modo serve para desenvolvimento e validação local.
+No backend `local_commands`, o portal consulta e administra apenas o CUPS local do processo FastAPI usando comandos do sistema como `lpstat`, `cupsenable`, `cupsdisable`, `cupsaccept`, `cupsreject`, `cancel`, `lpadmin`, `lp` e `lpmove`. Todos os comandos são executados sem shell e com argumentos fechados.
 
 `CUPS_BACKEND=remote_ipp` fica reservado para futura integração com a VM do PrintServer. O backend remoto ainda não executa consultas reais, para evitar conexão prematura com produção.
 
 Quando a API roda em Docker, `localhost` é o container. O MVP não tenta mapear o CUPS do host por montagem ou atalho de rede; essa decisão fica para a etapa de integração do PrintServer.
+
+A tela usa SSE em `/api/printers/events` como canal primário de atualização. Se o EventSource falhar, o frontend mantém polling automático. Operações que alteram CUPS validam o nome da impressora ou o job contra a lista real antes de executar ação, exigem confirmação/motivo quando são destrutivas e registram resultado em `audit_logs`.
 
 ## Paginação
 

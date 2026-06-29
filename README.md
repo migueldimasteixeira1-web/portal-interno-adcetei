@@ -90,7 +90,7 @@ O `iniciar-local.sh` usa a configuração de `apps/api/.env` quando esse arquivo
 
 ### Impressoras / CUPS
 
-O MVP do módulo Impressoras consulta somente o CUPS local da máquina onde o backend FastAPI está rodando. Não há conexão com o PrintServer de produção neste momento.
+O módulo Impressoras consulta e administra o CUPS local da máquina onde o backend FastAPI está rodando. Não há conexão com o PrintServer de produção neste momento.
 
 ```env
 CUPS_ENABLED=true
@@ -98,12 +98,17 @@ CUPS_BACKEND=local_commands
 CUPS_HOST=localhost
 CUPS_PORT=631
 CUPS_SCHEME=http
+CUPS_CACHE_TTL_SECONDS=5
+CUPS_EVENT_INTERVAL_SECONDS=3
+CUPS_AUTO_REFRESH_SECONDS=10
 ```
 
 - `local_commands`: usa comandos locais como `lpstat` e `lpoptions`, quando disponíveis;
 - `remote_ipp`: reservado para futura integração com o CUPS remoto da VM do PrintServer.
 
-Se a API estiver rodando dentro do Docker, `localhost` representa o container, não automaticamente o host. Esse MVP não tenta contornar isso; para testar o CUPS da máquina de desenvolvimento, rode o backend fora do Docker.
+Se a API estiver rodando dentro do Docker, `localhost` representa o container, não automaticamente o host. O módulo não tenta contornar isso; para testar o CUPS da máquina de desenvolvimento, rode o backend fora do Docker.
+
+A tela `/impressoras` usa SSE em `/api/printers/events` para atualização automática e mantém polling como fallback. Ações de fila e jobs são protegidas por permissões granulares e auditadas em `audit_logs`.
 
 ## Contas de demonstração
 
