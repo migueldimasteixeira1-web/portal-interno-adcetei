@@ -171,6 +171,30 @@ export interface PrinterJobs {
   checked_at: string;
 }
 
+export interface PrinterEventSnapshot {
+  health: PrinterHealth;
+  printers: Printer[];
+  jobs: PrinterJob[];
+  checked_at: string;
+}
+
+export interface PrinterActionPayload {
+  confirm?: boolean;
+  reason?: string;
+  target_printer?: string;
+}
+
+export interface PrinterActionResult {
+  ok: boolean;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  message: string;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  checked_at: string;
+}
+
 export interface RoleConfig {
   role: Role;
   label: string;

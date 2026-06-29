@@ -1,6 +1,6 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, PermissionDefinition, PrinterHealth, PrinterJobs, PrinterList, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, PermissionDefinition, PrinterActionPayload, PrinterActionResult, PrinterHealth, PrinterJobs, PrinterList, RoleConfig, Ticket, TicketPage, User } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
 export const SESSION_MESSAGE_KEY = "pti_session_message";
 let sessionExpiryInProgress = false;
@@ -101,6 +101,11 @@ export const api = {
   printersHealth: () => request<PrinterHealth>("/printers/health"),
   printers: () => request<PrinterList>("/printers"),
   printerJobs: () => request<PrinterJobs>("/printers/jobs"),
+  printerJobsFor: (printerName: string) => request<PrinterJobs>(`/printers/${encodeURIComponent(printerName)}/jobs`),
+  printerAction: (printerName: string, action: "enable" | "disable" | "accept" | "reject" | "purge" | "set-default", payload: PrinterActionPayload = {}) =>
+    request<PrinterActionResult>(`/printers/${encodeURIComponent(printerName)}/${action}`, { method: "POST", body: JSON.stringify(payload) }),
+  printerJobAction: (jobId: string, action: "cancel" | "hold" | "release" | "restart" | "move", payload: PrinterActionPayload = {}) =>
+    request<PrinterActionResult>(`/printers/jobs/${encodeURIComponent(jobId)}/${action}`, { method: "POST", body: JSON.stringify(payload) }),
   catalog: (includeInactive = false) => request<CatalogService[]>(`/catalog?include_inactive=${includeInactive}`),
   createCatalogService: (payload: Record<string, unknown>) =>
     request<CatalogService>("/admin/catalog", { method: "POST", body: JSON.stringify(payload) }),
