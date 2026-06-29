@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     cups_host: str = "localhost"
     cups_port: int = 631
     cups_scheme: str = "http"
+    cups_cache_ttl_seconds: int = 5
+    cups_event_interval_seconds: int = 3
+    cups_auto_refresh_seconds: int = 10
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

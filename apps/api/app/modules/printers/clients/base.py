@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from ..schemas import PrinterHealth, PrinterJobOut, PrinterOut
+from ..schemas import PrinterDeviceOut, PrinterDriverOut, PrinterHealth, PrinterJobOut, PrinterOut
 
 
 class PrinterClient(Protocol):
@@ -11,4 +11,43 @@ class PrinterClient(Protocol):
         ...
 
     def list_jobs(self) -> list[PrinterJobOut]:
+        ...
+
+    def list_devices(self) -> list[PrinterDeviceOut]:
+        ...
+
+    def list_drivers(self) -> list[PrinterDriverOut]:
+        ...
+
+    def enable_printer(self, printer_name: str) -> None:
+        ...
+
+    def disable_printer(self, printer_name: str) -> None:
+        ...
+
+    def accept_printer(self, printer_name: str) -> None:
+        ...
+
+    def reject_printer(self, printer_name: str) -> None:
+        ...
+
+    def purge_printer(self, printer_name: str) -> None:
+        ...
+
+    def set_default_printer(self, printer_name: str) -> None:
+        ...
+
+    def cancel_job(self, job_id: str) -> None:
+        ...
+
+    def hold_job(self, job_id: str) -> None:
+        ...
+
+    def release_job(self, job_id: str) -> None:
+        ...
+
+    def restart_job(self, job_id: str) -> None:
+        ...
+
+    def move_job(self, job_id: str, target_printer: str) -> None:
         ...

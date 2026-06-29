@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from ....config import settings
 from ....time_utils import iso_utc, utc_now
-from ..schemas import PrinterHealth, PrinterJobOut, PrinterOut
+from ..schemas import PrinterDeviceOut, PrinterDriverOut, PrinterHealth, PrinterJobOut, PrinterOut
 
 
 class CupsCommandError(RuntimeError):
@@ -109,6 +109,53 @@ class LocalCommandsPrinterClient:
             return []
         return [self._parse_job_line(line) for line in result.stdout.splitlines() if line.strip()]
 
+    def list_devices(self) -> list[PrinterDeviceOut]:
+        self._ensure_available()
+        result = self._run("lpinfo", "-v", check=False)
+        if not result.ok:
+            return []
+        return [self._parse_device_line(line) for line in result.stdout.splitlines() if line.strip()]
+
+    def list_drivers(self) -> list[PrinterDriverOut]:
+        self._ensure_available()
+        result = self._run("lpinfo", "-m", check=False)
+        if not result.ok:
+            return []
+        return [self._parse_driver_line(line) for line in result.stdout.splitlines() if line.strip()]
+
+    def enable_printer(self, printer_name: str) -> None:
+        self._run("cupsenable", printer_name)
+
+    def disable_printer(self, printer_name: str) -> None:
+        self._run("cupsdisable", printer_name)
+
+    def accept_printer(self, printer_name: str) -> None:
+        self._run("cupsaccept", printer_name)
+
+    def reject_printer(self, printer_name: str) -> None:
+        self._run("cupsreject", printer_name)
+
+    def purge_printer(self, printer_name: str) -> None:
+        self._run("cancel", "-a", printer_name)
+
+    def set_default_printer(self, printer_name: str) -> None:
+        self._run("lpadmin", "-d", printer_name)
+
+    def cancel_job(self, job_id: str) -> None:
+        self._run("cancel", job_id)
+
+    def hold_job(self, job_id: str) -> None:
+        self._run("lp", "-i", job_id, "-H", "hold")
+
+    def release_job(self, job_id: str) -> None:
+        self._run("lp", "-i", job_id, "-H", "resume")
+
+    def restart_job(self, job_id: str) -> None:
+        self._run("lp", "-i", job_id, "-H", "restart")
+
+    def move_job(self, job_id: str, target_printer: str) -> None:
+        self._run("lpmove", job_id, target_printer)
+
     def _ensure_available(self) -> None:
         health = self.health()
         if not health.available:
@@ -193,6 +240,22 @@ class LocalCommandsPrinterClient:
             owner=parts[1] if len(parts) >= 2 else "",
             size_bytes=size_bytes,
             submitted_at=" ".join(parts[3:]) if len(parts) > 3 else "",
+            raw=line.strip(),
+        )
+
+    def _parse_device_line(self, line: str) -> PrinterDeviceOut:
+        parts = line.split(maxsplit=1)
+        return PrinterDeviceOut(
+            kind=parts[0] if parts else "",
+            uri=parts[1] if len(parts) > 1 else "",
+            raw=line.strip(),
+        )
+
+    def _parse_driver_line(self, line: str) -> PrinterDriverOut:
+        parts = line.split(maxsplit=1)
+        return PrinterDriverOut(
+            name=parts[0] if parts else "",
+            description=parts[1] if len(parts) > 1 else "",
             raw=line.strip(),
         )
 
