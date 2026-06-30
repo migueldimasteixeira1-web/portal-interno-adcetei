@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Suspense } from "react";
 import { AlertCircle, CheckCircle2, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import AuthCardShell from "@/components/AuthCardShell";
+import SearchParamsSuspense from "@/components/SearchParamsSuspense";
 import { Alert, buttonStyles } from "@/components/ui";
 import { api } from "@/lib/api";
 
@@ -34,8 +35,7 @@ function ConfirmEmailContent() {
   const Icon = status === "success" ? CheckCircle2 : AlertCircle;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4 py-6 sm:px-6">
-      <section className="w-full max-w-[500px] rounded-lg border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)] sm:p-8">
+    <AuthCardShell>
         <div className={status === "success" ? "grid h-12 w-12 place-items-center rounded-md bg-[#edf7f5] text-[#0d5c4f]" : "grid h-12 w-12 place-items-center rounded-md bg-[#fffbeb] text-[#92400e]"}>
           <Icon size={24} />
         </div>
@@ -55,15 +55,14 @@ function ConfirmEmailContent() {
             Ir para o login
           </Link>
         </div>
-      </section>
-    </main>
+    </AuthCardShell>
   );
 }
 
 export default function ConfirmEmailPage() {
   return (
-    <Suspense fallback={null}>
+    <SearchParamsSuspense>
       <ConfirmEmailContent />
-    </Suspense>
+    </SearchParamsSuspense>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Building2, MailCheck, UserPlus } from "lucide-react";
+import { MailCheck, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import AuthBrandHeader from "@/components/AuthBrandHeader";
+import AuthCardShell from "@/components/AuthCardShell";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { api } from "@/lib/api";
 
@@ -47,15 +49,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4 py-6 sm:px-6">
-      <section className="w-full max-w-[520px] rounded-lg border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)] sm:p-8">
-        <div className="mb-7 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-md bg-[var(--navy-900)] text-white"><Building2 size={20} /></span>
-          <div>
-            <p className="text-sm font-semibold text-[var(--foreground)]">Portal Interno ADCETEI</p>
-            <p className="text-xs text-[var(--muted)]">Cadastro institucional</p>
-          </div>
-        </div>
+    <AuthCardShell className="max-w-[520px]">
+      <AuthBrandHeader subtitle="Cadastro institucional" />
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">Criar conta</p>
@@ -87,7 +82,6 @@ export default function RegisterPage() {
           <Link href="/login" className="font-semibold text-[var(--primary)] hover:underline">Voltar ao login</Link>
           <span className="inline-flex items-center gap-1.5 text-[var(--muted)]"><MailCheck size={15} />Verificação obrigatória</span>
         </div>
-      </section>
-    </main>
+    </AuthCardShell>
   );
 }

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Building2, Headphones, KeyRound, ShieldCheck, TicketCheck } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
+import AuthBrandHeader from "@/components/AuthBrandHeader";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { SESSION_MESSAGE_KEY } from "@/lib/api";
 
@@ -90,12 +91,8 @@ export default function LoginPage() {
         </aside>
 
         <section className="p-5 sm:p-8 md:p-10">
-          <div className="mb-7 flex items-center gap-3 md:hidden">
-            <span className="grid h-10 w-10 place-items-center rounded-md bg-[var(--navy-900)] text-white"><Building2 size={20} /></span>
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">Portal Interno ADCETEI</p>
-              <p className="text-xs text-[var(--muted)]">Prefeitura de Cabo Frio</p>
-            </div>
+          <div className="mb-7 md:hidden">
+            <AuthBrandHeader subtitle="Prefeitura de Cabo Frio" />
           </div>
 
           <div>
