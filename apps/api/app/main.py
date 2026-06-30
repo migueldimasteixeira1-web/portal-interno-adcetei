@@ -396,7 +396,8 @@ def list_users(
     if search:
         like = f"%{search}%"
         query = query.where(or_(User.full_name.ilike(like), User.username.ilike(like), User.email.ilike(like)))
-    return list(db.scalars(query))
+    users = list(db.scalars(query))
+    return [serialize_user(user, db, include_permissions=True) for user in users]
 
 
 @app.get("/api/assets", response_model=list[AssetOut])
