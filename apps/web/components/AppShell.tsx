@@ -9,22 +9,9 @@ import LoadingScreen from "./LoadingScreen";
 import UserAvatar from "./UserAvatar";
 import { Button, cn } from "./ui";
 import { roleLabels } from "@/lib/format";
-import { canAccessNavItem, moduleLabelForUser, portalNavSections } from "@/lib/modules";
+import { canAccessNavItem, moduleLabelForUser, pageLabelForPath, portalNavSections } from "@/lib/modules";
 import { publicRoutes } from "@/lib/routes";
 
-const pageLabels: Record<string, string> = {
-  "/dashboard": "Início",
-  "/chamados": "Chamados",
-  "/chamados/novo": "Abrir chamado",
-  "/inventario": "Inventário",
-  "/memorandos": "Memorandos",
-  "/impressoras": "Impressoras",
-  "/servicos-internos": "Serviços Internos",
-  "/administracao/usuarios": "Administração · Usuários",
-  "/administracao/catalogo": "Administração · Catálogo",
-  "/administracao/perfis": "Administração · Perfis",
-  "/administracao/auditoria": "Auditoria",
-};
 const appEnvironment = process.env.NEXT_PUBLIC_APP_ENV || "local";
 const environmentLabel = appEnvironment === "production"
   ? ""
@@ -43,9 +30,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const sections = portalNavSections
     .map((section) => ({ ...section, items: section.items.filter((item) => canAccessNavItem(item, user)) }))
     .filter((section) => section.items.length > 0);
-  const currentLabel = pathname.startsWith("/chamados/") && pathname !== "/chamados/novo"
-    ? "Detalhes do chamado"
-    : pageLabels[pathname] || "Portal Interno ADCETEI";
+  const currentLabel = pageLabelForPath(pathname);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">

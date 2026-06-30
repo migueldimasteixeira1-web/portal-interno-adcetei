@@ -91,3 +91,24 @@ export function canAccessNavItem(item: PortalNavItem, user?: User | null): boole
 export function moduleLabelForUser(item: PortalNavItem, user?: User | null): string {
   return user?.role === "requester" && item.requesterLabel ? item.requesterLabel : item.label;
 }
+
+const PAGE_TITLES: Record<string, string> = {
+  "/dashboard": "Início",
+  "/chamados": "Chamados",
+  "/chamados/novo": "Abrir chamado",
+  "/inventario": "Inventário",
+  "/memorandos": "Memorandos",
+  "/impressoras": "Impressoras",
+  "/servicos-internos": "Serviços Internos",
+  "/administracao/usuarios": "Administração · Usuários",
+  "/administracao/catalogo": "Administração · Catálogo",
+  "/administracao/perfis": "Administração · Perfis",
+  "/administracao/auditoria": "Auditoria",
+};
+
+export function pageLabelForPath(pathname: string): string {
+  if (pathname.startsWith("/chamados/") && pathname !== "/chamados/novo") {
+    return "Detalhes do chamado";
+  }
+  return PAGE_TITLES[pathname] || "Portal Interno ADCETEI";
+}
