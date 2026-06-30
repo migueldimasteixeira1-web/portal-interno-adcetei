@@ -50,7 +50,13 @@ from .schemas import (
 from .seed import seed_database
 from .time_utils import ensure_utc, sao_paulo_day_bounds_utc, utc_now
 
-app = FastAPI(title=settings.app_name, version="0.3.0", docs_url="/docs")
+app = FastAPI(
+    title=settings.app_name,
+    version="0.3.0",
+    docs_url="/docs" if settings.is_local_environment else None,
+    redoc_url="/redoc" if settings.is_local_environment else None,
+    openapi_url="/openapi.json" if settings.is_local_environment else None,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
