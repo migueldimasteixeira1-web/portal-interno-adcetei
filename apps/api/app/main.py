@@ -16,7 +16,7 @@ from .auth import (
     validate_institutional_email,
     verify_password,
 )
-from .catalog_forms import normalize_form_schema, validate_form_data
+from .catalog_forms import catalog_payload, normalize_form_schema, validate_form_data
 from .config import settings
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility, get_db
 from .domain import OPEN_STATUSES, PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
@@ -443,19 +443,7 @@ def list_catalog(
     if not include_inactive:
         query = query.where(ServiceCatalog.active.is_(True))
     services = list(db.scalars(query))
-    return [
-        {
-            "id": service.id,
-            "name": service.name,
-            "category": service.category,
-            "description": service.description,
-            "icon": service.icon,
-            "color": service.color,
-            "active": service.active,
-            "form_schema": normalize_form_schema(service.form_schema),
-        }
-        for service in services
-    ]
+    return [catalog_payload(service) for service in services]
 
 
 def ticket_visibility_conditions(current_user: User, db: Session) -> list[Any]:

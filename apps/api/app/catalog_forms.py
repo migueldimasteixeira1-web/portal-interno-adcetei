@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
+from .models import ServiceCatalog
+
 EMAIL_ADAPTER = TypeAdapter(EmailStr)
 
 FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
@@ -238,3 +240,16 @@ def validate_form_data(schema: dict[str, Any] | None, values: dict[str, Any] | N
         cleaned[key] = value
 
     return cleaned
+
+
+def catalog_payload(service: ServiceCatalog) -> dict[str, Any]:
+    return {
+        "id": service.id,
+        "name": service.name,
+        "category": service.category,
+        "description": service.description,
+        "icon": service.icon,
+        "color": service.color,
+        "active": service.active,
+        "form_schema": normalize_form_schema(service.form_schema),
+    }

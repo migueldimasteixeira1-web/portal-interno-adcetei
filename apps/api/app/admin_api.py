@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from .audit import add_audit
 from .auth import hash_password, validate_institutional_email
-from .catalog_forms import normalize_form_schema
+from .catalog_forms import catalog_payload, normalize_form_schema
 from .database import get_db
 from .email_verification import send_user_verification
 from .models import Asset, AuditLog, RoleConfig, ServiceCatalog, User
@@ -83,19 +83,6 @@ def validate_assigned_user(db: Session, user_id: int | None) -> None:
     user = db.get(User, user_id)
     if not user or not user.active:
         raise HTTPException(status_code=400, detail="Usuário responsável inválido")
-
-
-def catalog_payload(service: ServiceCatalog) -> dict[str, Any]:
-    return {
-        "id": service.id,
-        "name": service.name,
-        "category": service.category,
-        "description": service.description,
-        "icon": service.icon,
-        "color": service.color,
-        "active": service.active,
-        "form_schema": normalize_form_schema(service.form_schema),
-    }
 
 
 @router.post("/users", response_model=UserOut, status_code=201)
