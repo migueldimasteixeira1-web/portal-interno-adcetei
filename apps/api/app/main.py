@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from .admin_api import router as admin_router
 from .auth import (
     create_access_token,
-    generate_public_token,
     get_current_user,
     hash_password,
     hash_token,
@@ -21,7 +20,7 @@ from .catalog_forms import normalize_form_schema, validate_form_data
 from .config import settings
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility, get_db
 from .domain import OPEN_STATUSES, PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
-from .email_service import send_verification_email
+from .email_verification import send_user_verification
 from .models import Asset, ServiceCatalog, Ticket, TicketComment, User
 from .permissions import (
     ensure_role_configs,
@@ -247,11 +246,6 @@ def serialize_ticket(
     return data
 
 
-def verification_url(token: str) -> str:
-    base = settings.public_app_url.rstrip("/")
-    return f"{base}/confirmar-email?token={token}"
-
-
 def generate_username_from_email(db: Session, email: str) -> str:
     base = email.split("@", 1)[0].replace("+", ".")[:100]
     username = base
@@ -260,18 +254,6 @@ def generate_username_from_email(db: Session, email: str) -> str:
         username = f"{base[:110]}{suffix}"
         suffix += 1
     return username
-
-
-def set_email_verification_token(user: User) -> str:
-    token = generate_public_token()
-    user.email_verification_token_hash = hash_token(token)
-    user.email_verification_expires_at = now_utc() + timedelta(minutes=settings.email_verification_expire_minutes)
-    return token
-
-
-def queue_verification_email(user: User) -> None:
-    token = set_email_verification_token(user)
-    send_verification_email(user.email, user.full_name, verification_url(token))
 
 
 @app.on_event("startup")
@@ -332,7 +314,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     if existing:
         if existing.active and not existing.email_verified_at:
             try:
-                queue_verification_email(existing)
+                send_user_verification(existing)
             except Exception as exc:
                 db.rollback()
                 raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
@@ -354,7 +336,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
     try:
-        queue_verification_email(user)
+        send_user_verification(user)
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
@@ -385,7 +367,7 @@ def resend_verification(payload: ResendVerificationIn, db: Session = Depends(get
     if not user or user.email_verified_at or not user.active:
         return generic
     try:
-        queue_verification_email(user)
+        send_user_verification(user)
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
