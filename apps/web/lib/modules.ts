@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Role, User } from "./types";
+import { hasPermission } from "./permissions";
 
 export type PortalArea = "portal" | "modules" | "administration";
 export type PortalModuleStatus = "available" | "planned";
@@ -82,8 +83,8 @@ export const portalNavSections = [
 
 export function canAccessNavItem(item: PortalNavItem, user?: User | null): boolean {
   if (!user) return false;
-  if (item.permission) return user.permissions?.includes(item.permission);
-  if (item.permissionsAny) return item.permissionsAny.some((permission) => user.permissions?.includes(permission));
+  if (item.permission) return hasPermission(user, item.permission);
+  if (item.permissionsAny) return item.permissionsAny.some((permission) => hasPermission(user, permission));
   if (item.roles) return item.roles.includes(user.role);
   return true;
 }

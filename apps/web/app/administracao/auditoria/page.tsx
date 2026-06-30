@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Card, EmptyState, Input, Select, Toolbar } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { hasPermission } from "@/lib/permissions";
 import type { AuditLog } from "@/lib/types";
 
 const entityLabels: Record<string, string> = {
@@ -20,7 +21,7 @@ const entityLabels: Record<string, string> = {
 
 export default function AuditPage() {
   const { user } = useAuth();
-  const canView = user?.permissions?.includes("audit.view");
+  const canView = hasPermission(user, "audit.view");
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [search, setSearch] = useState("");
   const [entity, setEntity] = useState("");

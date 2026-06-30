@@ -10,6 +10,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Toolbar } from "@/components/ui";
 import { api } from "@/lib/api";
 import { assetStatusLabels, assetStatusTone, assetTypeLabels, formatDate } from "@/lib/format";
+import { hasPermission } from "@/lib/permissions";
 import type { Asset, User } from "@/lib/types";
 
 type AssetDraft = Omit<Asset, "id" | "last_seen_at" | "assigned_user">;
@@ -30,9 +31,9 @@ const emptyDraft: AssetDraft = {
 
 export default function InventoryPage() {
   const { user } = useAuth();
-  const canView = user?.permissions?.includes("assets.view");
-  const canManage = user?.permissions?.includes("assets.manage");
-  const canViewUsers = user?.permissions?.includes("users.view");
+  const canView = hasPermission(user, "assets.view");
+  const canManage = hasPermission(user, "assets.manage");
+  const canViewUsers = hasPermission(user, "users.view");
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState("");

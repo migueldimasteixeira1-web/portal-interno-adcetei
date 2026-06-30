@@ -9,6 +9,7 @@ import AccessDenied from "@/components/AccessDenied";
 import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import type { CatalogFormField, CatalogService } from "@/lib/types";
 
 type CatalogDraft = {
@@ -43,7 +44,7 @@ const emptyField: CatalogFormField = {
 
 export default function CatalogPage() {
   const { user } = useAuth();
-  const canManage = user?.permissions?.includes("catalog.manage");
+  const canManage = hasPermission(user, "catalog.manage");
   const [services, setServices] = useState<CatalogService[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
