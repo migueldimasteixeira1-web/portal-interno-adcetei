@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ApiError, SESSION_EXPIRED_EVENT, api, resetSessionExpiryGuard } from "@/lib/api";
+import { publicRoutes } from "@/lib/routes";
 import type { User } from "@/lib/types";
 
 interface AuthContextValue {
@@ -14,7 +15,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const publicRoutes = ["/login", "/criar-conta", "/confirmar-email", "/verifique-email"];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

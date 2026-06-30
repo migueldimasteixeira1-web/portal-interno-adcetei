@@ -10,6 +10,7 @@ import UserAvatar from "./UserAvatar";
 import { Button, cn } from "./ui";
 import { roleLabels } from "@/lib/format";
 import { canAccessNavItem, moduleLabelForUser, portalNavSections } from "@/lib/modules";
+import { publicRoutes } from "@/lib/routes";
 
 const pageLabels: Record<string, string> = {
   "/dashboard": "Início",
@@ -30,7 +31,6 @@ const environmentLabel = appEnvironment === "production"
   : appEnvironment === "staging"
     ? "Homologação"
     : "Ambiente local";
-const publicRoutes = ["/login", "/criar-conta", "/confirmar-email", "/verifique-email"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
