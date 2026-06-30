@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from .audit import add_audit
 from .auth import hash_password, validate_institutional_email
 from .catalog_forms import normalize_form_schema
 from .database import get_db
@@ -28,27 +29,6 @@ from .schemas import (
 from .time_utils import utc_now
 
 router = APIRouter(prefix="/api/admin", tags=["administração"])
-
-
-def add_audit(
-    db: Session,
-    actor: User,
-    action: str,
-    entity_type: str,
-    entity_id: str | int,
-    summary: str,
-    changes: dict[str, Any] | None = None,
-) -> None:
-    db.add(
-        AuditLog(
-            actor_id=actor.id,
-            action=action,
-            entity_type=entity_type,
-            entity_id=str(entity_id),
-            summary=summary,
-            changes=changes or {},
-        )
-    )
 
 
 def reject_null_fields(data: dict[str, Any], fields: set[str]) -> None:
