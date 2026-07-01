@@ -15,6 +15,12 @@ import { hasPermission } from "./permissions";
 export type PortalArea = "portal" | "modules" | "administration";
 export type PortalModuleStatus = "available" | "planned";
 
+export interface PortalNavAction {
+  href: string;
+  label: string;
+  requesterLabel?: string;
+}
+
 export interface PortalNavItem {
   href: string;
   label: string;
@@ -26,6 +32,7 @@ export interface PortalNavItem {
   permission?: string;
   permissionsAny?: string[];
   roles?: Role[];
+  actions?: PortalNavAction[];
 }
 
 export const portalHome: PortalNavItem = {
@@ -47,6 +54,10 @@ export const portalModules: PortalNavItem[] = [
     area: "modules",
     status: "available",
     roles: ["admin", "helpdesk", "technician", "requester"],
+    actions: [
+      { href: "/chamados", label: "Ver chamados", requesterLabel: "Meus chamados" },
+      { href: "/chamados/novo", label: "Abrir chamado" },
+    ],
   },
   {
     href: "/inventario",
@@ -91,6 +102,24 @@ export function canAccessNavItem(item: PortalNavItem, user?: User | null): boole
 
 export function moduleLabelForUser(item: PortalNavItem, user?: User | null): string {
   return user?.role === "requester" && item.requesterLabel ? item.requesterLabel : item.label;
+}
+
+export function actionLabelForUser(action: PortalNavAction, user?: User | null): string {
+  return user?.role === "requester" && action.requesterLabel ? action.requesterLabel : action.label;
+}
+
+export function isNavPathActive(pathname: string, href: string): boolean {
+  if (href === "/dashboard") return pathname === href;
+  if (href === "/chamados") return pathname === "/chamados" || /^\/chamados\/\d+/.test(pathname);
+  if (href === "/chamados/novo") return pathname === "/chamados/novo";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function isNavItemActive(pathname: string, item: PortalNavItem): boolean {
+  if (item.actions?.length) {
+    return item.actions.some((action) => isNavPathActive(pathname, action.href));
+  }
+  return isNavPathActive(pathname, item.href);
 }
 
 const PAGE_TITLES: Record<string, string> = {

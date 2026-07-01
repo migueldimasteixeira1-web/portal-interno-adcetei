@@ -6,10 +6,11 @@ import { LogOut, Menu } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import LoadingScreen from "./LoadingScreen";
+import NavCascadeItem from "./NavCascadeItem";
 import UserAvatar from "./UserAvatar";
 import { Button, cn } from "./ui";
 import { roleLabels } from "@/lib/format";
-import { canAccessNavItem, moduleLabelForUser, pageLabelForPath, portalNavSections } from "@/lib/modules";
+import { canAccessNavItem, pageLabelForPath, portalNavSections } from "@/lib/modules";
 import { publicRoutes } from "@/lib/routes";
 
 const appEnvironment = process.env.NEXT_PUBLIC_APP_ENV || "local";
@@ -55,30 +56,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <div key={section.title} className="mb-4 last:mb-0">
               <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">{section.title}</p>
               <ul className="space-y-0.5">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = pathname === item.href
-                    || (item.href !== "/dashboard" && item.href !== "/chamados" && pathname.startsWith(item.href))
-                    || (item.href === "/chamados" && /^\/chamados\/\d+/.test(pathname));
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                          active
-                            ? "bg-white/12 text-white"
-                            : "text-white/70 hover:bg-white/6 hover:text-white",
-                        )}
-                      >
-                        <Icon size={17} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-white" : "text-white/55"} />
-                        <span className="min-w-0 flex-1 truncate">{moduleLabelForUser(item, user)}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
+                {section.items.map((item) => (
+                  <NavCascadeItem
+                    key={item.href}
+                    item={item}
+                    user={user}
+                    pathname={pathname}
+                    onNavigate={() => setOpen(false)}
+                  />
+                ))}
               </ul>
             </div>
           ))}
