@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from .admin_api import router as admin_router
 from .auth import (
     create_access_token,
-    generate_public_token,
     get_current_user,
     hash_password,
     hash_token,
@@ -17,11 +16,11 @@ from .auth import (
     validate_institutional_email,
     verify_password,
 )
-from .catalog_forms import normalize_form_schema, validate_form_data
+from .catalog_forms import catalog_payload, normalize_form_schema, validate_form_data
 from .config import settings
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility, get_db
 from .domain import OPEN_STATUSES, PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
-from .email_service import send_verification_email
+from .email_verification import send_user_verification
 from .models import Asset, ServiceCatalog, Ticket, TicketComment, User
 from .permissions import (
     ensure_role_configs,
@@ -51,7 +50,13 @@ from .schemas import (
 from .seed import seed_database
 from .time_utils import ensure_utc, sao_paulo_day_bounds_utc, utc_now
 
-app = FastAPI(title=settings.app_name, version="0.3.0", docs_url="/docs")
+app = FastAPI(
+    title=settings.app_name,
+    version="0.3.0",
+    docs_url="/docs" if settings.is_local_environment else None,
+    redoc_url="/redoc" if settings.is_local_environment else None,
+    openapi_url="/openapi.json" if settings.is_local_environment else None,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -247,11 +252,6 @@ def serialize_ticket(
     return data
 
 
-def verification_url(token: str) -> str:
-    base = settings.public_app_url.rstrip("/")
-    return f"{base}/confirmar-email?token={token}"
-
-
 def generate_username_from_email(db: Session, email: str) -> str:
     base = email.split("@", 1)[0].replace("+", ".")[:100]
     username = base
@@ -260,18 +260,6 @@ def generate_username_from_email(db: Session, email: str) -> str:
         username = f"{base[:110]}{suffix}"
         suffix += 1
     return username
-
-
-def set_email_verification_token(user: User) -> str:
-    token = generate_public_token()
-    user.email_verification_token_hash = hash_token(token)
-    user.email_verification_expires_at = now_utc() + timedelta(minutes=settings.email_verification_expire_minutes)
-    return token
-
-
-def queue_verification_email(user: User) -> None:
-    token = set_email_verification_token(user)
-    send_verification_email(user.email, user.full_name, verification_url(token))
 
 
 @app.on_event("startup")
@@ -332,7 +320,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     if existing:
         if existing.active and not existing.email_verified_at:
             try:
-                queue_verification_email(existing)
+                send_user_verification(existing)
             except Exception as exc:
                 db.rollback()
                 raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
@@ -354,7 +342,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
     try:
-        queue_verification_email(user)
+        send_user_verification(user)
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
@@ -385,7 +373,7 @@ def resend_verification(payload: ResendVerificationIn, db: Session = Depends(get
     if not user or user.email_verified_at or not user.active:
         return generic
     try:
-        queue_verification_email(user)
+        send_user_verification(user)
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=503, detail="Não foi possível enviar o e-mail de verificação. Tente novamente mais tarde.") from exc
@@ -414,7 +402,8 @@ def list_users(
     if search:
         like = f"%{search}%"
         query = query.where(or_(User.full_name.ilike(like), User.username.ilike(like), User.email.ilike(like)))
-    return list(db.scalars(query))
+    users = list(db.scalars(query))
+    return [serialize_user(user, db, include_permissions=True) for user in users]
 
 
 @app.get("/api/assets", response_model=list[AssetOut])
@@ -461,19 +450,7 @@ def list_catalog(
     if not include_inactive:
         query = query.where(ServiceCatalog.active.is_(True))
     services = list(db.scalars(query))
-    return [
-        {
-            "id": service.id,
-            "name": service.name,
-            "category": service.category,
-            "description": service.description,
-            "icon": service.icon,
-            "color": service.color,
-            "active": service.active,
-            "form_schema": normalize_form_schema(service.form_schema),
-        }
-        for service in services
-    ]
+    return [catalog_payload(service) for service in services]
 
 
 def ticket_visibility_conditions(current_user: User, db: Session) -> list[Any]:

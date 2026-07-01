@@ -8,11 +8,12 @@ import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, Field, SectionHeader, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import type { PermissionDefinition, RoleConfig } from "@/lib/types";
 
 export default function RolesPage() {
   const { user, refreshUser } = useAuth();
-  const canManage = user?.permissions?.includes("roles.manage");
+  const canManage = hasPermission(user, "roles.manage");
   const [roles, setRoles] = useState<RoleConfig[]>([]);
   const [permissions, setPermissions] = useState<PermissionDefinition[]>([]);
   const [saving, setSaving] = useState("");

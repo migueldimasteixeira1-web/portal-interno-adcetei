@@ -2,42 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Boxes, ClipboardList, History, Home, LogOut, Menu, Settings2, ShieldCheck, Users, X } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import LoadingScreen from "./LoadingScreen";
+import NavCascadeItem from "./NavCascadeItem";
 import UserAvatar from "./UserAvatar";
 import { Button, cn } from "./ui";
 import { roleLabels } from "@/lib/format";
+import { canAccessNavItem, pageLabelForPath, portalNavSections } from "@/lib/modules";
+import { publicRoutes } from "@/lib/routes";
 
-const nav = [
-  { href: "/dashboard", label: "Início", icon: Home, roles: ["admin", "helpdesk", "technician", "requester"] },
-  { href: "/chamados/novo", label: "Abrir chamado", icon: ClipboardList, roles: ["admin", "helpdesk", "technician", "requester"] },
-  { href: "/chamados", label: "Central de chamados", requesterLabel: "Meus chamados", icon: ShieldCheck, roles: ["admin", "helpdesk", "technician", "requester"] },
-  { href: "/inventario", label: "Inventário", icon: Boxes, permission: "assets.view" },
-  { href: "/administracao/usuarios", label: "Usuários", icon: Users, permission: "users.view" },
-  { href: "/administracao/catalogo", label: "Catálogo de serviços", icon: BookOpen, permission: "catalog.manage" },
-  { href: "/administracao/perfis", label: "Perfis e permissões", icon: Settings2, permission: "roles.manage" },
-  { href: "/administracao/auditoria", label: "Auditoria", icon: History, permission: "audit.view" },
-];
-
-const pageLabels: Record<string, string> = {
-  "/dashboard": "Início",
-  "/chamados": "Chamados",
-  "/chamados/novo": "Abrir chamado",
-  "/inventario": "Inventário",
-  "/administracao/usuarios": "Usuários",
-  "/administracao/catalogo": "Catálogo de serviços",
-  "/administracao/perfis": "Perfis e permissões",
-  "/administracao/auditoria": "Auditoria",
-};
 const appEnvironment = process.env.NEXT_PUBLIC_APP_ENV || "local";
 const environmentLabel = appEnvironment === "production"
   ? ""
   : appEnvironment === "staging"
     ? "Homologação"
     : "Ambiente local";
-const publicRoutes = ["/login", "/criar-conta", "/confirmar-email", "/verifique-email"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -47,13 +28,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (publicRoutes.includes(pathname)) return <>{children}</>;
   if (loading || !user) return <LoadingScreen label="Validando seu acesso..." />;
 
-  const allowed = nav.filter((item) => {
-    if ("permission" in item && item.permission) return user.permissions?.includes(item.permission);
-    return "roles" in item && item.roles?.includes(user.role);
-  });
-  const currentLabel = pathname.startsWith("/chamados/") && pathname !== "/chamados/novo"
-    ? "Detalhes do chamado"
-    : pageLabels[pathname] || "Portal Interno ADCETEI";
+  const sections = portalNavSections
+    .map((section) => ({ ...section, items: section.items.filter((item) => canAccessNavItem(item, user)) }))
+    .filter((section) => section.items.length > 0);
+  const currentLabel = pageLabelForPath(pathname);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -74,34 +52,22 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3 soft-scrollbar" aria-label="Navegação principal">
-          <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">Menu</p>
-          <ul className="space-y-0.5">
-            {allowed.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href
-                || (item.href !== "/dashboard" && item.href !== "/chamados" && pathname.startsWith(item.href))
-                || (item.href === "/chamados" && /^\/chamados\/\d+/.test(pathname));
-              const label = user.role === "requester" && item.requesterLabel ? item.requesterLabel : item.label;
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-white/12 text-white"
-                        : "text-white/70 hover:bg-white/6 hover:text-white",
-                    )}
-                  >
-                    <Icon size={17} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-white" : "text-white/55"} />
-                    <span>{label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          {sections.map((section) => (
+            <div key={section.title} className="mb-4 last:mb-0">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">{section.title}</p>
+              <ul className="space-y-0.5">
+                {section.items.map((item) => (
+                  <NavCascadeItem
+                    key={item.href}
+                    item={item}
+                    user={user}
+                    pathname={pathname}
+                    onNavigate={() => setOpen(false)}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-white/10 p-3">

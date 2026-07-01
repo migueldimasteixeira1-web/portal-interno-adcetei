@@ -93,12 +93,3 @@ def get_current_user(
             detail="Confirme seu e-mail institucional antes de entrar no portal.",
         )
     return user
-
-
-def require_roles(*roles: str):
-    def checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso não permitido")
-        return current_user
-
-    return checker

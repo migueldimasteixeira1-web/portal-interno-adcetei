@@ -1,14 +1,14 @@
-from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from .auth import generate_public_token, hash_password, hash_token, validate_institutional_email
-from .catalog_forms import normalize_form_schema
+from .audit import add_audit
+from .auth import hash_password, validate_institutional_email
+from .catalog_forms import catalog_payload, normalize_form_schema
 from .database import get_db
-from .email_service import send_verification_email
+from .email_verification import send_user_verification
 from .models import Asset, AuditLog, RoleConfig, ServiceCatalog, User
 from .permissions import ALL_PERMISSIONS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
 from .schemas import (
@@ -27,30 +27,8 @@ from .schemas import (
     UserUpdate,
 )
 from .time_utils import utc_now
-from .config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["administração"])
-
-
-def add_audit(
-    db: Session,
-    actor: User,
-    action: str,
-    entity_type: str,
-    entity_id: str | int,
-    summary: str,
-    changes: dict[str, Any] | None = None,
-) -> None:
-    db.add(
-        AuditLog(
-            actor_id=actor.id,
-            action=action,
-            entity_type=entity_type,
-            entity_id=str(entity_id),
-            summary=summary,
-            changes=changes or {},
-        )
-    )
 
 
 def reject_null_fields(data: dict[str, Any], fields: set[str]) -> None:
@@ -105,35 +83,6 @@ def validate_assigned_user(db: Session, user_id: int | None) -> None:
     user = db.get(User, user_id)
     if not user or not user.active:
         raise HTTPException(status_code=400, detail="Usuário responsável inválido")
-
-
-def catalog_payload(service: ServiceCatalog) -> dict[str, Any]:
-    return {
-        "id": service.id,
-        "name": service.name,
-        "category": service.category,
-        "description": service.description,
-        "icon": service.icon,
-        "color": service.color,
-        "active": service.active,
-        "form_schema": normalize_form_schema(service.form_schema),
-    }
-
-
-def verification_url(token: str) -> str:
-    return f"{settings.public_app_url.rstrip('/')}/confirmar-email?token={token}"
-
-
-def set_email_verification_token(user: User) -> str:
-    token = generate_public_token()
-    user.email_verification_token_hash = hash_token(token)
-    user.email_verification_expires_at = utc_now() + timedelta(minutes=settings.email_verification_expire_minutes)
-    return token
-
-
-def send_user_verification(user: User) -> None:
-    token = set_email_verification_token(user)
-    send_verification_email(user.email, user.full_name, verification_url(token))
 
 
 @router.post("/users", response_model=UserOut, status_code=201)

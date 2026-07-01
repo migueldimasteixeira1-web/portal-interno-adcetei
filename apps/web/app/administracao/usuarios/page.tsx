@@ -11,6 +11,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Toolbar } from "@/components/ui";
 import { api } from "@/lib/api";
 import { roleLabels } from "@/lib/format";
+import { hasPermission } from "@/lib/permissions";
 import type { Role, User } from "@/lib/types";
 
 type UserDraft = {
@@ -52,8 +53,8 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<UserDraft>(emptyDraft);
 
-  const canView = user?.permissions?.includes("users.view");
-  const canManage = user?.permissions?.includes("users.manage");
+  const canView = hasPermission(user, "users.view");
+  const canManage = hasPermission(user, "users.manage");
 
   const load = async () => {
     try {
