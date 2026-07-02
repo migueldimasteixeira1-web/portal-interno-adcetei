@@ -21,6 +21,7 @@ from .config import settings
 from .database import Base, SessionLocal, engine, ensure_schema_compatibility, get_db
 from .domain import OPEN_STATUSES, PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
 from .email_verification import send_user_verification
+from .inventory_api import router as inventory_router
 from .models import Asset, ServiceCatalog, Ticket, TicketComment, User
 from .permissions import (
     ensure_role_configs,
@@ -65,6 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(admin_router)
+app.include_router(inventory_router)
 
 FIELD_LABELS = {
     "status": "o status",
