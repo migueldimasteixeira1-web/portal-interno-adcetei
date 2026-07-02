@@ -75,10 +75,16 @@ fi
 
 "$API_PYTHON" -c "import uvicorn" >/dev/null
 
-echo "[1/9] Validando helpers de formulário e e-mail institucional..."
+echo "[1/9] Validando helpers de formulário, e-mail e inventário..."
 ENVIRONMENT=test "$API_PYTHON" - <<'PY'
 from apps.api.app.catalog_forms import normalize_form_schema, validate_form_data
 from apps.api.app.auth import validate_institutional_email
+from apps.api.app.inventory_service import (
+    build_asset_display_name,
+    initial_inventory_status,
+    normalize_serial_number,
+    validate_shipping_date_for_status,
+)
 
 schema = normalize_form_schema({
     "fields": [
@@ -107,6 +113,18 @@ for email in ("usuario@cabofrio.rj.gov.br", "usuario@gmail.com", "usuario@adcete
         pass
     else:
         raise AssertionError(f"e-mail institucional inválido aceito: {email}")
+assert normalize_serial_number("  AB  123  / Série  ") == "ab 123 / série"
+assert initial_inventory_status(" ADCETEI ", None) == "stock"
+assert initial_inventory_status("Escola Municipal", None) == "allocated"
+assert initial_inventory_status("ADCETEI", 12) == "allocated"
+try:
+    validate_shipping_date_for_status("allocated", None)
+except ValueError:
+    pass
+else:
+    raise AssertionError("equipamento alocado sem data de envio foi aceito")
+assert build_asset_display_name("Notebook", "Dell", "Latitude", " SN 123 ") == "Notebook - Dell - Latitude - SN 123"
+assert "PAT" not in build_asset_display_name(serial_number="SN-9")
 print("Helpers: OK")
 PY
 
@@ -320,6 +338,14 @@ expect(status, 200, "técnico consulta inventário completo")
 if not full_inventory or "ip_address" not in full_inventory[0]:
     raise AssertionError("inventário administrativo não contém os dados completos")
 foreign_asset = next(item for item in full_inventory if item.get("assigned_user_id") != requester_user["id"])
+
+status, inventory_meta = call("GET", "/inventory/meta", operator)
+expect(status, 200, "metadados do módulo de inventário")
+expect(inventory_meta["default_sector"], "ADCETEI", "setor padrão do inventário")
+expect(set(inventory_meta["statuses"]), {"stock", "allocated", "maintenance", "retired"}, "status planejados do inventário")
+for permission in ("inventory.view", "inventory.create", "inventory.bulk_scan", "inventory.import", "inventory.move", "inventory.edit", "inventory.manage_catalogs", "inventory.audit"):
+    if permission not in inventory_meta["permissions"]:
+        raise AssertionError(f"permissão de inventário ausente nos metadados: {permission}")
 
 status, catalog = call("GET", "/catalog", requester)
 expect(status, 200, "catálogo")
@@ -686,6 +712,13 @@ original_permissions = technician_role["permissions"]
 for permission in ("tickets.view_all", "tickets.triage", "tickets.internal_notes", "users.view", "assets.view"):
     if permission not in original_permissions:
         raise AssertionError(f"permissão operacional ausente do técnico: {permission}")
+for permission in ("inventory.view",):
+    if permission not in original_permissions:
+        raise AssertionError(f"permissão base de inventário ausente do técnico: {permission}")
+admin_role = next(item for item in roles if item["role"] == "admin")
+for permission in ("inventory.view", "inventory.create", "inventory.bulk_scan", "inventory.import", "inventory.move", "inventory.edit", "inventory.manage_catalogs", "inventory.audit"):
+    if permission not in admin_role["permissions"]:
+        raise AssertionError(f"permissão granular de inventário ausente do admin: {permission}")
 temporary_permissions = sorted(set(original_permissions + ["users.view"]))
 status, changed_role = call(
     "PATCH",
@@ -705,6 +738,14 @@ status, dependent_role = call(
 )
 expect(status, 200, "dependência de permissão aceita")
 expect("assets.view" in dependent_role["permissions"], True, "dependência de visualização aplicada")
+status, dependent_role = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"permissions": ["inventory.move"]},
+)
+expect(status, 200, "dependência de permissão granular aceita")
+expect("inventory.view" in dependent_role["permissions"], True, "dependência base do inventário aplicada")
 status, _ = call(
     "PATCH",
     "/admin/roles/technician",
