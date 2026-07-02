@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAsset, InventoryAssetCreatePayload, InventoryCatalogs, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryCatalogs, InventoryChangeResponsiblePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -100,8 +100,17 @@ export const api = {
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
   inventoryAssets: () => request<InventoryAsset[]>("/inventory/assets"),
   inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
+  inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),
   createInventoryAsset: (payload: InventoryAssetCreatePayload) =>
     request<InventoryAsset>("/inventory/assets", { method: "POST", body: JSON.stringify(payload) }),
+  allocateInventoryAsset: (id: number | string, payload: InventoryAllocatePayload) =>
+    request<InventoryAsset>(`/inventory/assets/${id}/allocate`, { method: "POST", body: JSON.stringify(payload) }),
+  changeInventoryAssetResponsible: (id: number | string, payload: InventoryChangeResponsiblePayload) =>
+    request<InventoryAsset>(`/inventory/assets/${id}/change-responsible`, { method: "POST", body: JSON.stringify(payload) }),
+  returnInventoryAssetToStock: (id: number | string, payload: InventoryMovementPayload) =>
+    request<InventoryAsset>(`/inventory/assets/${id}/return-to-stock`, { method: "POST", body: JSON.stringify(payload) }),
+  sendInventoryAssetToMaintenance: (id: number | string, payload: InventoryMovementPayload) =>
+    request<InventoryAsset>(`/inventory/assets/${id}/maintenance`, { method: "POST", body: JSON.stringify(payload) }),
   assetTicketOptions: () => request<AssetTicketOption[]>("/assets/ticket-options"),
   catalog: (includeInactive = false) => request<CatalogService[]>(`/catalog?include_inactive=${includeInactive}`),
   createCatalogService: (payload: Record<string, unknown>) =>

@@ -64,6 +64,15 @@ export const inventoryAssetStatusLabels: Record<string, string> = {
   retired: "Baixado",
 };
 
+export const inventoryMovementActionLabels: Record<string, string> = {
+  created: "Cadastro",
+  updated: "Atualização",
+  allocated: "Envio/Alocação",
+  responsible_changed: "Troca de responsável",
+  returned_to_stock: "Devolução ao estoque",
+  maintenance: "Manutenção",
+};
+
 export const assetTypeLabels: Record<string, string> = {
   computer: "Computador",
   notebook: "Notebook",

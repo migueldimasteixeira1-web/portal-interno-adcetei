@@ -51,6 +51,7 @@ export interface AssetTicketOption {
 }
 
 export type InventoryAssetStatus = "stock" | "allocated" | "maintenance" | "retired";
+export type InventoryMovementAction = "created" | "updated" | "allocated" | "responsible_changed" | "returned_to_stock" | "maintenance";
 
 export interface InventoryCatalogItem {
   id: number;
@@ -120,6 +121,35 @@ export interface InventoryAssetCreatePayload {
   received_at: string;
   delivered_at?: string | null;
   notes?: string;
+}
+
+export interface InventoryMovement {
+  id: number;
+  action: InventoryMovementAction;
+  movement_date: string;
+  notes: string;
+  from_status?: InventoryAssetStatus | null;
+  to_status: InventoryAssetStatus;
+  from_sector?: InventoryAssetCatalogRef | null;
+  to_sector?: InventoryAssetCatalogRef | null;
+  from_user?: InventoryAssetUserRef | null;
+  to_user?: InventoryAssetUserRef | null;
+  actor?: InventoryAssetUserRef | null;
+  created_at: string;
+}
+
+export interface InventoryMovementPayload {
+  movement_date: string;
+  notes?: string;
+}
+
+export interface InventoryAllocatePayload extends InventoryMovementPayload {
+  sector_id: number;
+  assigned_user_id?: number | null;
+}
+
+export interface InventoryChangeResponsiblePayload extends InventoryMovementPayload {
+  assigned_user_id: number;
 }
 
 export interface CatalogFormField {
