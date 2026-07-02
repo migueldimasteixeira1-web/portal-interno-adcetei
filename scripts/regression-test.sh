@@ -339,6 +339,11 @@ if not full_inventory or "ip_address" not in full_inventory[0]:
     raise AssertionError("inventário administrativo não contém os dados completos")
 foreign_asset = next(item for item in full_inventory if item.get("assigned_user_id") != requester_user["id"])
 
+status, _ = call("GET", "/inventory/meta", requester)
+expect(status, 403, "metadados do inventário exigem inventory.view")
+status, _ = call("GET", "/inventory/catalogs", requester)
+expect(status, 403, "usuário comum não acessa catálogos de inventário")
+
 status, inventory_meta = call("GET", "/inventory/meta", operator)
 expect(status, 200, "metadados do módulo de inventário")
 expect(inventory_meta["default_sector"], "ADCETEI", "setor padrão do inventário")
@@ -346,6 +351,58 @@ expect(set(inventory_meta["statuses"]), {"stock", "allocated", "maintenance", "r
 for permission in ("inventory.view", "inventory.create", "inventory.bulk_scan", "inventory.import", "inventory.move", "inventory.edit", "inventory.manage_catalogs", "inventory.audit"):
     if permission not in inventory_meta["permissions"]:
         raise AssertionError(f"permissão de inventário ausente nos metadados: {permission}")
+
+status, catalogs = call("GET", "/inventory/catalogs", admin)
+expect(status, 200, "administrador consulta catálogos de inventário")
+if not any(item["name"] == "ADCETEI" and item["is_active"] for item in catalogs["sectors"]):
+    raise AssertionError("setor padrão ADCETEI ausente")
+status, _ = call("POST", "/inventory/catalogs/sectors", admin, {"name": "  adcetei  "})
+expect(status, 409, "setor padrão não pode ser duplicado")
+
+status, supplier = call("POST", "/inventory/catalogs/suppliers", admin, {"name": "Fornecedor Teste"})
+expect(status, 201, "administrador cria fornecedor")
+status, _ = call("POST", "/inventory/catalogs/suppliers", admin, {"name": " fornecedor   teste "})
+expect(status, 409, "fornecedor duplicado bloqueado")
+status, supplier = call("PATCH", f"/inventory/catalogs/suppliers/{supplier['id']}", admin, {"is_active": False})
+expect(status, 200, "administrador inativa fornecedor")
+expect(supplier["is_active"], False, "fornecedor inativado")
+status, supplier = call("PATCH", f"/inventory/catalogs/suppliers/{supplier['id']}", admin, {"is_active": True})
+expect(status, 200, "administrador reativa fornecedor")
+expect(supplier["is_active"], True, "fornecedor reativado")
+
+status, equipment_type = call("POST", "/inventory/catalogs/equipment-types", admin, {"name": "Notebook"})
+expect(status, 201, "administrador cria tipo de equipamento")
+status, manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Dell"})
+expect(status, 201, "administrador cria fabricante")
+status, _ = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": "Latitude 5440", "manufacturer_id": 999999, "equipment_type_id": equipment_type["id"]},
+)
+expect(status, 400, "modelo com fabricante inexistente bloqueado")
+status, _ = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": "Latitude 5440", "manufacturer_id": manufacturer["id"], "equipment_type_id": 999999},
+)
+expect(status, 400, "modelo com tipo inexistente bloqueado")
+status, equipment_model = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": "Latitude 5440", "manufacturer_id": manufacturer["id"], "equipment_type_id": equipment_type["id"]},
+)
+expect(status, 201, "administrador cria modelo")
+expect(equipment_model["manufacturer_id"], manufacturer["id"], "fabricante vinculado ao modelo")
+status, _ = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": " latitude   5440 ", "manufacturer_id": manufacturer["id"], "equipment_type_id": equipment_type["id"]},
+)
+expect(status, 409, "modelo duplicado bloqueado")
 
 status, catalog = call("GET", "/catalog", requester)
 expect(status, 200, "catálogo")
