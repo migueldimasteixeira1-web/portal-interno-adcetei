@@ -111,6 +111,8 @@ Os cadastros base do inventário já existem no backend para fornecedores, tipos
 
 A Parte 6 adicionou histórico e movimentações em `asset_movements`. Alocação, troca de responsável, devolução ao estoque e manutenção registram ator, data operacional, setor/responsável/status de origem e destino. Entrada em lote por leitura de série e importação por planilha continuam planejadas para etapas posteriores.
 
+A Parte 7 adicionou entrada em lote por leitura/digitação de números de série. O fluxo cria todos os itens como estoque ADCETEI, sem responsável e sem data de envio, registrando movimento inicial `created` para cada equipamento. Importação por planilha continua para etapa posterior.
+
 `GET /api/assets` exige a permissão `assets.view`.
 
 A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:

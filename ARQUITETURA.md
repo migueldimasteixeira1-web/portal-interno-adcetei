@@ -117,6 +117,8 @@ O contrato modular de equipamentos fica em `/api/inventory/assets`. Ele reaprove
 
 Movimentações ficam em `asset_movements` e registram ator, data operacional, setor/responsável/status anterior e setor/responsável/status novo. Ações operacionais básicas já cobrem alocação, troca de responsável, devolução ao estoque e manutenção. Entrada em lote e importação seguem como etapas posteriores.
 
+A entrada em lote por leitura de número de série fica em `/inventario/lote` e usa `/api/inventory/assets/bulk-scan`. Ela pré-valida duplicidades, confirma tudo sem criação parcial e cria os equipamentos como estoque ADCETEI com movimento inicial `created`. Importação por planilha permanece fora deste fluxo.
+
 Existem duas superfícies:
 
 ### Inventário administrativo
