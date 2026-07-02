@@ -50,6 +50,78 @@ export interface AssetTicketOption {
   assigned_user?: User | null;
 }
 
+export type InventoryAssetStatus = "stock" | "allocated" | "maintenance" | "retired";
+
+export interface InventoryCatalogItem {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryEquipmentModel extends InventoryCatalogItem {
+  manufacturer_id: number;
+  equipment_type_id: number;
+}
+
+export interface InventoryCatalogs {
+  suppliers: InventoryCatalogItem[];
+  equipment_types: InventoryCatalogItem[];
+  manufacturers: InventoryCatalogItem[];
+  models: InventoryEquipmentModel[];
+  sectors: InventoryCatalogItem[];
+}
+
+export interface InventoryAssetCatalogRef {
+  id: number;
+  name: string;
+}
+
+export interface InventoryAssetUserRef {
+  id: number;
+  full_name: string;
+  email: string;
+  department: string;
+}
+
+export interface InventoryAsset {
+  id: number;
+  serial_number: string;
+  status: InventoryAssetStatus;
+  display_name: string;
+  supplier_id?: number | null;
+  supplier?: InventoryAssetCatalogRef | null;
+  equipment_type_id?: number | null;
+  equipment_type?: InventoryAssetCatalogRef | null;
+  manufacturer_id?: number | null;
+  manufacturer?: InventoryAssetCatalogRef | null;
+  equipment_model_id?: number | null;
+  equipment_model?: InventoryAssetCatalogRef | null;
+  sector_id?: number | null;
+  sector?: InventoryAssetCatalogRef | null;
+  assigned_user_id?: number | null;
+  assigned_user?: InventoryAssetUserRef | null;
+  received_at?: string | null;
+  delivered_at?: string | null;
+  notes: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface InventoryAssetCreatePayload {
+  serial_number: string;
+  supplier_id: number;
+  equipment_type_id: number;
+  manufacturer_id: number;
+  equipment_model_id: number;
+  sector_id?: number | null;
+  assigned_user_id?: number | null;
+  received_at: string;
+  delivered_at?: string | null;
+  notes?: string;
+}
+
 export interface CatalogFormField {
   key: string;
   label: string;

@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAsset, InventoryAssetCreatePayload, InventoryCatalogs, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -97,6 +97,9 @@ export const api = {
     request<Asset>("/admin/assets", { method: "POST", body: JSON.stringify(payload) }),
   updateAsset: (id: number, payload: Record<string, unknown>) =>
     request<Asset>(`/admin/assets/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
+  createInventoryAsset: (payload: InventoryAssetCreatePayload) =>
+    request<InventoryAsset>("/inventory/assets", { method: "POST", body: JSON.stringify(payload) }),
   assetTicketOptions: () => request<AssetTicketOption[]>("/assets/ticket-options"),
   catalog: (includeInactive = false) => request<CatalogService[]>(`/catalog?include_inactive=${includeInactive}`),
   createCatalogService: (payload: Record<string, unknown>) =>
