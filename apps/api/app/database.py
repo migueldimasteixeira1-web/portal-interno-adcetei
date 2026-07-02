@@ -40,6 +40,22 @@ def ensure_schema_compatibility() -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_token_hash VARCHAR(128) DEFAULT ''"))
         if "password_reset_expires_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP"))
+        connection.execute(text("UPDATE users SET role = 'technician' WHERE role = 'helpdesk'"))
+        connection.execute(text("UPDATE users SET role = 'user' WHERE role = 'requester'"))
+
+    if "role_configs" in table_names:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    UPDATE role_configs
+                    SET role = 'technician', label = 'Técnico'
+                    WHERE role = 'helpdesk'
+                      AND NOT EXISTS (SELECT 1 FROM role_configs WHERE role = 'technician')
+                    """
+                )
+            )
+            connection.execute(text("DELETE FROM role_configs WHERE role IN ('helpdesk', 'requester')"))
 
     if "tickets" not in table_names:
         return

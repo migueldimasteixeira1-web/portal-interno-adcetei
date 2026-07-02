@@ -110,16 +110,16 @@ def display_value(field: str, value: Any, db: Session) -> str:
 def ensure_ticket_access(ticket: Ticket, current_user: User, db: Session) -> None:
     if has_permission(db, current_user, "tickets.view_all"):
         return
-    if current_user.role == "requester" and ticket.requester_id != current_user.id:
+    if current_user.role == "user" and ticket.requester_id != current_user.id:
         raise HTTPException(status_code=403, detail="Acesso não permitido")
-    if current_user.role != "requester" and ticket.assignee_id != current_user.id:
+    if current_user.role != "user" and ticket.assignee_id != current_user.id:
         raise HTTPException(status_code=403, detail="Acesso não permitido")
 
 
 def validate_ticket_references(data: dict[str, Any], db: Session) -> None:
     if data.get("assignee_id") is not None:
         assignee = db.get(User, data["assignee_id"])
-        if not assignee or not assignee.active or assignee.role not in {"admin", "helpdesk", "technician"}:
+        if not assignee or not assignee.active or assignee.role not in {"admin", "technician"}:
             raise HTTPException(status_code=400, detail="Responsável inválido")
     if data.get("asset_id") is not None and not db.get(Asset, data["asset_id"]):
         raise HTTPException(status_code=400, detail="Equipamento inválido")
@@ -332,7 +332,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
         full_name=payload.full_name.strip(),
         email=email,
         password_hash=hash_password(payload.password),
-        role="requester",
+        role="user",
         secretariat="Prefeitura de Cabo Frio",
         department="Não informado",
         source="email",
@@ -433,7 +433,7 @@ def list_asset_ticket_options(
     current_user: User = Depends(get_current_user),
 ):
     query = select(Asset).order_by(Asset.name)
-    if current_user.role == "requester":
+    if current_user.role == "user":
         query = query.where(Asset.assigned_user_id == current_user.id)
     return list(db.scalars(query))
 
@@ -456,7 +456,7 @@ def list_catalog(
 def ticket_visibility_conditions(current_user: User, db: Session) -> list[Any]:
     if has_permission(db, current_user, "tickets.view_all"):
         return []
-    if current_user.role == "requester":
+    if current_user.role == "user":
         return [Ticket.requester_id == current_user.id]
     return [Ticket.assignee_id == current_user.id]
 
@@ -549,7 +549,7 @@ def create_ticket(
     asset = db.get(Asset, payload.asset_id) if payload.asset_id is not None else None
     if payload.asset_id is not None and not asset:
         raise HTTPException(status_code=400, detail="Equipamento inválido")
-    if current_user.role == "requester" and asset and asset.assigned_user_id != current_user.id:
+    if current_user.role == "user" and asset and asset.assigned_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="O equipamento selecionado não está vinculado ao seu usuário")
     try:
         normalized_form_schema = normalize_form_schema(service.form_schema)
@@ -635,7 +635,7 @@ def update_ticket(
     if null_fields:
         raise HTTPException(status_code=422, detail="Campos obrigatórios não podem ser nulos")
     if not has_permission(db, current_user, "tickets.triage"):
-        if current_user.role == "requester":
+        if current_user.role == "user":
             raise HTTPException(status_code=403, detail="Acesso não permitido")
         forbidden = set(data) - TECHNICIAN_UPDATE_FIELDS
         if forbidden:
@@ -731,10 +731,10 @@ def dashboard(
 
     team_load = []
     if has_permission(db, current_user, "users.view"):
-        helpdeskers = list(
-            db.scalars(select(User).where(User.role.in_(["helpdesk", "technician"]), User.active.is_(True)).order_by(User.full_name))
+        technicians = list(
+            db.scalars(select(User).where(User.role == "technician", User.active.is_(True)).order_by(User.full_name))
         )
-        for member in helpdeskers:
+        for member in technicians:
             member_count = db.scalar(select(func.count(Ticket.id)).where(Ticket.assignee_id == member.id, Ticket.status.in_(OPEN_STATUSES))) or 0
             team_load.append({"id": member.id, "name": member.full_name, "role": member.role, "open": member_count})
 
@@ -746,7 +746,7 @@ def dashboard(
         overdue=count(Ticket.due_at < current_time, Ticket.status.in_(OPEN_STATUSES)),
         solved_today=count(Ticket.closed_at >= day_start, Ticket.closed_at <= day_end),
         my_open=count(Ticket.assignee_id == current_user.id, Ticket.status.in_(OPEN_STATUSES))
-        if current_user.role != "requester"
+        if current_user.role != "user"
         else count(Ticket.status.in_(OPEN_STATUSES)),
         by_category=[{"name": name, "value": value} for name, value in db.execute(category_query)],
         by_status=[{"name": name, "value": value} for name, value in db.execute(status_query)],

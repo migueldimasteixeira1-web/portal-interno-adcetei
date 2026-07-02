@@ -34,9 +34,9 @@ DEFAULT_ROLE_CONFIGS = {
         "ldap_group": "",
         "permissions": sorted(ALL_PERMISSIONS),
     },
-    "helpdesk": {
-        "label": "Helpdesk",
-        "description": "Triagem, distribuição e acompanhamento geral dos chamados.",
+    "technician": {
+        "label": "Técnico",
+        "description": "Triagem, atendimento e acompanhamento operacional dos chamados.",
         "ldap_group": "",
         "permissions": [
             "tickets.view_all",
@@ -46,14 +46,8 @@ DEFAULT_ROLE_CONFIGS = {
             "assets.view",
         ],
     },
-    "technician": {
-        "label": "Técnico",
-        "description": "Atendimento dos chamados atribuídos e consulta técnica.",
-        "ldap_group": "",
-        "permissions": ["tickets.internal_notes", "assets.view"],
-    },
-    "requester": {
-        "label": "Solicitante",
+    "user": {
+        "label": "Usuário",
         "description": "Abertura e acompanhamento dos próprios chamados.",
         "ldap_group": "",
         "permissions": [],
@@ -66,6 +60,16 @@ def ensure_role_configs(db: Session) -> None:
     for role, data in DEFAULT_ROLE_CONFIGS.items():
         if role not in existing:
             db.add(RoleConfig(role=role, **data))
+            continue
+        config = db.get(RoleConfig, role)
+        if not config:
+            continue
+        config.label = data["label"]
+        config.description = data["description"]
+        if role == "admin":
+            config.permissions = sorted(ALL_PERMISSIONS)
+        elif role == "technician":
+            config.permissions = normalize_permissions(list(set(config.permissions or []) | set(data["permissions"])))
     db.commit()
 
 

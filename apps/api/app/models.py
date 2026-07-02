@@ -18,7 +18,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(180))
     email: Mapped[str] = mapped_column(String(180), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), default="")
-    role: Mapped[str] = mapped_column(String(40), default="requester", index=True)
+    role: Mapped[str] = mapped_column(String(40), default="user", index=True)
     secretariat: Mapped[str] = mapped_column(String(150), default="Prefeitura de Cabo Frio")
     department: Mapped[str] = mapped_column(String(150), default="Não informado")
     phone: Mapped[str] = mapped_column(String(40), default="")

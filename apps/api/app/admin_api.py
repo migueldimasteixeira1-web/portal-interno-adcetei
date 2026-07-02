@@ -10,7 +10,7 @@ from .catalog_forms import catalog_payload, normalize_form_schema
 from .database import get_db
 from .email_verification import send_user_verification
 from .models import Asset, AuditLog, RoleConfig, ServiceCatalog, User
-from .permissions import ALL_PERMISSIONS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
+from .permissions import ALL_PERMISSIONS, DEFAULT_ROLE_CONFIGS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
 from .schemas import (
     AssetCreate,
     AssetOut,
@@ -396,7 +396,7 @@ def list_roles(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permission("roles.manage")),
 ):
-    return list(db.scalars(select(RoleConfig).order_by(RoleConfig.role)))
+    return list(db.scalars(select(RoleConfig).where(RoleConfig.role.in_(DEFAULT_ROLE_CONFIGS.keys())).order_by(RoleConfig.role)))
 
 
 @router.get("/permissions", response_model=list[PermissionDefinitionOut])
@@ -411,6 +411,8 @@ def update_role(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permission("roles.manage")),
 ):
+    if role not in DEFAULT_ROLE_CONFIGS:
+        raise HTTPException(status_code=404, detail="Perfil não encontrado")
     config = db.get(RoleConfig, role)
     if not config:
         raise HTTPException(status_code=404, detail="Perfil não encontrado")
