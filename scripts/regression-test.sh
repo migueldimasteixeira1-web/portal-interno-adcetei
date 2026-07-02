@@ -404,6 +404,132 @@ status, _ = call(
 )
 expect(status, 409, "modelo duplicado bloqueado")
 
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    requester,
+    {
+        "serial_number": "REQ-SEM-PERMISSAO",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+    },
+)
+expect(status, 403, "usuário comum não cria equipamento")
+
+status, modular_asset = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "  SN   MOD-001  ",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "notes": "Criado pela regressão do contrato modular.",
+    },
+)
+expect(status, 201, "administrador cria equipamento modular")
+expect(modular_asset["serial_number"], "SN MOD-001", "serial normalizado sem destruir caracteres")
+expect(modular_asset["status"], "stock", "equipamento sem setor externo e responsável entra em estoque")
+expect(modular_asset["supplier"]["name"], supplier["name"], "fornecedor no contrato novo")
+expect(modular_asset["equipment_type"]["name"], equipment_type["name"], "tipo no contrato novo")
+expect(modular_asset["manufacturer"]["name"], manufacturer["name"], "fabricante no contrato novo")
+expect(modular_asset["equipment_model"]["name"], equipment_model["name"], "modelo no contrato novo")
+expect(modular_asset["sector"]["name"], "ADCETEI", "setor padrão no contrato novo")
+if "Latitude 5440" not in modular_asset["display_name"] or "SN MOD-001" not in modular_asset["display_name"]:
+    raise AssertionError(f"display name incompleto: {modular_asset['display_name']}")
+
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "sn mod-001",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+    },
+)
+expect(status, 409, "serial duplicado bloqueado por comparação normalizada")
+
+status, other_manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Lenovo"})
+expect(status, 201, "administrador cria fabricante alternativo")
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-MODELO-INCOMPATIVEL",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": other_manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+    },
+)
+expect(status, 400, "modelo incompatível com fabricante bloqueado")
+
+status, external_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Escola Municipal"})
+expect(status, 201, "administrador cria setor externo")
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-SEM-ENTREGA",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "sector_id": external_sector["id"],
+    },
+)
+expect(status, 422, "setor externo exige data de entrega")
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-RESP-SEM-ENTREGA",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "assigned_user_id": requester_user["id"],
+    },
+)
+expect(status, 422, "responsável exige data de entrega")
+
+status, allocated_asset = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-ALOCADO-001",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "assigned_user_id": requester_user["id"],
+        "delivered_at": "2026-07-02T12:00:00-03:00",
+    },
+)
+expect(status, 201, "administrador cria equipamento alocado")
+expect(allocated_asset["status"], "allocated", "responsável coloca equipamento como alocado")
+expect(allocated_asset["assigned_user"]["id"], requester_user["id"], "responsável no contrato novo")
+
+status, listed_assets = call("GET", "/inventory/assets", admin, params={"status_filter": "stock"})
+expect(status, 200, "administrador lista equipamentos no contrato novo")
+if not any(item["id"] == modular_asset["id"] for item in listed_assets):
+    raise AssertionError("equipamento em estoque não retornou no filtro do contrato novo")
+status, detailed_asset = call("GET", f"/inventory/assets/{allocated_asset['id']}", admin)
+expect(status, 200, "administrador detalha equipamento modular")
+expect(detailed_asset["status"], "allocated", "detalhe converte active legado para allocated")
+
+status, legacy_inventory = call("GET", "/assets", operator)
+expect(status, 200, "rota antiga de assets segue funcionando")
+if not any(item["id"] == allocated_asset["id"] and item["status"] == "active" for item in legacy_inventory):
+    raise AssertionError("rota antiga não preservou status active para equipamento alocado")
+
 status, catalog = call("GET", "/catalog", requester)
 expect(status, 200, "catálogo")
 printer_service = next(item for item in catalog if item["name"] == "Instalar impressora")
@@ -424,6 +550,20 @@ status, _ = call(
     },
 )
 expect(status, 403, "equipamento de outro usuário rejeitado")
+
+status, ticket_with_modular_asset = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": general_service["id"],
+        "description": "Chamado com equipamento criado pelo contrato modular.",
+        "asset_id": allocated_asset["id"],
+        "form_data": {},
+    },
+)
+expect(status, 201, "ticket.asset_id segue compatível com equipamento modular")
+expect(ticket_with_modular_asset["asset"]["id"], allocated_asset["id"], "chamado preserva vínculo com asset modular")
 
 # Campos administrativos continuam proibidos na abertura.
 status, _ = call(
