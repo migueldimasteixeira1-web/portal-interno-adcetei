@@ -317,6 +317,44 @@ class InventoryAssetCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class InventoryBulkScanRequest(BaseModel):
+    supplier_id: int
+    equipment_type_id: int
+    manufacturer_id: int
+    equipment_model_id: int
+    received_at: date
+    serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryBulkScanItemPreview(BaseModel):
+    index: int
+    serial_number: str
+    normalized_serial: str
+
+
+class InventoryBulkScanError(BaseModel):
+    index: int
+    serial_number: str
+    normalized_serial: str
+    message: str
+
+
+class InventoryBulkScanPreviewOut(BaseModel):
+    total: int
+    valid_count: int
+    invalid_count: int
+    valid_items: list[InventoryBulkScanItemPreview]
+    errors: list[InventoryBulkScanError]
+
+
+class InventoryBulkScanConfirmOut(BaseModel):
+    created_count: int
+    assets: list[InventoryAssetOut]
+    summary: InventoryBulkScanPreviewOut
+
+
 class InventoryAssetUpdate(BaseModel):
     serial_number: Optional[str] = Field(default=None, min_length=1, max_length=120)
     status: Optional[InventoryAssetStatus] = None

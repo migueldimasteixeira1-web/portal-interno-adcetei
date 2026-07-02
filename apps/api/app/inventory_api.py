@@ -17,7 +17,9 @@ from .inventory_service import (
     apply_return_to_stock,
     apply_send_to_maintenance,
     asset_movement_state,
+    build_bulk_scan_preview,
     build_asset_display_name,
+    display_serial_number,
     initial_inventory_status,
     inventory_status_from_asset,
     legacy_asset_status,
@@ -47,6 +49,9 @@ from .schemas import (
     InventoryAssetOut,
     InventoryAssetUpdate,
     InventoryAllocateRequest,
+    InventoryBulkScanConfirmOut,
+    InventoryBulkScanPreviewOut,
+    InventoryBulkScanRequest,
     InventoryChangeResponsibleRequest,
     InventoryEquipmentModelCreate,
     InventoryEquipmentModelOut,
@@ -325,6 +330,76 @@ def add_asset_movement(
     return movement
 
 
+def existing_normalized_serials(db: Session) -> set[str]:
+    return {
+        normalize_serial_number(serial)
+        for serial, in db.execute(select(Asset.serial_number))
+        if serial and normalize_serial_number(serial)
+    }
+
+
+def bulk_scan_preview_payload(db: Session, payload: InventoryBulkScanRequest) -> dict[str, Any]:
+    validate_optional_catalogs(db, payload.supplier_id, None)
+    validate_asset_catalogs(
+        db,
+        payload.equipment_type_id,
+        payload.manufacturer_id,
+        payload.equipment_model_id,
+    )
+    return build_bulk_scan_preview(payload.serial_numbers, existing_normalized_serials(db))
+
+
+def create_bulk_scan_asset(
+    db: Session,
+    *,
+    payload: InventoryBulkScanRequest,
+    serial_number: str,
+    supplier: InventorySupplier,
+    equipment_type: InventoryEquipmentType,
+    manufacturer: InventoryManufacturer,
+    equipment_model: InventoryEquipmentModel,
+    sector: InventorySector,
+    received_at: Any,
+    actor_id: int,
+) -> Asset:
+    display_name = build_asset_display_name(
+        equipment_type.name,
+        manufacturer.name,
+        equipment_model.name,
+        serial_number,
+    )
+    asset = Asset(
+        name=display_name[:160],
+        asset_type=equipment_type.name[:60],
+        manufacturer=manufacturer.name[:100],
+        model=equipment_model.name[:140],
+        serial_number=serial_number,
+        status=legacy_asset_status("stock"),
+        location=sector.name,
+        assigned_user_id=None,
+        supplier_id=supplier.id,
+        equipment_type_id=equipment_type.id,
+        manufacturer_id=manufacturer.id,
+        equipment_model_id=equipment_model.id,
+        sector_id=sector.id,
+        received_at=received_at,
+        delivered_at=None,
+        notes=payload.notes.strip(),
+    )
+    db.add(asset)
+    db.flush()
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="created",
+        before={"sector_id": None, "user_id": None, "status": None},
+        movement_at=received_at,
+        notes=payload.notes,
+        actor_id=actor_id,
+    )
+    return asset
+
+
 def calculated_asset_status(sector: InventorySector | None, assigned_user_id: int | None) -> str:
     return initial_inventory_status(sector.name if sector else DEFAULT_INVENTORY_SECTOR, assigned_user_id)
 
@@ -347,6 +422,60 @@ def list_inventory_assets(
     if status_filter:
         assets = [asset for asset in assets if asset_inventory_status(asset) == status_filter]
     return [inventory_asset_payload(asset) for asset in assets]
+
+
+@router.post("/assets/bulk-scan/preview", response_model=InventoryBulkScanPreviewOut)
+def preview_inventory_bulk_scan(
+    payload: InventoryBulkScanRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.bulk_scan")),
+):
+    return bulk_scan_preview_payload(db, payload)
+
+
+@router.post("/assets/bulk-scan/confirm", response_model=InventoryBulkScanConfirmOut)
+def confirm_inventory_bulk_scan(
+    payload: InventoryBulkScanRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.bulk_scan")),
+):
+    preview = bulk_scan_preview_payload(db, payload)
+    if preview["errors"]:
+        raise HTTPException(status_code=409, detail="Corrija os erros do lote antes de confirmar")
+
+    supplier, _ = validate_optional_catalogs(db, payload.supplier_id, None)
+    equipment_type, manufacturer, equipment_model = validate_asset_catalogs(
+        db,
+        payload.equipment_type_id,
+        payload.manufacturer_id,
+        payload.equipment_model_id,
+    )
+    if supplier is None:
+        raise HTTPException(status_code=400, detail="Fornecedor inválido")
+    sector = get_default_sector(db)
+    received_at = movement_datetime(payload.received_at)
+    created_assets = [
+        create_bulk_scan_asset(
+            db,
+            payload=payload,
+            serial_number=display_serial_number(item["serial_number"]),
+            supplier=supplier,
+            equipment_type=equipment_type,
+            manufacturer=manufacturer,
+            equipment_model=equipment_model,
+            sector=sector,
+            received_at=received_at,
+            actor_id=current_user.id,
+        )
+        for item in preview["valid_items"]
+    ]
+    db.commit()
+    assets = [inventory_asset_payload(fresh_inventory_asset(db, asset.id)) for asset in created_assets]
+    return {
+        "created_count": len(assets),
+        "assets": assets,
+        "summary": preview,
+    }
 
 
 @router.get("/assets/{asset_id}", response_model=InventoryAssetOut)

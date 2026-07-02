@@ -12,6 +12,10 @@ def normalize_serial_number(value: str | None) -> str:
     return " ".join((value or "").strip().split()).casefold()
 
 
+def display_serial_number(value: str | None) -> str:
+    return " ".join((value or "").strip().split())
+
+
 def initial_inventory_status(sector: str | None, responsible_id: int | None = None) -> str:
     normalized_sector = " ".join((sector or "").strip().split()).casefold()
     default_sector = DEFAULT_INVENTORY_SECTOR.casefold()
@@ -115,3 +119,51 @@ def apply_return_to_stock(asset, default_sector) -> None:
 
 def apply_send_to_maintenance(asset) -> None:
     asset.status = legacy_asset_status("maintenance")
+
+
+def build_bulk_scan_preview(serial_numbers: list[str], existing_normalized_serials: set[str]) -> dict:
+    valid_items: list[dict] = []
+    errors: list[dict] = []
+    seen: set[str] = set()
+
+    for index, raw_serial in enumerate(serial_numbers, start=1):
+        serial = display_serial_number(raw_serial)
+        normalized = normalize_serial_number(serial)
+        if not normalized:
+            errors.append({
+                "index": index,
+                "serial_number": raw_serial,
+                "normalized_serial": "",
+                "message": "Número de série obrigatório",
+            })
+            continue
+        if normalized in seen:
+            errors.append({
+                "index": index,
+                "serial_number": serial,
+                "normalized_serial": normalized,
+                "message": "Número de série duplicado no lote",
+            })
+            continue
+        seen.add(normalized)
+        if normalized in existing_normalized_serials:
+            errors.append({
+                "index": index,
+                "serial_number": serial,
+                "normalized_serial": normalized,
+                "message": "Número de série já cadastrado",
+            })
+            continue
+        valid_items.append({
+            "index": index,
+            "serial_number": serial,
+            "normalized_serial": normalized,
+        })
+
+    return {
+        "total": len(serial_numbers),
+        "valid_count": len(valid_items),
+        "invalid_count": len(errors),
+        "valid_items": valid_items,
+        "errors": errors,
+    }
