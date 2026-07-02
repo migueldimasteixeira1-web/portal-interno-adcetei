@@ -107,7 +107,9 @@ Direção planejada do módulo: fundação modular, cadastros base, evolução d
 
 Os cadastros base do inventário já existem no backend para fornecedores, tipos de equipamento, fabricantes, modelos e setores. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
 
-`assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente; movimentações completas, entrada em lote, importação por planilha e UI virão depois.
+`assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente.
+
+A Parte 6 adicionou histórico e movimentações em `asset_movements`. Alocação, troca de responsável, devolução ao estoque e manutenção registram ator, data operacional, setor/responsável/status de origem e destino. Entrada em lote por leitura de série e importação por planilha continuam planejadas para etapas posteriores.
 
 `GET /api/assets` exige a permissão `assets.view`.
 

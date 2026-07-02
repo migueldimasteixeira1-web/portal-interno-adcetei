@@ -113,7 +113,9 @@ A evolução prevista será incremental: fundação modular, cadastros base, evo
 
 Os cadastros base ficam sob `/api/inventory/catalogs` e cobrem fornecedores, tipos de equipamento, fabricantes, modelos e setores. A criação/edição exige `inventory.manage_catalogs`; a listagem exige `inventory.view`.
 
-O contrato modular de equipamentos fica em `/api/inventory/assets`. Ele reaproveita a tabela `assets`, adiciona vínculos opcionais aos cadastros base, usa número de série como identificação principal e mantém fallback para `asset_type`, `manufacturer`, `model` e `name`. As rotas legadas de assets continuam disponíveis; movimentações completas, entrada em lote, importação e UI serão etapas posteriores.
+O contrato modular de equipamentos fica em `/api/inventory/assets`. Ele reaproveita a tabela `assets`, adiciona vínculos opcionais aos cadastros base, usa número de série como identificação principal e mantém fallback para `asset_type`, `manufacturer`, `model` e `name`. As rotas legadas de assets continuam disponíveis.
+
+Movimentações ficam em `asset_movements` e registram ator, data operacional, setor/responsável/status anterior e setor/responsável/status novo. Ações operacionais básicas já cobrem alocação, troca de responsável, devolução ao estoque e manutenção. Entrada em lote e importação seguem como etapas posteriores.
 
 Existem duas superfícies:
 
