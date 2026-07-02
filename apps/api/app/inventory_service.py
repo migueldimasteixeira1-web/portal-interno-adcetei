@@ -1,6 +1,7 @@
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 
 from .inventory_constants import DEFAULT_INVENTORY_SECTOR
+from .time_utils import SAO_PAULO, ensure_utc
 
 
 def normalize_catalog_name(value: str) -> str:
@@ -36,3 +37,81 @@ def build_asset_display_name(
         if part and part.strip()
     ]
     return " - ".join(parts) if parts else "Equipamento sem identificação"
+
+
+def inventory_status_from_asset(asset) -> str:
+    return "allocated" if getattr(asset, "status", "") == "active" else getattr(asset, "status", "")
+
+
+def legacy_asset_status(status: str) -> str:
+    return "active" if status == "allocated" else status
+
+
+def movement_datetime(value: date | datetime) -> datetime:
+    if isinstance(value, datetime):
+        normalized = ensure_utc(value)
+        if normalized is None:
+            raise ValueError("Data da movimentação obrigatória")
+        return normalized
+    return datetime.combine(value, time(hour=12), tzinfo=SAO_PAULO).astimezone(timezone.utc)
+
+
+def asset_movement_state(asset) -> dict[str, int | str | None]:
+    return {
+        "sector_id": getattr(asset, "sector_id", None),
+        "user_id": getattr(asset, "assigned_user_id", None),
+        "status": inventory_status_from_asset(asset),
+    }
+
+
+def movement_values(
+    *,
+    asset_id: int,
+    action: str,
+    before: dict[str, int | str | None],
+    after: dict[str, int | str | None],
+    movement_date: datetime,
+    notes: str,
+    actor_id: int | None,
+) -> dict[str, int | str | datetime | None]:
+    return {
+        "asset_id": asset_id,
+        "action": action,
+        "from_sector_id": before.get("sector_id"),
+        "to_sector_id": after.get("sector_id"),
+        "from_user_id": before.get("user_id"),
+        "to_user_id": after.get("user_id"),
+        "from_status": before.get("status"),
+        "to_status": after.get("status") or "",
+        "movement_date": movement_date,
+        "notes": notes.strip(),
+        "actor_id": actor_id,
+    }
+
+
+def apply_asset_allocation(asset, sector, assigned_user_id: int | None, delivered_at: datetime) -> None:
+    asset.sector_id = sector.id
+    asset.location = sector.name
+    asset.assigned_user_id = assigned_user_id
+    asset.delivered_at = delivered_at
+    asset.status = legacy_asset_status("allocated")
+
+
+def apply_responsible_change(asset, assigned_user_id: int, movement_at: datetime) -> None:
+    if inventory_status_from_asset(asset) == "stock":
+        raise ValueError("Equipamento em estoque deve ser enviado para setor antes de trocar responsável")
+    asset.assigned_user_id = assigned_user_id
+    asset.delivered_at = movement_at
+    asset.status = legacy_asset_status("allocated")
+
+
+def apply_return_to_stock(asset, default_sector) -> None:
+    asset.sector_id = default_sector.id
+    asset.location = default_sector.name
+    asset.assigned_user_id = None
+    asset.delivered_at = None
+    asset.status = legacy_asset_status("stock")
+
+
+def apply_send_to_maintenance(asset) -> None:
+    asset.status = legacy_asset_status("maintenance")

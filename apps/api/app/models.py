@@ -135,6 +135,31 @@ class InventorySector(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
+class AssetMovement(Base):
+    __tablename__ = "asset_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    action: Mapped[str] = mapped_column(String(60), index=True)
+    from_sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
+    to_sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
+    from_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    to_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    from_status: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(40))
+    movement_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    actor_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+    asset: Mapped[Asset] = relationship()
+    from_sector: Mapped[Optional[InventorySector]] = relationship(foreign_keys=[from_sector_id])
+    to_sector: Mapped[Optional[InventorySector]] = relationship(foreign_keys=[to_sector_id])
+    from_user: Mapped[Optional[User]] = relationship(foreign_keys=[from_user_id])
+    to_user: Mapped[Optional[User]] = relationship(foreign_keys=[to_user_id])
+    actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])
+
+
 class ServiceCatalog(Base):
     __tablename__ = "service_catalog"
 

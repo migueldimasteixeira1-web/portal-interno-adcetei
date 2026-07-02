@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
@@ -259,6 +259,7 @@ class InventoryCatalogsOut(BaseModel):
 
 
 InventoryAssetStatus = Literal["stock", "allocated", "maintenance", "retired"]
+InventoryMovementAction = Literal["created", "updated", "allocated", "responsible_changed", "returned_to_stock", "maintenance"]
 
 
 class InventoryAssetCatalogRefOut(BaseModel):
@@ -329,6 +330,48 @@ class InventoryAssetUpdate(BaseModel):
     delivered_at: Optional[datetime] = None
     notes: Optional[str] = Field(default=None, max_length=2000)
     model_config = ConfigDict(extra="forbid")
+
+
+class InventoryMovementCreate(BaseModel):
+    movement_date: date
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryAllocateRequest(InventoryMovementCreate):
+    sector_id: int
+    assigned_user_id: Optional[int] = None
+
+
+class InventoryChangeResponsibleRequest(InventoryMovementCreate):
+    assigned_user_id: int
+
+
+class InventoryReturnToStockRequest(InventoryMovementCreate):
+    pass
+
+
+class InventoryMaintenanceRequest(InventoryMovementCreate):
+    pass
+
+
+class InventoryMovementOut(BaseModel):
+    id: int
+    action: InventoryMovementAction
+    movement_date: datetime
+    notes: str
+    from_status: Optional[InventoryAssetStatus] = None
+    to_status: InventoryAssetStatus
+    from_sector: Optional[InventoryAssetCatalogRefOut] = None
+    to_sector: Optional[InventoryAssetCatalogRefOut] = None
+    from_user: Optional[InventoryAssetUserRefOut] = None
+    to_user: Optional[InventoryAssetUserRefOut] = None
+    actor: Optional[InventoryAssetUserRefOut] = None
+    created_at: datetime
+
+    @field_serializer("movement_date", "created_at")
+    def serialize_movement_datetimes(self, value: datetime) -> str:
+        return iso_utc(value) or ""
 
 
 class AuditLogOut(BaseModel):

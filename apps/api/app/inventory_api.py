@@ -12,14 +12,24 @@ from .inventory_constants import (
     INVENTORY_STATUSES,
 )
 from .inventory_service import (
+    apply_asset_allocation,
+    apply_responsible_change,
+    apply_return_to_stock,
+    apply_send_to_maintenance,
+    asset_movement_state,
     build_asset_display_name,
     initial_inventory_status,
+    inventory_status_from_asset,
+    legacy_asset_status,
+    movement_datetime,
+    movement_values,
     normalize_catalog_name,
     normalize_serial_number,
     validate_shipping_date_for_status,
 )
 from .models import (
     Asset,
+    AssetMovement,
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
@@ -36,9 +46,14 @@ from .schemas import (
     InventoryAssetCreate,
     InventoryAssetOut,
     InventoryAssetUpdate,
+    InventoryAllocateRequest,
+    InventoryChangeResponsibleRequest,
     InventoryEquipmentModelCreate,
     InventoryEquipmentModelOut,
     InventoryEquipmentModelUpdate,
+    InventoryMaintenanceRequest,
+    InventoryMovementOut,
+    InventoryReturnToStockRequest,
 )
 from .time_utils import utc_now
 
@@ -209,11 +224,7 @@ def inventory_asset_query():
 
 
 def asset_inventory_status(asset: Asset) -> str:
-    return "allocated" if asset.status == "active" else asset.status
-
-
-def legacy_asset_status(status: str) -> str:
-    return "active" if status == "allocated" else status
+    return inventory_status_from_asset(asset)
 
 
 def asset_display_name(asset: Asset) -> str:
@@ -251,6 +262,69 @@ def inventory_asset_payload(asset: Asset) -> dict[str, Any]:
     }
 
 
+def inventory_movement_query():
+    return select(AssetMovement).options(
+        joinedload(AssetMovement.from_sector),
+        joinedload(AssetMovement.to_sector),
+        joinedload(AssetMovement.from_user),
+        joinedload(AssetMovement.to_user),
+        joinedload(AssetMovement.actor),
+    )
+
+
+def inventory_movement_payload(movement: AssetMovement) -> dict[str, Any]:
+    return {
+        "id": movement.id,
+        "action": movement.action,
+        "movement_date": movement.movement_date,
+        "notes": movement.notes or "",
+        "from_status": movement.from_status,
+        "to_status": movement.to_status,
+        "from_sector": catalog_ref(movement.from_sector),
+        "to_sector": catalog_ref(movement.to_sector),
+        "from_user": movement.from_user,
+        "to_user": movement.to_user,
+        "actor": movement.actor,
+        "created_at": movement.created_at,
+    }
+
+
+def get_inventory_asset_or_404(db: Session, asset_id: int) -> Asset:
+    asset = db.scalar(inventory_asset_query().where(Asset.id == asset_id))
+    if not asset:
+        raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    return asset
+
+
+def fresh_inventory_asset(db: Session, asset_id: int) -> Asset:
+    return db.scalar(inventory_asset_query().where(Asset.id == asset_id).execution_options(populate_existing=True))
+
+
+def add_asset_movement(
+    db: Session,
+    *,
+    asset: Asset,
+    action: str,
+    before: dict[str, int | str | None],
+    movement_at: Any,
+    notes: str,
+    actor_id: int | None,
+) -> AssetMovement:
+    movement = AssetMovement(
+        **movement_values(
+            asset_id=asset.id,
+            action=action,
+            before=before,
+            after=asset_movement_state(asset),
+            movement_date=movement_at,
+            notes=notes,
+            actor_id=actor_id,
+        )
+    )
+    db.add(movement)
+    return movement
+
+
 def calculated_asset_status(sector: InventorySector | None, assigned_user_id: int | None) -> str:
     return initial_inventory_status(sector.name if sector else DEFAULT_INVENTORY_SECTOR, assigned_user_id)
 
@@ -281,10 +355,7 @@ def get_inventory_asset(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.view")),
 ):
-    asset = db.scalar(inventory_asset_query().where(Asset.id == asset_id))
-    if not asset:
-        raise HTTPException(status_code=404, detail="Equipamento não encontrado")
-    return inventory_asset_payload(asset)
+    return inventory_asset_payload(get_inventory_asset_or_404(db, asset_id))
 
 
 @router.post("/assets", response_model=InventoryAssetOut, status_code=201)
@@ -307,6 +378,7 @@ def create_inventory_asset(
     )
     status = calculated_asset_status(sector, payload.assigned_user_id)
     ensure_shipping_date(status, payload.delivered_at)
+    received_at = payload.received_at or utc_now()
     display_name = build_asset_display_name(
         equipment_type.name,
         manufacturer.name,
@@ -327,13 +399,23 @@ def create_inventory_asset(
         manufacturer_id=manufacturer.id,
         equipment_model_id=equipment_model.id,
         sector_id=sector.id,
-        received_at=payload.received_at or utc_now(),
+        received_at=received_at,
         delivered_at=payload.delivered_at,
         notes=payload.notes.strip(),
     )
     db.add(asset)
+    db.flush()
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="created",
+        before={"sector_id": None, "user_id": None, "status": None},
+        movement_at=received_at,
+        notes=payload.notes,
+        actor_id=current_user.id,
+    )
     db.commit()
-    return inventory_asset_payload(db.scalar(inventory_asset_query().where(Asset.id == asset.id)))
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
 
 
 @router.patch("/assets/{asset_id}", response_model=InventoryAssetOut)
@@ -391,7 +473,126 @@ def update_inventory_asset(
     asset.status = legacy_asset_status(status)
     asset.name = asset_display_name(asset)[:160]
     db.commit()
-    return inventory_asset_payload(db.scalar(inventory_asset_query().where(Asset.id == asset.id)))
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
+
+
+@router.get("/assets/{asset_id}/movements", response_model=list[InventoryMovementOut])
+def list_inventory_asset_movements(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.view")),
+):
+    get_inventory_asset_or_404(db, asset_id)
+    movements = db.scalars(
+        inventory_movement_query()
+        .where(AssetMovement.asset_id == asset_id)
+        .order_by(AssetMovement.movement_date.desc(), AssetMovement.id.desc())
+    ).unique()
+    return [inventory_movement_payload(movement) for movement in movements]
+
+
+@router.post("/assets/{asset_id}/allocate", response_model=InventoryAssetOut)
+def allocate_inventory_asset(
+    asset_id: int,
+    payload: InventoryAllocateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.move")),
+):
+    asset = get_inventory_asset_or_404(db, asset_id)
+    sector = db.get(InventorySector, payload.sector_id)
+    if not sector:
+        raise HTTPException(status_code=400, detail="Setor inválido")
+    validate_user(db, payload.assigned_user_id)
+    movement_at = movement_datetime(payload.movement_date)
+    before = asset_movement_state(asset)
+    apply_asset_allocation(asset, sector, payload.assigned_user_id, movement_at)
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="allocated",
+        before=before,
+        movement_at=movement_at,
+        notes=payload.notes,
+        actor_id=current_user.id,
+    )
+    db.commit()
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
+
+
+@router.post("/assets/{asset_id}/change-responsible", response_model=InventoryAssetOut)
+def change_inventory_asset_responsible(
+    asset_id: int,
+    payload: InventoryChangeResponsibleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.move")),
+):
+    asset = get_inventory_asset_or_404(db, asset_id)
+    validate_user(db, payload.assigned_user_id)
+    movement_at = movement_datetime(payload.movement_date)
+    before = asset_movement_state(asset)
+    try:
+        apply_responsible_change(asset, payload.assigned_user_id, movement_at)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="responsible_changed",
+        before=before,
+        movement_at=movement_at,
+        notes=payload.notes,
+        actor_id=current_user.id,
+    )
+    db.commit()
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
+
+
+@router.post("/assets/{asset_id}/return-to-stock", response_model=InventoryAssetOut)
+def return_inventory_asset_to_stock(
+    asset_id: int,
+    payload: InventoryReturnToStockRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.move")),
+):
+    asset = get_inventory_asset_or_404(db, asset_id)
+    movement_at = movement_datetime(payload.movement_date)
+    before = asset_movement_state(asset)
+    apply_return_to_stock(asset, get_default_sector(db))
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="returned_to_stock",
+        before=before,
+        movement_at=movement_at,
+        notes=payload.notes,
+        actor_id=current_user.id,
+    )
+    db.commit()
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
+
+
+@router.post("/assets/{asset_id}/maintenance", response_model=InventoryAssetOut)
+def send_inventory_asset_to_maintenance(
+    asset_id: int,
+    payload: InventoryMaintenanceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.move")),
+):
+    asset = get_inventory_asset_or_404(db, asset_id)
+    movement_at = movement_datetime(payload.movement_date)
+    before = asset_movement_state(asset)
+    apply_send_to_maintenance(asset)
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="maintenance",
+        before=before,
+        movement_at=movement_at,
+        notes=payload.notes,
+        actor_id=current_user.id,
+    )
+    db.commit()
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
 
 
 @router.get("/catalogs", response_model=InventoryCatalogsOut)
