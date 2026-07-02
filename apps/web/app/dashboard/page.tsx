@@ -43,7 +43,7 @@ export default function DashboardPage() {
     [user],
   );
   const hubStats = data ? [
-    { label: "Chamados abertos", value: data.total, hint: user?.role === "requester" ? "Suas solicitações" : "Na operação" },
+    { label: "Chamados abertos", value: data.total, hint: user?.role === "user" ? "Suas solicitações" : "Na operação" },
     { label: "Novos", value: data.new, hint: "Aguardando triagem" },
     { label: "Pendências", value: data.pending, hint: "Aguardando retorno" },
     { label: "Resolvidos hoje", value: data.solved_today, hint: "Fechamentos do dia" },
@@ -68,7 +68,7 @@ export default function DashboardPage() {
         <div className="rounded-md border border-[#d4dbe4] bg-white p-4">
           <p className="text-sm font-semibold text-[#1a2332]">Atalho recomendado</p>
           <p className="mt-1 text-sm leading-6 text-[#5c6b7e]">
-            {user?.role === "requester" ? "Abra ou acompanhe suas solicitações técnicas pelo módulo de chamados." : "Acompanhe a fila técnica pelo módulo de chamados."}
+            {user?.role === "user" ? "Abra ou acompanhe suas solicitações técnicas pelo módulo de chamados." : "Acompanhe a fila técnica pelo módulo de chamados."}
           </p>
           <Link href="/chamados" className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "mt-3")}>
             {moduleLabelForUser(portalModules[0], user)} <ArrowRight size={14} />
@@ -140,7 +140,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <StatusChip status={ticket.status} />
-                      {user?.role !== "requester" && <PriorityChip priority={ticket.priority} />}
+                      {user?.role !== "user" && <PriorityChip priority={ticket.priority} />}
                     </div>
                   </div>
                 </Link>

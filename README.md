@@ -57,7 +57,7 @@ usuario@secretaria.cabofrio.rj.gov.br
 
 Exemplos válidos incluem `miguel.teixeira@adcetei.cabofrio.rj.gov.br` e `joao.silva@educacao.cabofrio.rj.gov.br`. E-mails `@cabofrio.rj.gov.br`, pessoais ou de outros domínios são recusados.
 
-Novas contas públicas nascem como `Solicitante`, sem e-mail verificado. O usuário só consegue entrar depois de confirmar o link enviado por SMTP. Helpdesk, Técnico e Administrador continuam sendo atribuídos manualmente por um administrador.
+Novas contas públicas nascem como `Usuário`, sem e-mail verificado. O usuário só consegue entrar depois de confirmar o link enviado por SMTP. Técnico e Administrador continuam sendo atribuídos manualmente por um administrador.
 
 Variáveis principais:
 
@@ -95,9 +95,9 @@ Disponíveis somente quando `SEED_DEMO_DATA=true`:
 | Perfil | Usuário | Senha |
 |---|---|---|
 | Administrador | `admin@adcetei.cabofrio.rj.gov.br` | `admin123` |
-| Helpdesk | `maiana.ignacio@adcetei.cabofrio.rj.gov.br` | `123456` |
+| Técnico | `maiana.ignacio@adcetei.cabofrio.rj.gov.br` | `123456` |
 | Técnico | `lucas.martins@adcetei.cabofrio.rj.gov.br` | `123456` |
-| Solicitante | `kathlelyn.abreu@sedec.cabofrio.rj.gov.br` | `123456` |
+| Usuário | `kathlelyn.abreu@sedec.cabofrio.rj.gov.br` | `123456` |
 
 ## Segurança do inventário
 
@@ -110,9 +110,9 @@ A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:
 - `asset_type`;
 - `patrimony`.
 
-Solicitantes recebem apenas equipamentos vinculados ao próprio usuário. O backend também impede que um solicitante envie manualmente o identificador de um equipamento pertencente a outra pessoa.
+Usuários comuns recebem apenas equipamentos vinculados ao próprio usuário. O backend também impede que um usuário envie manualmente o identificador de um equipamento pertencente a outra pessoa.
 
-Detalhes de equipamento dentro de chamados do solicitante não incluem IP, serial, sistema operacional ou usuário vinculado.
+Detalhes de equipamento dentro de chamados do usuário não incluem IP, serial, sistema operacional ou usuário vinculado.
 
 ## Chamados
 

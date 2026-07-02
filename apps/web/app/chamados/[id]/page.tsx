@@ -43,7 +43,7 @@ export default function TicketDetailPage() {
           user.permissions.includes("users.view") ? api.users() : Promise.resolve([]),
           user.permissions.includes("assets.view") ? api.assets() : Promise.resolve([]),
         ]);
-        setStaff(users.filter((item) => item.role !== "requester"));
+        setStaff(users.filter((item) => item.role !== "user"));
         setAssets(assetList);
       }
       setError("");
@@ -130,7 +130,7 @@ export default function TicketDetailPage() {
   }
 
   const overdue = ticket.due_at && new Date(ticket.due_at) < new Date() && !["resolved", "closed", "cancelled"].includes(ticket.status);
-  const requester = user.role === "requester";
+  const isUserProfile = user.role === "user";
   const formFieldLabels = Object.fromEntries(
     (ticket.form_schema_snapshot?.fields || []).map((field) => [field.key, field.label]),
   );
@@ -146,7 +146,7 @@ export default function TicketDetailPage() {
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold tabular-nums text-[#8b97a8]">#{String(ticket.id).padStart(4, "0")}</span>
             <StatusChip status={ticket.status} />
-            {!requester && <PriorityChip priority={ticket.priority} />}
+            {!isUserProfile && <PriorityChip priority={ticket.priority} />}
             {overdue && <Badge className="border border-[#f5c2c2] bg-[#fef2f2] text-[#991b1b]">Prazo vencido</Badge>}
           </div>
           <h1 className="text-xl font-semibold text-[#1a2332] sm:text-2xl">{ticket.title}</h1>
@@ -228,7 +228,7 @@ export default function TicketDetailPage() {
               />
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-[#8b97a8]">
-                  {internal ? "Esta nota não será exibida ao solicitante." : requester ? "Sua mensagem será enviada à equipe de TI." : "A resposta será visível ao solicitante."}
+                  {internal ? "Esta nota não será exibida ao solicitante." : isUserProfile ? "Sua mensagem será enviada à equipe de TI." : "A resposta será visível ao solicitante."}
                 </p>
                 <Button disabled={saving || comment.trim().length < 2}>
                   <Send size={15} />
@@ -280,10 +280,10 @@ export default function TicketDetailPage() {
                       <p className="mt-0.5 text-sm font-semibold text-[#1a2332]">{ticket.asset.name}</p>
                       <p className="mt-0.5 text-xs text-[#5c6b7e]">
                         {assetTypeLabels[ticket.asset.asset_type] || ticket.asset.asset_type}
-                        {!requester && ticket.asset.manufacturer ? ` · ${ticket.asset.manufacturer} ${ticket.asset.model || ""}` : ""}
+                        {!isUserProfile && ticket.asset.manufacturer ? ` · ${ticket.asset.manufacturer} ${ticket.asset.model || ""}` : ""}
                       </p>
                       <p className="text-xs text-[#8b97a8]">
-                        {!requester && `IP ${ticket.asset.ip_address || "não informado"} · `}
+                        {!isUserProfile && `IP ${ticket.asset.ip_address || "não informado"} · `}
                         Patrimônio {ticket.asset.patrimony || "não informado"}
                       </p>
                     </div>

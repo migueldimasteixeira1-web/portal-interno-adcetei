@@ -92,7 +92,7 @@ O cadastro público aceita somente `usuario@secretaria.cabofrio.rj.gov.br`, vali
 
 O token de verificação é aleatório, salvo apenas como hash SHA-256, possui expiração e é invalidado após uso. Em ambiente sem SMTP configurado, apenas ambientes locais registram o link no log; homologação e produção retornam falha clara de envio.
 
-O login aceita e-mail institucional e senha. Usuários inativos, não verificados ou com senha incorreta não recebem JWT. Administradores atribuem manualmente os perfis Helpdesk, Técnico e Administrador.
+O login aceita e-mail institucional e senha. Usuários inativos, não verificados ou com senha incorreta não recebem JWT. Administradores atribuem manualmente os perfis Técnico e Administrador.
 
 ## Seed
 
@@ -116,7 +116,7 @@ Existem duas superfícies:
 Disponível para:
 
 - administrador;
-- helpdesk;
+- técnico;
 - técnico.
 
 Retorna dados completos, como IP, serial, sistema operacional, localização e usuário.
@@ -125,7 +125,7 @@ Retorna dados completos, como IP, serial, sistema operacional, localização e u
 
 `GET /api/assets/ticket-options`
 
-Retorna somente os campos necessários para seleção. Solicitantes recebem exclusivamente ativos vinculados ao próprio usuário. A criação do chamado repete essa validação no backend para impedir manipulação manual do identificador.
+Retorna somente os campos necessários para seleção. Usuários comuns recebem exclusivamente ativos vinculados ao próprio usuário. A criação do chamado repete essa validação no backend para impedir manipulação manual do identificador.
 
 ## Paginação
 
@@ -186,7 +186,7 @@ Essa medida evita exigir reset do banco atual. É uma ponte temporária; novas e
 - solicitante não define título ou prioridade;
 - notas internas são filtradas no backend;
 - alterações administrativas geram eventos públicos com autoria;
-- helpdesk e administrador podem vincular qualquer equipamento na triagem.
+- técnico e administrador podem vincular qualquer equipamento na triagem.
 
 ## Implantação em VM
 

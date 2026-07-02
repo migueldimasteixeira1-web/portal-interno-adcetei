@@ -102,7 +102,7 @@ class CatalogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-RoleName = Literal["admin", "helpdesk", "technician", "requester"]
+RoleName = Literal["admin", "technician", "user"]
 AssetStatus = Literal["active", "maintenance", "stock", "retired"]
 
 
@@ -111,7 +111,7 @@ class UserCreate(BaseModel):
     full_name: str = Field(min_length=3, max_length=180)
     email: EmailStr
     password: str = Field(min_length=10, max_length=128)
-    role: RoleName = "requester"
+    role: RoleName = "user"
     secretariat: str = Field(default="Prefeitura de Cabo Frio", max_length=150)
     department: str = Field(default="Não informado", max_length=150)
     phone: str = Field(default="", max_length=40)
