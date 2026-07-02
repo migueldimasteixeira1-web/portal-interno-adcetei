@@ -101,6 +101,10 @@ Disponíveis somente quando `SEED_DEMO_DATA=true`:
 
 ## Segurança do inventário
 
+O Inventário está sendo modularizado em etapas. A tabela `assets` continua sendo a base dos equipamentos por compatibilidade com chamados e as rotas atuais de assets seguem disponíveis durante a transição.
+
+Direção planejada do módulo: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
+
 `GET /api/assets` exige a permissão `assets.view`.
 
 A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:

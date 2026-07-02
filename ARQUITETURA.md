@@ -107,6 +107,10 @@ O seed:
 
 ## Inventário
 
+O módulo de Inventário está sendo separado em arquivos próprios de backend. A tabela `assets` permanece como base dos equipamentos para preservar compatibilidade com chamados (`asset_id`) e as rotas legadas de assets continuam ativas durante a transição.
+
+A evolução prevista será incremental: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
+
 Existem duas superfícies:
 
 ### Inventário administrativo
@@ -117,7 +121,6 @@ Disponível para:
 
 - administrador;
 - técnico;
-- técnico.
 
 Retorna dados completos, como IP, serial, sistema operacional, localização e usuário.
 
