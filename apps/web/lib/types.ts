@@ -152,6 +152,43 @@ export interface InventoryChangeResponsiblePayload extends InventoryMovementPayl
   assigned_user_id: number;
 }
 
+export interface InventoryBulkScanPayload {
+  supplier_id: number;
+  equipment_type_id: number;
+  manufacturer_id: number;
+  equipment_model_id: number;
+  received_at: string;
+  serial_numbers: string[];
+  notes?: string;
+}
+
+export interface InventoryBulkScanItemPreview {
+  index: number;
+  serial_number: string;
+  normalized_serial: string;
+}
+
+export interface InventoryBulkScanError {
+  index: number;
+  serial_number: string;
+  normalized_serial: string;
+  message: string;
+}
+
+export interface InventoryBulkScanPreview {
+  total: number;
+  valid_count: number;
+  invalid_count: number;
+  valid_items: InventoryBulkScanItemPreview[];
+  errors: InventoryBulkScanError[];
+}
+
+export interface InventoryBulkScanConfirm {
+  created_count: number;
+  assets: InventoryAsset[];
+  summary: InventoryBulkScanPreview;
+}
+
 export interface CatalogFormField {
   key: string;
   label: string;

@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryCatalogs, InventoryChangeResponsiblePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogs, InventoryChangeResponsiblePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -103,6 +103,10 @@ export const api = {
   inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),
   createInventoryAsset: (payload: InventoryAssetCreatePayload) =>
     request<InventoryAsset>("/inventory/assets", { method: "POST", body: JSON.stringify(payload) }),
+  previewInventoryBulkScan: (payload: InventoryBulkScanPayload) =>
+    request<InventoryBulkScanPreview>("/inventory/assets/bulk-scan/preview", { method: "POST", body: JSON.stringify(payload) }),
+  confirmInventoryBulkScan: (payload: InventoryBulkScanPayload) =>
+    request<InventoryBulkScanConfirm>("/inventory/assets/bulk-scan/confirm", { method: "POST", body: JSON.stringify(payload) }),
   allocateInventoryAsset: (id: number | string, payload: InventoryAllocatePayload) =>
     request<InventoryAsset>(`/inventory/assets/${id}/allocate`, { method: "POST", body: JSON.stringify(payload) }),
   changeInventoryAssetResponsible: (id: number | string, payload: InventoryChangeResponsiblePayload) =>
