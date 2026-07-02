@@ -1,13 +1,14 @@
 "use client";
 
 import { Boxes, CircleOff, Computer, Pencil, Plus, Search, Wrench } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
 import AccessDenied from "@/components/AccessDenied";
 import { useAuth } from "@/components/AuthProvider";
-import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Toolbar } from "@/components/ui";
+import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Toolbar, buttonStyles } from "@/components/ui";
 import { api } from "@/lib/api";
 import { assetStatusLabels, assetStatusTone, assetTypeLabels, formatDate } from "@/lib/format";
 import { hasPermission } from "@/lib/permissions";
@@ -33,6 +34,7 @@ export default function InventoryPage() {
   const { user } = useAuth();
   const canView = hasPermission(user, "assets.view");
   const canManage = hasPermission(user, "assets.manage");
+  const canCreateInventory = hasPermission(user, "inventory.create");
   const canViewUsers = hasPermission(user, "users.view");
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -135,7 +137,12 @@ export default function InventoryPage() {
         eyebrow="Ativos de TI"
         title="Inventário"
         subtitle="Consulte equipamentos e mantenha responsáveis, localização e situação atualizados."
-        actions={canManage ? <Button onClick={openCreate}><Plus size={16} />Novo equipamento</Button> : undefined}
+        actions={(canCreateInventory || canManage) ? (
+          <div className="flex flex-wrap gap-2">
+            {canCreateInventory && <Link href="/inventario/novo" className={buttonStyles()}><Plus size={16} />Novo equipamento</Link>}
+            {canManage && <Button variant={canCreateInventory ? "secondary" : "primary"} onClick={openCreate}><Plus size={16} />Cadastro legado</Button>}
+          </div>
+        ) : undefined}
       />
       {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && !dialogOpen && <Alert tone="danger" className="mb-4">{error}</Alert>}
