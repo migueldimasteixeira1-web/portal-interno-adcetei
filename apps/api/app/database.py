@@ -76,6 +76,26 @@ def ensure_schema_compatibility() -> None:
                 {"name": DEFAULT_INVENTORY_SECTOR, "normalized_name": normalized_default_sector},
             )
 
+    if "assets" in table_names:
+        asset_columns = {column["name"] for column in inspector.get_columns("assets")}
+        with engine.begin() as connection:
+            if "supplier_id" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN supplier_id INTEGER"))
+            if "equipment_type_id" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN equipment_type_id INTEGER"))
+            if "manufacturer_id" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN manufacturer_id INTEGER"))
+            if "equipment_model_id" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN equipment_model_id INTEGER"))
+            if "sector_id" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN sector_id INTEGER"))
+            if "received_at" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN received_at TIMESTAMP"))
+            if "delivered_at" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN delivered_at TIMESTAMP"))
+            if "notes" not in asset_columns:
+                connection.execute(text("ALTER TABLE assets ADD COLUMN notes TEXT DEFAULT ''"))
+
     if "tickets" not in table_names:
         return
     ticket_columns = {column["name"] for column in inspector.get_columns("tickets")}

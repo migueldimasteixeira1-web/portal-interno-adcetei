@@ -56,8 +56,21 @@ class Asset(Base):
     operating_system: Mapped[str] = mapped_column(String(120), default="")
     assigned_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    supplier_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_suppliers.id"), nullable=True)
+    equipment_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_equipment_types.id"), nullable=True)
+    manufacturer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_manufacturers.id"), nullable=True)
+    equipment_model_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_equipment_models.id"), nullable=True)
+    sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
+    received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
 
     assigned_user: Mapped[Optional[User]] = relationship()
+    supplier: Mapped[Optional[InventorySupplier]] = relationship()
+    equipment_type: Mapped[Optional[InventoryEquipmentType]] = relationship()
+    manufacturer_ref: Mapped[Optional[InventoryManufacturer]] = relationship()
+    equipment_model: Mapped[Optional[InventoryEquipmentModel]] = relationship()
+    sector: Mapped[Optional[InventorySector]] = relationship()
     tickets: Mapped[list[Ticket]] = relationship(back_populates="asset")
 
 
