@@ -98,6 +98,8 @@ export const api = {
   updateAsset: (id: number, payload: Record<string, unknown>) =>
     request<Asset>(`/admin/assets/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
+  inventoryAssets: () => request<InventoryAsset[]>("/inventory/assets"),
+  inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
   createInventoryAsset: (payload: InventoryAssetCreatePayload) =>
     request<InventoryAsset>("/inventory/assets", { method: "POST", body: JSON.stringify(payload) }),
   assetTicketOptions: () => request<AssetTicketOption[]>("/assets/ticket-options"),
