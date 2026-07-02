@@ -525,6 +525,92 @@ status, detailed_asset = call("GET", f"/inventory/assets/{allocated_asset['id']}
 expect(status, 200, "administrador detalha equipamento modular")
 expect(detailed_asset["status"], "allocated", "detalhe converte active legado para allocated")
 
+status, created_movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+expect(status, 200, "administrador lista histórico de equipamento")
+if not any(item["action"] == "created" for item in created_movements):
+    raise AssertionError("cadastro modular não registrou movimentação inicial")
+
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/allocate",
+    requester,
+    {"sector_id": external_sector["id"], "assigned_user_id": requester_user["id"], "movement_date": "2026-07-02"},
+)
+expect(status, 403, "usuário comum sem inventory.move não movimenta equipamento")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/allocate",
+    admin,
+    {
+        "sector_id": external_sector["id"],
+        "assigned_user_id": requester_user["id"],
+        "movement_date": "2026-07-02",
+        "notes": "Entregue ao setor pela regressão.",
+    },
+)
+expect(status, 200, "administrador aloca equipamento")
+expect(moved_asset["status"], "allocated", "alocação muda status para alocado")
+expect(moved_asset["sector"]["id"], external_sector["id"], "alocação muda setor")
+expect(moved_asset["assigned_user"]["id"], requester_user["id"], "alocação vincula responsável")
+assert_explicit_zone(moved_asset["delivered_at"], "inventário.delivered_at")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+expect(status, 200, "histórico após alocação")
+allocated_movement = next((item for item in movements if item["action"] == "allocated"), None)
+if not allocated_movement or allocated_movement["to_sector"]["id"] != external_sector["id"] or allocated_movement["to_user"]["id"] != requester_user["id"]:
+    raise AssertionError("histórico não registrou alocação com setor/responsável")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/change-responsible",
+    admin,
+    {
+        "assigned_user_id": admin_user["id"],
+        "movement_date": "2026-07-03",
+        "notes": "Troca de responsável pela regressão.",
+    },
+)
+expect(status, 200, "administrador troca responsável")
+expect(moved_asset["assigned_user"]["id"], admin_user["id"], "responsável atualizado")
+expect(moved_asset["status"], "allocated", "troca mantém equipamento alocado")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+responsible_movement = next((item for item in movements if item["action"] == "responsible_changed"), None)
+if not responsible_movement or responsible_movement["from_user"]["id"] != requester_user["id"] or responsible_movement["to_user"]["id"] != admin_user["id"]:
+    raise AssertionError("histórico não registrou troca de responsável")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/return-to-stock",
+    admin,
+    {"movement_date": "2026-07-04", "notes": "Devolvido à ADCETEI pela regressão."},
+)
+expect(status, 200, "administrador devolve ao estoque")
+expect(moved_asset["status"], "stock", "devolução muda status para estoque")
+expect(moved_asset["sector"]["name"], "ADCETEI", "devolução volta ao setor padrão")
+expect(moved_asset["assigned_user"], None, "devolução limpa responsável")
+expect(moved_asset["delivered_at"], None, "devolução limpa data de entrega")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+returned_movement = next((item for item in movements if item["action"] == "returned_to_stock"), None)
+if not returned_movement or returned_movement["to_sector"]["name"] != "ADCETEI" or returned_movement["to_user"] is not None:
+    raise AssertionError("histórico não registrou devolução ao estoque")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/maintenance",
+    admin,
+    {"movement_date": "2026-07-05", "notes": "Separado para manutenção pela regressão."},
+)
+expect(status, 200, "administrador envia para manutenção")
+expect(moved_asset["status"], "maintenance", "manutenção muda status")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+maintenance_movement = next((item for item in movements if item["action"] == "maintenance"), None)
+if not maintenance_movement or maintenance_movement["from_status"] != "stock" or maintenance_movement["to_status"] != "maintenance":
+    raise AssertionError("histórico não registrou manutenção")
+
+status, detailed_asset = call("GET", f"/inventory/assets/{modular_asset['id']}", admin)
+expect(status, 200, "detalhe segue retornando contrato novo após movimentações")
+expect(detailed_asset["status"], "maintenance", "detalhe reflete última movimentação")
+
 status, legacy_inventory = call("GET", "/assets", operator)
 expect(status, 200, "rota antiga de assets segue funcionando")
 if not any(item["id"] == allocated_asset["id"] and item["status"] == "active" for item in legacy_inventory):
