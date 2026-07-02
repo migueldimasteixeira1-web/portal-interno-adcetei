@@ -52,6 +52,7 @@ export default function InventoryPage() {
   const { user } = useAuth();
   const canView = hasPermission(user, "inventory.view");
   const canCreate = hasPermission(user, "inventory.create");
+  const canBulkScan = hasPermission(user, "inventory.bulk_scan");
   const [assets, setAssets] = useState<InventoryAsset[]>([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -103,7 +104,12 @@ export default function InventoryPage() {
         eyebrow="Inventário"
         title="Inventário"
         subtitle="Consulte equipamentos por número de série, vínculo atual, setor e situação operacional."
-        actions={canCreate ? <Link href="/inventario/novo" className={buttonStyles()}><Plus size={16} />Novo equipamento</Link> : undefined}
+        actions={(canCreate || canBulkScan) ? (
+          <div className="flex flex-wrap gap-2">
+            {canBulkScan && <Link href="/inventario/lote" className={buttonStyles({ variant: "secondary" })}><Plus size={16} />Entrada em lote</Link>}
+            {canCreate && <Link href="/inventario/novo" className={buttonStyles()}><Plus size={16} />Novo equipamento</Link>}
+          </div>
+        ) : undefined}
       />
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
