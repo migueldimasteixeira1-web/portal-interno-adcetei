@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, CircleOff, Eye, PackageCheck, Plus, Search, UserCheck, Wrench } from "lucide-react";
+import { Boxes, CircleOff, Eye, PackageCheck, Plus, Search, Settings2, UserCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -53,6 +53,7 @@ export default function InventoryPage() {
   const canView = hasPermission(user, "inventory.view");
   const canCreate = hasPermission(user, "inventory.create");
   const canBulkScan = hasPermission(user, "inventory.bulk_scan");
+  const canManageCatalogs = hasPermission(user, "inventory.manage_catalogs");
   const [assets, setAssets] = useState<InventoryAsset[]>([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -104,8 +105,9 @@ export default function InventoryPage() {
         eyebrow="Inventário"
         title="Inventário"
         subtitle="Consulte equipamentos por número de série, vínculo atual, setor e situação operacional."
-        actions={(canCreate || canBulkScan) ? (
+        actions={(canCreate || canBulkScan || canManageCatalogs) ? (
           <div className="flex flex-wrap gap-2">
+            {canManageCatalogs && <Link href="/inventario/cadastros" className={buttonStyles({ variant: "secondary" })}><Settings2 size={16} />Cadastros</Link>}
             {canBulkScan && <Link href="/inventario/lote" className={buttonStyles({ variant: "secondary" })}><Plus size={16} />Entrada em lote</Link>}
             {canCreate && <Link href="/inventario/novo" className={buttonStyles()}><Plus size={16} />Novo equipamento</Link>}
           </div>

@@ -136,6 +136,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/chamados": "Chamados",
   "/chamados/novo": "Abrir chamado",
   "/inventario": "Inventário",
+  "/inventario/novo": "Inventário · Novo equipamento",
+  "/inventario/lote": "Inventário · Entrada em lote",
+  "/inventario/cadastros": "Inventário · Cadastros",
   "/memorandos": "Memorandos",
   "/impressoras": "Impressoras",
   "/servicos-internos": "Serviços Internos",
@@ -149,7 +152,7 @@ export function pageLabelForPath(pathname: string): string {
   if (pathname.startsWith("/chamados/") && pathname !== "/chamados/novo") {
     return "Detalhes do chamado";
   }
-  if (pathname.startsWith("/inventario/") && pathname !== "/inventario/novo") {
+  if (pathname.startsWith("/inventario/") && pathname !== "/inventario/novo" && pathname !== "/inventario/lote" && pathname !== "/inventario/cadastros") {
     return "Detalhes do equipamento";
   }
   return PAGE_TITLES[pathname] || "Portal Interno ADCETEI";
