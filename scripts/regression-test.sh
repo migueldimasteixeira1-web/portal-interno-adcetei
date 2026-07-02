@@ -120,10 +120,14 @@ from sqlalchemy import inspect
 from apps.api.app.database import engine, ensure_schema_compatibility
 
 with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
-    connection.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(120), email VARCHAR(180), created_at TIMESTAMP)")
-    connection.execute("INSERT INTO users (id, username, email, created_at) VALUES (1, 'admin', 'admin@adcetei.cabofrio.rj.gov.br', CURRENT_TIMESTAMP)")
-    connection.execute("INSERT INTO users (id, username, email, created_at) VALUES (2, 'legado', 'legado@cabofrio.rj.gov.br', CURRENT_TIMESTAMP)")
+    connection.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(120), email VARCHAR(180), role VARCHAR(40), created_at TIMESTAMP)")
+    connection.execute("INSERT INTO users (id, username, email, role, created_at) VALUES (1, 'admin', 'admin@adcetei.cabofrio.rj.gov.br', 'admin', CURRENT_TIMESTAMP)")
+    connection.execute("INSERT INTO users (id, username, email, role, created_at) VALUES (2, 'legado', 'legado@cabofrio.rj.gov.br', 'requester', CURRENT_TIMESTAMP)")
+    connection.execute("INSERT INTO users (id, username, email, role, created_at) VALUES (3, 'suporte', 'suporte@adcetei.cabofrio.rj.gov.br', 'helpdesk', CURRENT_TIMESTAMP)")
     connection.execute("CREATE TABLE tickets (id INTEGER PRIMARY KEY, title VARCHAR(220) NOT NULL)")
+    connection.execute("CREATE TABLE role_configs (role VARCHAR(40) PRIMARY KEY, label VARCHAR(80), description VARCHAR(300), ldap_group VARCHAR(180), permissions JSON, updated_at TIMESTAMP)")
+    connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('helpdesk', 'Helpdesk', '', '', '[]')")
+    connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('requester', 'Solicitante', '', '', '[]')")
 
 ensure_schema_compatibility()
 columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
@@ -136,6 +140,12 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     rows = dict(connection.execute("select username, email_verified_at from users").fetchall())
     assert rows["admin"], "e-mail institucional legado deveria ser preservado como verificado"
     assert rows["legado"] is None, "e-mail legado fora do padrão não deve ser verificado automaticamente"
+    user_roles = dict(connection.execute("select username, role from users").fetchall())
+    assert user_roles["legado"] == "user", "perfil requester legado deve virar user"
+    assert user_roles["suporte"] == "technician", "perfil helpdesk legado deve virar technician"
+    roles = {row[0] for row in connection.execute("select role from role_configs").fetchall()}
+    assert "helpdesk" not in roles, "perfil helpdesk legado não deve permanecer ativo"
+    assert "requester" not in roles, "perfil requester legado não deve permanecer ativo"
 print("Migração legada: OK")
 PY
 
@@ -166,7 +176,7 @@ with SessionLocal() as db:
             full_name="Conta Pendente",
             email="conta.pendente@adcetei.cabofrio.rj.gov.br",
             password_hash=hash_password("senha-segura-123"),
-            role="requester",
+            role="user",
             secretariat="Prefeitura de Cabo Frio",
             department="Não informado",
             source="email",
@@ -191,7 +201,7 @@ with SessionLocal() as db:
             full_name="Usuário Legado",
             email="legado@cabofrio.rj.gov.br",
             password_hash=hash_password("senha-segura-123"),
-            role="requester",
+            role="user",
             secretariat="Prefeitura de Cabo Frio",
             department="Não informado",
             source="local",
@@ -278,7 +288,7 @@ def assert_explicit_zone(value, label):
 
 
 requester, requester_user = login("kathlelyn.abreu@sedec.cabofrio.rj.gov.br")
-helpdesk, _ = login("maiana.ignacio@adcetei.cabofrio.rj.gov.br")
+operator, _ = login("maiana.ignacio@adcetei.cabofrio.rj.gov.br")
 technician, _ = login("lucas.martins@adcetei.cabofrio.rj.gov.br")
 admin, admin_user = login("admin@adcetei.cabofrio.rj.gov.br", "admin123")
 
@@ -294,19 +304,19 @@ with sqlite3.connect(DB_PATH) as connection:
 
 # Inventário completo é restrito; opções de abertura são mínimas e do próprio usuário.
 status, _ = call("GET", "/assets", requester)
-expect(status, 403, "solicitante sem inventário completo")
+expect(status, 403, "usuário sem inventário completo")
 status, options = call("GET", "/assets/ticket-options", requester)
 expect(status, 200, "opções resumidas de equipamento")
 if not options:
-    raise AssertionError("solicitante deveria possuir equipamentos vinculados")
+    raise AssertionError("usuário deveria possuir equipamentos vinculados")
 allowed_keys = {"id", "name", "asset_type", "patrimony"}
 for option in options:
     expect(set(option), allowed_keys, "campos expostos na opção de equipamento")
 if any(option["asset_type"] == "network" for option in options):
     raise AssertionError("equipamento de rede de outro usuário foi exposto")
 
-status, full_inventory = call("GET", "/assets", helpdesk)
-expect(status, 200, "helpdesk consulta inventário completo")
+status, full_inventory = call("GET", "/assets", operator)
+expect(status, 200, "técnico consulta inventário completo")
 if not full_inventory or "ip_address" not in full_inventory[0]:
     raise AssertionError("inventário administrativo não contém os dados completos")
 foreign_asset = next(item for item in full_inventory if item.get("assigned_user_id") != requester_user["id"])
@@ -414,21 +424,21 @@ expect(status, 201, "criação com formulário dinâmico")
 expect(software_ticket["form_data"]["software_name"], "7-Zip", "persistência de campo dinâmico")
 
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", requester, {"priority": "critical"})
-expect(status, 403, "solicitante não altera chamado")
+expect(status, 403, "usuário não altera chamado")
 
-status, users = call("GET", "/users", helpdesk)
-expect(status, 200, "helpdesk consulta responsáveis")
+status, users = call("GET", "/users", operator)
+expect(status, 200, "técnico consulta responsáveis")
 tech_id = next(item["id"] for item in users if item["username"] == "tecnico")
 
-status, _ = call("PATCH", f"/tickets/{ticket['id']}", helpdesk, {"status": "valor_invalido"})
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "valor_invalido"})
 expect(status, 422, "status inválido")
 status, updated = call(
     "PATCH",
     f"/tickets/{ticket['id']}",
-    helpdesk,
+    operator,
     {"status": "assigned", "priority": "high", "assignee_id": tech_id},
 )
-expect(status, 200, "triagem do helpdesk")
+expect(status, 200, "triagem do técnico")
 events = [item for item in updated["comments"] if item["event_type"] == "update"]
 expect(len(events), 3, "eventos administrativos")
 if not all("Maiana Ignácio" in item["body"] and not item["internal"] for item in events):
@@ -437,25 +447,25 @@ if not all("Maiana Ignácio" in item["body"] and not item["internal"] for item i
 status, note = call(
     "POST",
     f"/tickets/{ticket['id']}/comments",
-    helpdesk,
+    operator,
     {"body": "Nota interna de validação.", "internal": True},
 )
-expect(status, 201, "helpdesk cria nota interna")
+expect(status, 201, "técnico cria nota interna")
 assert_explicit_zone(note["created_at"], "comentário.created_at")
 
 status, requester_view = call("GET", f"/tickets/{ticket['id']}", requester)
-expect(status, 200, "solicitante acompanha chamado")
+expect(status, 200, "usuário acompanha chamado")
 expect(sum(1 for item in requester_view["comments"] if item["internal"]), 0, "notas internas filtradas")
 expect(sum(1 for item in requester_view["comments"] if item["event_type"] == "update"), 3, "eventos visíveis")
 
 status, _ = call("GET", f"/tickets/{ticket['id']}", technician)
 expect(status, 200, "técnico acessa chamado atribuído")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"priority": "critical"})
-expect(status, 403, "técnico não altera prioridade")
+expect(status, 200, "técnico altera prioridade")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "in_progress"})
 expect(status, 200, "técnico altera status permitido")
 
-_, page = call("GET", "/tickets", helpdesk, params={"page_size": 100})
+_, page = call("GET", "/tickets", operator, params={"page_size": 100})
 foreign_ticket = next(
     item for item in page["items"]
     if item.get("assignee") and item["assignee"]["id"] != tech_id
@@ -464,9 +474,9 @@ status, _ = call(
     "POST",
     f"/tickets/{foreign_ticket['id']}/comments",
     technician,
-    {"body": "Comentário indevido.", "internal": True},
+    {"body": "Comentário técnico de validação.", "internal": True},
 )
-expect(status, 403, "técnico não comenta em chamado alheio")
+expect(status, 201, "técnico comenta em chamado da fila")
 
 # Cria volume suficiente para validar páginas distintas e totais agregados.
 for index in range(23):
@@ -511,20 +521,20 @@ print("Regressão funcional: OK")
 status, _ = call(
     "POST",
     "/admin/users",
-    helpdesk,
+    operator,
     {
         "username": "sempermissao",
         "full_name": "Usuário sem permissão",
         "email": "sempermissao@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",
-        "role": "requester",
+        "role": "user",
         "secretariat": "Prefeitura de Cabo Frio",
         "department": "Teste",
         "phone": "",
         "active": True,
     },
 )
-expect(status, 403, "helpdesk não gerencia usuários")
+expect(status, 403, "técnico não gerencia usuários")
 
 status, created_user = call(
     "POST",
@@ -535,7 +545,7 @@ status, created_user = call(
         "full_name": "Usuário Administrativo de Teste",
         "email": "teste.admin@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",
-        "role": "requester",
+        "role": "user",
         "secretariat": "Prefeitura de Cabo Frio",
         "department": "Validação",
         "phone": "",
@@ -575,7 +585,7 @@ status, _ = call(
         "full_name": "Usuário Duplicado",
         "email": "duplicado@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",
-        "role": "requester",
+        "role": "user",
         "secretariat": "Prefeitura de Cabo Frio",
         "department": "Validação",
         "phone": "",
@@ -670,8 +680,12 @@ expect(updated_service["active"], False, "serviço arquivado")
 
 status, roles = call("GET", "/admin/roles", admin)
 expect(status, 200, "administrador consulta perfis")
+expect({item["role"] for item in roles}, {"admin", "technician", "user"}, "perfis simplificados")
 technician_role = next(item for item in roles if item["role"] == "technician")
 original_permissions = technician_role["permissions"]
+for permission in ("tickets.view_all", "tickets.triage", "tickets.internal_notes", "users.view", "assets.view"):
+    if permission not in original_permissions:
+        raise AssertionError(f"permissão operacional ausente do técnico: {permission}")
 temporary_permissions = sorted(set(original_permissions + ["users.view"]))
 status, changed_role = call(
     "PATCH",
