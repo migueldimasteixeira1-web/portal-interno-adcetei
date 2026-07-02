@@ -3,6 +3,10 @@ from datetime import date, datetime
 from .inventory_constants import DEFAULT_INVENTORY_SECTOR
 
 
+def normalize_catalog_name(value: str) -> str:
+    return " ".join(value.strip().split()).casefold()
+
+
 def normalize_serial_number(value: str | None) -> str:
     return " ".join((value or "").strip().split()).casefold()
 

@@ -2,6 +2,8 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import settings
+from .inventory_constants import DEFAULT_INVENTORY_SECTOR
+from .inventory_service import normalize_catalog_name
 
 database_url = settings.effective_database_url
 connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
@@ -57,6 +59,22 @@ def ensure_schema_compatibility() -> None:
                 )
             )
             connection.execute(text("DELETE FROM role_configs WHERE role IN ('helpdesk', 'requester')"))
+
+    if "inventory_sectors" in table_names:
+        normalized_default_sector = normalize_catalog_name(DEFAULT_INVENTORY_SECTOR)
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO inventory_sectors (name, normalized_name, is_active, created_at, updated_at)
+                    SELECT :name, :normalized_name, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM inventory_sectors WHERE normalized_name = :normalized_name
+                    )
+                    """
+                ),
+                {"name": DEFAULT_INVENTORY_SECTOR, "normalized_name": normalized_default_sector},
+            )
 
     if "tickets" not in table_names:
         return

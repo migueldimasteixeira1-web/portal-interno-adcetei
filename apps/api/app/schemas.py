@@ -210,6 +210,54 @@ class PermissionDefinitionOut(BaseModel):
     group: str
 
 
+class InventoryCatalogItemCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    is_active: bool = True
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryCatalogItemUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    is_active: Optional[bool] = None
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryEquipmentModelCreate(InventoryCatalogItemCreate):
+    manufacturer_id: int
+    equipment_type_id: int
+
+
+class InventoryEquipmentModelUpdate(InventoryCatalogItemUpdate):
+    manufacturer_id: Optional[int] = None
+    equipment_type_id: Optional[int] = None
+
+
+class InventoryCatalogItemOut(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_catalog_datetimes(self, value: datetime) -> str:
+        return iso_utc(value) or ""
+
+
+class InventoryEquipmentModelOut(InventoryCatalogItemOut):
+    manufacturer_id: int
+    equipment_type_id: int
+
+
+class InventoryCatalogsOut(BaseModel):
+    suppliers: list[InventoryCatalogItemOut]
+    equipment_types: list[InventoryCatalogItemOut]
+    manufacturers: list[InventoryCatalogItemOut]
+    models: list[InventoryEquipmentModelOut]
+    sectors: list[InventoryCatalogItemOut]
+
+
 class AuditLogOut(BaseModel):
     id: int
     action: str
