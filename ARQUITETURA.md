@@ -111,7 +111,9 @@ O módulo de Inventário está sendo separado em arquivos próprios de backend. 
 
 A evolução prevista será incremental: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
 
-Os cadastros base ficam sob `/api/inventory/catalogs` e cobrem fornecedores, tipos de equipamento, fabricantes, modelos e setores. A criação/edição exige `inventory.manage_catalogs`; a listagem exige `inventory.view`. Esses cadastros ainda não alteram `Asset` nem criam chaves estrangeiras nos equipamentos.
+Os cadastros base ficam sob `/api/inventory/catalogs` e cobrem fornecedores, tipos de equipamento, fabricantes, modelos e setores. A criação/edição exige `inventory.manage_catalogs`; a listagem exige `inventory.view`.
+
+O contrato modular de equipamentos fica em `/api/inventory/assets`. Ele reaproveita a tabela `assets`, adiciona vínculos opcionais aos cadastros base, usa número de série como identificação principal e mantém fallback para `asset_type`, `manufacturer`, `model` e `name`. As rotas legadas de assets continuam disponíveis; movimentações completas, entrada em lote, importação e UI serão etapas posteriores.
 
 Existem duas superfícies:
 

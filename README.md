@@ -105,7 +105,9 @@ O Inventário está sendo modularizado em etapas. A tabela `assets` continua sen
 
 Direção planejada do módulo: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
 
-Os cadastros base do inventário já existem no backend para fornecedores, tipos de equipamento, fabricantes, modelos e setores. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição, ainda sem vínculo direto com `Asset` e sem tela própria.
+Os cadastros base do inventário já existem no backend para fornecedores, tipos de equipamento, fabricantes, modelos e setores. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
+
+`assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente; movimentações completas, entrada em lote, importação por planilha e UI virão depois.
 
 `GET /api/assets` exige a permissão `assets.view`.
 
