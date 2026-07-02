@@ -1,8 +1,7 @@
 export const roleLabels: Record<string, string> = {
   admin: "Administrador",
-  helpdesk: "Helpdesk",
   technician: "Técnico",
-  requester: "Solicitante",
+  user: "Usuário",
 };
 
 export const statusLabels: Record<string, string> = {

@@ -56,7 +56,7 @@ export default function TicketsPage() {
   useEffect(() => { void load({ search: "", status: "", priority: "" }, 1); }, []);
 
   const canViewAll = !!user?.permissions.includes("tickets.view_all");
-  const requester = user?.role === "requester" && !canViewAll;
+  const requester = user?.role === "user" && !canViewAll;
   const assignedOnly = user?.role === "technician" && !canViewAll;
   const hasFilters = !!(appliedFilters.search || appliedFilters.status || appliedFilters.priority);
   const totalPages = Math.max(1, Math.ceil(total / 20));

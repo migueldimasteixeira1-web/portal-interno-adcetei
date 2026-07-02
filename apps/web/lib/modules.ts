@@ -21,7 +21,7 @@ export type PortalModuleStatus = "available" | "planned";
 export interface PortalNavItem {
   href: string;
   label: string;
-  requesterLabel?: string;
+  userLabel?: string;
   description?: string;
   icon: LucideIcon;
   area: PortalArea;
@@ -37,19 +37,19 @@ export const portalHome: PortalNavItem = {
   description: "Hub do Portal Interno ADCETEI",
   icon: Home,
   area: "portal",
-  roles: ["admin", "helpdesk", "technician", "requester"],
+  roles: ["admin", "technician", "user"],
 };
 
 export const portalModules: PortalNavItem[] = [
   {
     href: "/chamados",
     label: "Chamados Técnicos",
-    requesterLabel: "Meus chamados",
+    userLabel: "Meus chamados",
     description: "Solicitações de suporte, triagem e acompanhamento técnico.",
     icon: ClipboardList,
     area: "modules",
     status: "available",
-    roles: ["admin", "helpdesk", "technician", "requester"],
+    roles: ["admin", "technician", "user"],
   },
   {
     href: "/inventario",
@@ -67,7 +67,7 @@ export const portalModules: PortalNavItem[] = [
     icon: FileText,
     area: "modules",
     status: "planned",
-    roles: ["admin", "helpdesk", "technician", "requester"],
+    roles: ["admin", "technician", "user"],
   },
   {
     href: "/impressoras",
@@ -76,7 +76,7 @@ export const portalModules: PortalNavItem[] = [
     icon: Printer,
     area: "modules",
     status: "planned",
-    roles: ["admin", "helpdesk", "technician", "requester"],
+    roles: ["admin", "technician", "user"],
   },
   {
     href: "/servicos-internos",
@@ -85,7 +85,7 @@ export const portalModules: PortalNavItem[] = [
     icon: ServerCog,
     area: "modules",
     status: "planned",
-    roles: ["admin", "helpdesk", "technician", "requester"],
+    roles: ["admin", "technician", "user"],
   },
   {
     href: "/administracao/usuarios",
@@ -120,7 +120,7 @@ export function canAccessNavItem(item: PortalNavItem, user?: User | null): boole
 }
 
 export function moduleLabelForUser(item: PortalNavItem, user?: User | null): string {
-  return user?.role === "requester" && item.requesterLabel ? item.requesterLabel : item.label;
+  return user?.role === "user" && item.userLabel ? item.userLabel : item.label;
 }
 
 export function isNavItemActive(pathname: string, item: PortalNavItem): boolean {

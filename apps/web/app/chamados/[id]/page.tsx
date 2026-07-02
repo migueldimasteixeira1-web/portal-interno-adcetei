@@ -43,7 +43,7 @@ export default function TicketDetailPage() {
           user.permissions.includes("users.view") ? api.users() : Promise.resolve([]),
           user.permissions.includes("assets.view") ? api.assets() : Promise.resolve([]),
         ]);
-        setStaff(users.filter((item) => item.role !== "requester"));
+        setStaff(users.filter((item) => item.role !== "user"));
         setAssets(assetList);
       }
       setError("");
@@ -130,7 +130,7 @@ export default function TicketDetailPage() {
   }
 
   const overdue = ticket.due_at && new Date(ticket.due_at) < new Date() && !["resolved", "closed", "cancelled"].includes(ticket.status);
-  const requester = user.role === "requester";
+  const requester = user.role === "user";
   const formFieldLabels = Object.fromEntries(
     (ticket.form_schema_snapshot?.fields || []).map((field) => [field.key, field.label]),
   );

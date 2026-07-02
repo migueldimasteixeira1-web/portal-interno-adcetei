@@ -9,8 +9,8 @@ import { Alert, Button, Field, Input } from "@/components/ui";
 import { SESSION_MESSAGE_KEY } from "@/lib/api";
 
 const demoUsers = [
-  ["kathlelyn.abreu@sedec.cabofrio.rj.gov.br", "Servidor"],
-  ["maiana.ignacio@adcetei.cabofrio.rj.gov.br", "Helpdesk"],
+  ["kathlelyn.abreu@sedec.cabofrio.rj.gov.br", "Usuário"],
+  ["maiana.ignacio@adcetei.cabofrio.rj.gov.br", "Técnico"],
   ["lucas.martins@adcetei.cabofrio.rj.gov.br", "Técnico"],
   ["admin@adcetei.cabofrio.rj.gov.br", "Administrador"],
 ];

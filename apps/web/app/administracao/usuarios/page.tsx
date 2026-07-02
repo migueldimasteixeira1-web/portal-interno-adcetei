@@ -32,7 +32,7 @@ const emptyDraft: UserDraft = {
   full_name: "",
   email: "",
   password: "",
-  role: "requester",
+  role: "user",
   secretariat: "Prefeitura de Cabo Frio",
   department: "",
   phone: "",
@@ -206,7 +206,7 @@ export default function UsersPage() {
         onConfirm={save}
         loading={saving}
         title={editing ? "Editar usuário" : "Criar usuário"}
-        description="Perfis de Helpdesk, Técnico e Administrador são atribuídos manualmente por administradores."
+        description="Perfis de Técnico e Administrador são atribuídos manualmente por administradores."
         confirmLabel="Salvar usuário"
       >
         <div className="grid gap-4 sm:grid-cols-2">

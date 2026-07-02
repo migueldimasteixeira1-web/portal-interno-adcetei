@@ -79,7 +79,7 @@ export default function RolesPage() {
       <PageHeader eyebrow="Segurança" title="Perfis e permissões" subtitle="Defina o que cada perfil pode fazer no portal. A atribuição de perfis é manual pelos administradores." />
       {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
-      <Alert tone="warning" className="mb-4">Alterações atingem todos os usuários daquele perfil. Permitir “Ver todos os chamados” para Solicitante expõe chamados de outros servidores.</Alert>
+      <Alert tone="warning" className="mb-4">Alterações atingem todos os usuários daquele perfil. Permitir “Ver todos os chamados” para Usuário expõe chamados de outros servidores.</Alert>
 
       <div className="grid gap-4 xl:grid-cols-2">
         {roles.map((role) => (
