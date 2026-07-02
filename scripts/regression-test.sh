@@ -471,6 +471,89 @@ status, _ = call(
 )
 expect(status, 400, "modelo incompatível com fabricante bloqueado")
 
+bulk_payload = {
+    "supplier_id": supplier["id"],
+    "equipment_type_id": equipment_type["id"],
+    "manufacturer_id": manufacturer["id"],
+    "equipment_model_id": equipment_model["id"],
+    "received_at": "2026-07-02",
+    "serial_numbers": ["SN-BULK-001", "SN-BULK-002"],
+    "notes": "Entrada em lote pela regressão.",
+}
+status, _ = call("POST", "/inventory/assets/bulk-scan/preview", requester, bulk_payload)
+expect(status, 403, "usuário comum não faz preview de lote")
+status, _ = call("POST", "/inventory/assets/bulk-scan/confirm", requester, bulk_payload)
+expect(status, 403, "usuário comum não confirma lote")
+
+status, bulk_preview = call("POST", "/inventory/assets/bulk-scan/preview", admin, bulk_payload)
+expect(status, 200, "administrador faz preview de lote válido")
+expect(bulk_preview["total"], 2, "preview contabiliza total enviado")
+expect(bulk_preview["valid_count"], 2, "preview contabiliza itens válidos")
+expect(bulk_preview["invalid_count"], 0, "preview válido não tem erros")
+
+status, duplicate_preview = call(
+    "POST",
+    "/inventory/assets/bulk-scan/preview",
+    admin,
+    {**bulk_payload, "serial_numbers": ["SN-BULK-DUP", " sn-bulk-dup ", "SN-BULK-OK"]},
+)
+expect(status, 200, "preview de lote com duplicado local")
+expect(duplicate_preview["valid_count"], 2, "duplicado local mantém itens únicos válidos")
+expect(duplicate_preview["invalid_count"], 1, "duplicado local gera erro")
+if duplicate_preview["errors"][0]["message"] != "Número de série duplicado no lote":
+    raise AssertionError("preview não identificou duplicado dentro do lote")
+
+status, existing_preview = call(
+    "POST",
+    "/inventory/assets/bulk-scan/preview",
+    admin,
+    {**bulk_payload, "serial_numbers": ["sn mod-001"]},
+)
+expect(status, 200, "preview de lote com serial existente")
+expect(existing_preview["valid_count"], 0, "serial existente não é válido")
+expect(existing_preview["invalid_count"], 1, "serial existente gera erro")
+if existing_preview["errors"][0]["message"] != "Número de série já cadastrado":
+    raise AssertionError("preview não identificou serial existente")
+
+status, _ = call(
+    "POST",
+    "/inventory/assets/bulk-scan/preview",
+    admin,
+    {**bulk_payload, "manufacturer_id": other_manufacturer["id"]},
+)
+expect(status, 400, "preview bloqueia modelo incompatível com fabricante")
+
+status, before_bulk_assets = call("GET", "/inventory/assets", admin)
+expect(status, 200, "lista antes do lote inválido")
+status, _ = call(
+    "POST",
+    "/inventory/assets/bulk-scan/confirm",
+    admin,
+    {**bulk_payload, "serial_numbers": ["SN-BULK-ROLLBACK", "SN MOD-001"]},
+)
+expect(status, 409, "confirm revalida e bloqueia lote com erro")
+status, after_failed_bulk_assets = call("GET", "/inventory/assets", admin)
+expect(status, 200, "lista após lote inválido")
+expect(len(after_failed_bulk_assets), len(before_bulk_assets), "confirm inválido não cria parcialmente")
+if any(item["serial_number"] == "SN-BULK-ROLLBACK" for item in after_failed_bulk_assets):
+    raise AssertionError("confirm inválido criou item parcial")
+
+status, bulk_confirm = call("POST", "/inventory/assets/bulk-scan/confirm", admin, bulk_payload)
+expect(status, 200, "administrador confirma lote válido")
+expect(bulk_confirm["created_count"], 2, "confirm retorna quantidade criada")
+expect(bulk_confirm["summary"]["valid_count"], 2, "confirm retorna resumo do preview")
+for created in bulk_confirm["assets"]:
+    expect(created["status"], "stock", "lote cria equipamento em estoque")
+    expect(created["sector"]["name"], "ADCETEI", "lote entra no setor padrão")
+    expect(created["assigned_user"], None, "lote não vincula responsável")
+    expect(created["delivered_at"], None, "lote não define data de envio")
+    expect(created["received_at"] is not None, True, "lote define data de recebimento")
+    status, created_movements = call("GET", f"/inventory/assets/{created['id']}/movements", admin)
+    expect(status, 200, "histórico de item do lote")
+    created_movement = next((item for item in created_movements if item["action"] == "created"), None)
+    if not created_movement or created_movement["to_sector"]["name"] != "ADCETEI" or created_movement["to_status"] != "stock":
+        raise AssertionError("item do lote não registrou movimento inicial created")
+
 status, external_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Escola Municipal"})
 expect(status, 201, "administrador cria setor externo")
 status, _ = call(
