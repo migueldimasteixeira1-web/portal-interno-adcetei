@@ -74,6 +74,26 @@ export interface InventoryCatalogs {
   sectors: InventoryCatalogItem[];
 }
 
+export interface InventoryCatalogCreatePayload {
+  name: string;
+  is_active?: boolean;
+}
+
+export interface InventoryCatalogUpdatePayload {
+  name?: string;
+  is_active?: boolean;
+}
+
+export interface InventoryEquipmentModelCreatePayload extends InventoryCatalogCreatePayload {
+  manufacturer_id: number;
+  equipment_type_id: number;
+}
+
+export interface InventoryEquipmentModelUpdatePayload extends InventoryCatalogUpdatePayload {
+  manufacturer_id?: number;
+  equipment_type_id?: number;
+}
+
 export interface InventoryAssetCatalogRef {
   id: number;
   name: string;

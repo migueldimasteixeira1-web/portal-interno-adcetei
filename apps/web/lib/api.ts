@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogs, InventoryChangeResponsiblePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogCreatePayload, InventoryCatalogItem, InventoryCatalogs, InventoryCatalogUpdatePayload, InventoryChangeResponsiblePayload, InventoryEquipmentModel, InventoryEquipmentModelCreatePayload, InventoryEquipmentModelUpdatePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -98,6 +98,26 @@ export const api = {
   updateAsset: (id: number, payload: Record<string, unknown>) =>
     request<Asset>(`/admin/assets/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
+  createInventorySupplier: (payload: InventoryCatalogCreatePayload) =>
+    request<InventoryCatalogItem>("/inventory/catalogs/suppliers", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventorySupplier: (id: number, payload: InventoryCatalogUpdatePayload) =>
+    request<InventoryCatalogItem>(`/inventory/catalogs/suppliers/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  createInventoryEquipmentType: (payload: InventoryCatalogCreatePayload) =>
+    request<InventoryCatalogItem>("/inventory/catalogs/equipment-types", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventoryEquipmentType: (id: number, payload: InventoryCatalogUpdatePayload) =>
+    request<InventoryCatalogItem>(`/inventory/catalogs/equipment-types/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  createInventoryManufacturer: (payload: InventoryCatalogCreatePayload) =>
+    request<InventoryCatalogItem>("/inventory/catalogs/manufacturers", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventoryManufacturer: (id: number, payload: InventoryCatalogUpdatePayload) =>
+    request<InventoryCatalogItem>(`/inventory/catalogs/manufacturers/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  createInventoryModel: (payload: InventoryEquipmentModelCreatePayload) =>
+    request<InventoryEquipmentModel>("/inventory/catalogs/models", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventoryModel: (id: number, payload: InventoryEquipmentModelUpdatePayload) =>
+    request<InventoryEquipmentModel>(`/inventory/catalogs/models/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  createInventorySector: (payload: InventoryCatalogCreatePayload) =>
+    request<InventoryCatalogItem>("/inventory/catalogs/sectors", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventorySector: (id: number, payload: InventoryCatalogUpdatePayload) =>
+    request<InventoryCatalogItem>(`/inventory/catalogs/sectors/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   inventoryAssets: () => request<InventoryAsset[]>("/inventory/assets"),
   inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
   inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),
