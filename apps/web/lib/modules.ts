@@ -58,7 +58,7 @@ export const portalModules: PortalNavItem[] = [
     icon: Boxes,
     area: "modules",
     status: "available",
-    permission: "assets.view",
+    permission: "inventory.view",
   },
   {
     href: "/memorandos",
@@ -148,6 +148,9 @@ const PAGE_TITLES: Record<string, string> = {
 export function pageLabelForPath(pathname: string): string {
   if (pathname.startsWith("/chamados/") && pathname !== "/chamados/novo") {
     return "Detalhes do chamado";
+  }
+  if (pathname.startsWith("/inventario/") && pathname !== "/inventario/novo") {
+    return "Detalhes do equipamento";
   }
   return PAGE_TITLES[pathname] || "Portal Interno ADCETEI";
 }
