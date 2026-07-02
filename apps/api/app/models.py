@@ -96,7 +96,7 @@ class Ticket(Base):
     urgency: Mapped[str] = mapped_column(String(30), default="medium")
     impact: Mapped[str] = mapped_column(String(30), default="medium")
     category: Mapped[str] = mapped_column(String(100), index=True)
-    team: Mapped[str] = mapped_column(String(100), default="Helpdesk")
+    team: Mapped[str] = mapped_column(String(100), default="Técnico")
     origin: Mapped[str] = mapped_column(String(40), default="portal")
     location: Mapped[str] = mapped_column(String(160), default="")
     requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)

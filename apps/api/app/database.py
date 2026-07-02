@@ -40,8 +40,9 @@ def ensure_schema_compatibility() -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_token_hash VARCHAR(128) DEFAULT ''"))
         if "password_reset_expires_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP"))
-        connection.execute(text("UPDATE users SET role = 'technician' WHERE role = 'helpdesk'"))
-        connection.execute(text("UPDATE users SET role = 'user' WHERE role = 'requester'"))
+        if "role" in user_columns:
+            connection.execute(text("UPDATE users SET role = 'technician' WHERE role = 'helpdesk'"))
+            connection.execute(text("UPDATE users SET role = 'user' WHERE role = 'requester'"))
 
     if "role_configs" in table_names:
         with engine.begin() as connection:
