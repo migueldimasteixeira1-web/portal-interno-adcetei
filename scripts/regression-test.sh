@@ -81,6 +81,7 @@ from apps.api.app.catalog_forms import normalize_form_schema, validate_form_data
 from apps.api.app.auth import validate_institutional_email
 from apps.api.app.inventory_service import (
     build_asset_display_name,
+    default_sector_update_error,
     initial_inventory_status,
     normalize_serial_number,
     validate_shipping_date_for_status,
@@ -125,6 +126,10 @@ else:
     raise AssertionError("equipamento alocado sem data de envio foi aceito")
 assert build_asset_display_name("Notebook", "Dell", "Latitude", " SN 123 ") == "Notebook - Dell - Latitude - SN 123"
 assert "PAT" not in build_asset_display_name(serial_number="SN-9")
+assert default_sector_update_error({"is_active": False}, current_name="ADCETEI") is not None
+assert default_sector_update_error({"name": "Outro setor"}, current_name=" ADCETEI ") is not None
+assert default_sector_update_error({"is_active": True}, current_name="ADCETEI") is None
+assert default_sector_update_error({"is_active": False}, current_name="Escola Municipal") is None
 print("Helpers: OK")
 PY
 
@@ -356,6 +361,28 @@ status, catalogs = call("GET", "/inventory/catalogs", admin)
 expect(status, 200, "administrador consulta catálogos de inventário")
 if not any(item["name"] == "ADCETEI" and item["is_active"] for item in catalogs["sectors"]):
     raise AssertionError("setor padrão ADCETEI ausente")
+default_sector = next(item for item in catalogs["sectors"] if item["name"] == "ADCETEI")
+status, body = call("PATCH", f"/inventory/catalogs/sectors/{default_sector['id']}", admin, {"is_active": False})
+expect(status, 400, "setor padrão ADCETEI não pode ser desativado")
+if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou desativado.":
+    raise AssertionError("mensagem de proteção do setor padrão ausente ao desativar")
+status, body = call("PATCH", f"/inventory/catalogs/sectors/{default_sector['id']}", admin, {"name": "Estoque Central"})
+expect(status, 400, "setor padrão ADCETEI não pode ser renomeado")
+if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou desativado.":
+    raise AssertionError("mensagem de proteção do setor padrão ausente ao renomear")
+status, protected_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Setor Proteção Regressão"})
+expect(status, 201, "administrador cria setor auxiliar para teste de proteção")
+status, protected_sector = call("PATCH", f"/inventory/catalogs/sectors/{protected_sector['id']}", admin, {"is_active": False})
+expect(status, 200, "outros setores podem ser desativados")
+expect(protected_sector["is_active"], False, "setor auxiliar desativado")
+status, protected_sector = call(
+    "PATCH",
+    f"/inventory/catalogs/sectors/{protected_sector['id']}",
+    admin,
+    {"name": "Setor Proteção Renomeado", "is_active": True},
+)
+expect(status, 200, "outros setores podem ser renomeados e reativados")
+expect(protected_sector["name"], "Setor Proteção Renomeado", "setor auxiliar renomeado")
 status, _ = call("POST", "/inventory/catalogs/sectors", admin, {"name": "  adcetei  "})
 expect(status, 409, "setor padrão não pode ser duplicado")
 

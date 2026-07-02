@@ -19,6 +19,7 @@ from .inventory_service import (
     asset_movement_state,
     build_bulk_scan_preview,
     build_asset_display_name,
+    default_sector_update_error,
     display_serial_number,
     initial_inventory_status,
     inventory_status_from_asset,
@@ -858,4 +859,9 @@ def update_sector(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
+    sector = get_item(db, InventorySector, item_id)
+    data = payload.model_dump(exclude_unset=True)
+    error = default_sector_update_error(data, current_name=sector.name)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
     return update_item(db, InventorySector, item_id, payload)

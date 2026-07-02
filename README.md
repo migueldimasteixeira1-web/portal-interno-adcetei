@@ -115,6 +115,8 @@ A Parte 7 adicionou entrada em lote por leitura/digitação de números de séri
 
 A Parte 8 adicionou a tela `/inventario/cadastros` para gerenciar fornecedores, tipos de equipamento, fabricantes, modelos e setores. O acesso exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
 
+O setor padrão `ADCETEI` é protegido no backend: não pode ser renomeado nem desativado via API.
+
 `GET /api/assets` exige a permissão `assets.view`.
 
 A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:

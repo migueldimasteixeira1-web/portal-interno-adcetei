@@ -8,6 +8,23 @@ def normalize_catalog_name(value: str) -> str:
     return " ".join(value.strip().split()).casefold()
 
 
+DEFAULT_SECTOR_UPDATE_ERROR = "O setor padrão ADCETEI não pode ser renomeado ou desativado."
+
+
+def is_default_inventory_sector_name(name: str) -> bool:
+    return normalize_catalog_name(name) == normalize_catalog_name(DEFAULT_INVENTORY_SECTOR)
+
+
+def default_sector_update_error(updates: dict[str, object], *, current_name: str) -> str | None:
+    if not is_default_inventory_sector_name(current_name):
+        return None
+    if "name" in updates and not is_default_inventory_sector_name(str(updates["name"])):
+        return DEFAULT_SECTOR_UPDATE_ERROR
+    if updates.get("is_active") is False:
+        return DEFAULT_SECTOR_UPDATE_ERROR
+    return None
+
+
 def normalize_serial_number(value: str | None) -> str:
     return " ".join((value or "").strip().split()).casefold()
 

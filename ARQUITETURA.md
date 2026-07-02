@@ -121,6 +121,8 @@ A entrada em lote por leitura de número de série fica em `/inventario/lote` e 
 
 A Parte 8 adicionou `/inventario/cadastros` para gerenciar os cadastros base do inventário (fornecedores, tipos, fabricantes, modelos e setores). A tela exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
 
+O setor padrão `ADCETEI` é protegido no backend contra renomeação e desativação pela API de cadastros.
+
 Existem duas superfícies:
 
 ### Inventário administrativo
