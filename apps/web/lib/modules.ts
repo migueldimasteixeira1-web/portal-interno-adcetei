@@ -2,9 +2,12 @@ import {
   BookOpen,
   Boxes,
   ClipboardList,
+  FileText,
   History,
   Home,
   Network,
+  Printer,
+  ServerCog,
   Settings2,
   Users,
 } from "lucide-react";
@@ -14,12 +17,6 @@ import { hasPermission } from "./permissions";
 
 export type PortalArea = "portal" | "modules" | "administration";
 export type PortalModuleStatus = "available" | "planned";
-
-export interface PortalNavAction {
-  href: string;
-  label: string;
-  requesterLabel?: string;
-}
 
 export interface PortalNavItem {
   href: string;
@@ -32,7 +29,6 @@ export interface PortalNavItem {
   permission?: string;
   permissionsAny?: string[];
   roles?: Role[];
-  actions?: PortalNavAction[];
 }
 
 export const portalHome: PortalNavItem = {
@@ -54,10 +50,6 @@ export const portalModules: PortalNavItem[] = [
     area: "modules",
     status: "available",
     roles: ["admin", "helpdesk", "technician", "requester"],
-    actions: [
-      { href: "/chamados", label: "Ver chamados", requesterLabel: "Meus chamados" },
-      { href: "/chamados/novo", label: "Abrir chamado" },
-    ],
   },
   {
     href: "/inventario",
@@ -67,6 +59,33 @@ export const portalModules: PortalNavItem[] = [
     area: "modules",
     status: "available",
     permission: "assets.view",
+  },
+  {
+    href: "/memorandos",
+    label: "Memorandos",
+    description: "Formalizações internas, encaminhamentos e registros administrativos.",
+    icon: FileText,
+    area: "modules",
+    status: "planned",
+    roles: ["admin", "helpdesk", "technician", "requester"],
+  },
+  {
+    href: "/impressoras",
+    label: "Impressoras",
+    description: "Integração planejada com CUPS, filas e recursos de impressão.",
+    icon: Printer,
+    area: "modules",
+    status: "planned",
+    roles: ["admin", "helpdesk", "technician", "requester"],
+  },
+  {
+    href: "/servicos-internos",
+    label: "Serviços Internos",
+    description: "Catálogo de ferramentas, VMs e serviços operacionais da ADCETEI.",
+    icon: ServerCog,
+    area: "modules",
+    status: "planned",
+    roles: ["admin", "helpdesk", "technician", "requester"],
   },
   {
     href: "/administracao/usuarios",
@@ -104,22 +123,12 @@ export function moduleLabelForUser(item: PortalNavItem, user?: User | null): str
   return user?.role === "requester" && item.requesterLabel ? item.requesterLabel : item.label;
 }
 
-export function actionLabelForUser(action: PortalNavAction, user?: User | null): string {
-  return user?.role === "requester" && action.requesterLabel ? action.requesterLabel : action.label;
-}
-
-export function isNavPathActive(pathname: string, href: string): boolean {
-  if (href === "/dashboard") return pathname === href;
-  if (href === "/chamados") return pathname === "/chamados" || /^\/chamados\/\d+/.test(pathname);
-  if (href === "/chamados/novo") return pathname === "/chamados/novo";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 export function isNavItemActive(pathname: string, item: PortalNavItem): boolean {
-  if (item.actions?.length) {
-    return item.actions.some((action) => isNavPathActive(pathname, action.href));
+  if (item.href === "/dashboard") return pathname === item.href;
+  if (item.href === "/chamados") {
+    return pathname === "/chamados" || pathname === "/chamados/novo" || /^\/chamados\/\d+/.test(pathname);
   }
-  return isNavPathActive(pathname, item.href);
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 const PAGE_TITLES: Record<string, string> = {
@@ -127,6 +136,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/chamados": "Chamados",
   "/chamados/novo": "Abrir chamado",
   "/inventario": "Inventário",
+  "/memorandos": "Memorandos",
+  "/impressoras": "Impressoras",
+  "/servicos-internos": "Serviços Internos",
   "/administracao/usuarios": "Administração · Usuários",
   "/administracao/catalogo": "Administração · Catálogo",
   "/administracao/perfis": "Administração · Perfis",

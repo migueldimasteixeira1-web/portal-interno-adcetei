@@ -35,7 +35,11 @@ export default function DashboardPage() {
 
   const firstName = user?.full_name.split(" ")[0] || "servidor";
   const visibleModules = useMemo(
-    () => portalModules.filter((item) => canAccessNavItem(item, user)),
+    () => portalModules.filter((item) => item.area === "modules" && item.status !== "planned" && canAccessNavItem(item, user)),
+    [user],
+  );
+  const plannedModules = useMemo(
+    () => portalModules.filter((item) => item.area === "modules" && item.status === "planned" && canAccessNavItem(item, user)),
     [user],
   );
   const hubStats = data ? [
@@ -58,7 +62,7 @@ export default function DashboardPage() {
         <div className="rounded-md border border-[#c5daf0] bg-[#f3f7fb] p-4">
           <p className="text-sm font-semibold text-[#164f84]">Hub modular do portal</p>
           <p className="mt-1 text-sm leading-6 text-[#5c6b7e]">
-            Use esta tela como ponto de partida para suporte técnico e consulta de ativos do portal.
+            Use esta tela como ponto de partida para suporte técnico, ativos e módulos planejados do portal.
           </p>
         </div>
         <div className="rounded-md border border-[#d4dbe4] bg-white p-4">
@@ -72,9 +76,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {visibleModules.map((item) => <ModuleCard key={item.href} item={item} />)}
-      </div>
+      <section aria-labelledby="available-modules-title">
+        <div className="mb-2 flex items-center gap-3">
+          <h2 id="available-modules-title" className="text-sm font-semibold text-[#1a2332]">Módulos disponíveis</h2>
+          <span className="h-px flex-1 bg-[#d4dbe4]" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {visibleModules.map((item) => <ModuleCard key={item.href} item={item} />)}
+        </div>
+      </section>
+
+      {plannedModules.length > 0 && (
+        <section className="mt-5" aria-labelledby="planned-modules-title">
+          <div className="mb-2 flex items-center gap-3">
+            <h2 id="planned-modules-title" className="text-sm font-semibold text-[#1a2332]">Próximos módulos</h2>
+            <span className="h-px flex-1 bg-[#d4dbe4]" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {plannedModules.map((item) => <ModuleCard key={item.href} item={item} />)}
+          </div>
+        </section>
+      )}
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="overflow-hidden">

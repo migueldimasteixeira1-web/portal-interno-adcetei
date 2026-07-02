@@ -10,6 +10,7 @@ function statusLabel(status?: PortalNavItem["status"]) {
 export default function ModuleCard({ item }: { item: PortalNavItem }) {
   const Icon = item.icon;
   const planned = item.status === "planned";
+
   return (
     <Link
       href={item.href}
