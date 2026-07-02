@@ -258,6 +258,79 @@ class InventoryCatalogsOut(BaseModel):
     sectors: list[InventoryCatalogItemOut]
 
 
+InventoryAssetStatus = Literal["stock", "allocated", "maintenance", "retired"]
+
+
+class InventoryAssetCatalogRefOut(BaseModel):
+    id: int
+    name: str
+
+
+class InventoryAssetUserRefOut(BaseModel):
+    id: int
+    full_name: str
+    email: EmailStr
+    department: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryAssetOut(BaseModel):
+    id: int
+    serial_number: str
+    status: InventoryAssetStatus
+    display_name: str
+    supplier_id: Optional[int] = None
+    supplier: Optional[InventoryAssetCatalogRefOut] = None
+    equipment_type_id: Optional[int] = None
+    equipment_type: Optional[InventoryAssetCatalogRefOut] = None
+    manufacturer_id: Optional[int] = None
+    manufacturer: Optional[InventoryAssetCatalogRefOut] = None
+    equipment_model_id: Optional[int] = None
+    equipment_model: Optional[InventoryAssetCatalogRefOut] = None
+    sector_id: Optional[int] = None
+    sector: Optional[InventoryAssetCatalogRefOut] = None
+    assigned_user_id: Optional[int] = None
+    assigned_user: Optional[InventoryAssetUserRefOut] = None
+    received_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: str = ""
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @field_serializer("received_at", "delivered_at", "created_at", "updated_at")
+    def serialize_inventory_asset_datetimes(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class InventoryAssetCreate(BaseModel):
+    serial_number: str = Field(min_length=1, max_length=120)
+    supplier_id: Optional[int] = None
+    equipment_type_id: int
+    manufacturer_id: int
+    equipment_model_id: int
+    sector_id: Optional[int] = None
+    assigned_user_id: Optional[int] = None
+    received_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryAssetUpdate(BaseModel):
+    serial_number: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    status: Optional[InventoryAssetStatus] = None
+    supplier_id: Optional[int] = None
+    equipment_type_id: Optional[int] = None
+    manufacturer_id: Optional[int] = None
+    equipment_model_id: Optional[int] = None
+    sector_id: Optional[int] = None
+    assigned_user_id: Optional[int] = None
+    received_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
 class AuditLogOut(BaseModel):
     id: int
     action: str
