@@ -113,6 +113,8 @@ A Parte 6 adicionou histórico e movimentações em `asset_movements`. Alocaçã
 
 A Parte 7 adicionou entrada em lote por leitura/digitação de números de série. O fluxo cria todos os itens como estoque ADCETEI, sem responsável e sem data de envio, registrando movimento inicial `created` para cada equipamento. Importação por planilha continua para etapa posterior.
 
+A Parte 8 adicionou a tela `/inventario/cadastros` para gerenciar fornecedores, tipos de equipamento, fabricantes, modelos e setores. O acesso exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+
 `GET /api/assets` exige a permissão `assets.view`.
 
 A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:

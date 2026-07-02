@@ -119,6 +119,8 @@ Movimentações ficam em `asset_movements` e registram ator, data operacional, s
 
 A entrada em lote por leitura de número de série fica em `/inventario/lote` e usa `/api/inventory/assets/bulk-scan`. Ela pré-valida duplicidades, confirma tudo sem criação parcial e cria os equipamentos como estoque ADCETEI com movimento inicial `created`. Importação por planilha permanece fora deste fluxo.
 
+A Parte 8 adicionou `/inventario/cadastros` para gerenciar os cadastros base do inventário (fornecedores, tipos, fabricantes, modelos e setores). A tela exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+
 Existem duas superfícies:
 
 ### Inventário administrativo
