@@ -110,9 +110,9 @@ A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:
 - `asset_type`;
 - `patrimony`.
 
-Solicitantes recebem apenas equipamentos vinculados ao próprio usuário. O backend também impede que um solicitante envie manualmente o identificador de um equipamento pertencente a outra pessoa.
+Usuários comuns recebem apenas equipamentos vinculados ao próprio usuário. O backend também impede que um usuário envie manualmente o identificador de um equipamento pertencente a outra pessoa.
 
-Detalhes de equipamento dentro de chamados do solicitante não incluem IP, serial, sistema operacional ou usuário vinculado.
+Detalhes de equipamento dentro de chamados do usuário não incluem IP, serial, sistema operacional ou usuário vinculado.
 
 ## Chamados
 

@@ -125,7 +125,7 @@ Retorna dados completos, como IP, serial, sistema operacional, localização e u
 
 `GET /api/assets/ticket-options`
 
-Retorna somente os campos necessários para seleção. Solicitantes recebem exclusivamente ativos vinculados ao próprio usuário. A criação do chamado repete essa validação no backend para impedir manipulação manual do identificador.
+Retorna somente os campos necessários para seleção. Usuários comuns recebem exclusivamente ativos vinculados ao próprio usuário. A criação do chamado repete essa validação no backend para impedir manipulação manual do identificador.
 
 ## Paginação
 
