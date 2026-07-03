@@ -1,26 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Computer, Info, Mail, MonitorCog, Network, Printer, Search, Shield, UserCog } from "lucide-react";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Info, Search } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import CatalogIcon from "@/components/CatalogIcon";
 import LoadingScreen from "@/components/LoadingScreen";
 import PageHeader from "@/components/PageHeader";
 import { Alert, Button, Card, EmptyState, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { api } from "@/lib/api";
 import { assetTypeLabels } from "@/lib/format";
 import type { AssetTicketOption, CatalogFormField, CatalogService } from "@/lib/types";
-
-const icons: Record<string, ReactNode> = {
-  Print: <Printer size={18} />,
-  Email: <Mail size={18} />,
-  ManageAccounts: <UserCog size={18} />,
-  PersonAdd: <UserCog size={18} />,
-  Computer: <Computer size={18} />,
-  DesktopWindows: <MonitorCog size={18} />,
-  WifiOff: <Network size={18} />,
-  Apps: <Shield size={18} />,
-  SupportAgent: <Shield size={18} />,
-};
 
 export default function NewTicketPage() {
   const router = useRouter();
@@ -267,7 +256,7 @@ export default function NewTicketPage() {
                   className="panel-flat flex items-start gap-3 p-3.5 text-left transition hover:border-[#1a5f9e] focus-visible:border-[#1a5f9e]"
                 >
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]">
-                    {icons[service.icon] || <Shield size={18} />}
+                    <CatalogIcon name={service.icon} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-[#1a2332]">{service.name}</h3>

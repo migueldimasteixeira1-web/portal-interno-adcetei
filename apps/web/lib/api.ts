@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogCreatePayload, InventoryCatalogItem, InventoryCatalogs, InventoryCatalogUpdatePayload, InventoryChangeResponsiblePayload, InventoryEquipmentModel, InventoryEquipmentModelCreatePayload, InventoryEquipmentModelUpdatePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogOptions, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogCreatePayload, InventoryCatalogItem, InventoryCatalogs, InventoryCatalogUpdatePayload, InventoryChangeResponsiblePayload, InventoryEquipmentModel, InventoryEquipmentModelCreatePayload, InventoryEquipmentModelUpdatePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -137,6 +137,7 @@ export const api = {
     request<InventoryAsset>(`/inventory/assets/${id}/maintenance`, { method: "POST", body: JSON.stringify(payload) }),
   assetTicketOptions: () => request<AssetTicketOption[]>("/assets/ticket-options"),
   catalog: (includeInactive = false) => request<CatalogService[]>(`/catalog?include_inactive=${includeInactive}`),
+  catalogOptions: () => request<CatalogOptions>("/admin/catalog/options"),
   createCatalogService: (payload: Record<string, unknown>) =>
     request<CatalogService>("/admin/catalog", { method: "POST", body: JSON.stringify(payload) }),
   updateCatalogService: (id: number, payload: Record<string, unknown>) =>

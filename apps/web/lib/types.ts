@@ -217,6 +217,18 @@ export interface CatalogFormField {
   placeholder: string;
   options: string[];
   max_length: number;
+  help?: string;
+}
+
+export interface CatalogIconOption {
+  key: string;
+  label: string;
+}
+
+export interface CatalogOptions {
+  categories: string[];
+  icons: CatalogIconOption[];
+  fields: CatalogFormField[];
 }
 
 export interface CatalogService {
