@@ -370,6 +370,8 @@ status, body = call("PATCH", f"/inventory/catalogs/sectors/{default_sector['id']
 expect(status, 400, "setor padrão ADCETEI não pode ser renomeado")
 if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou desativado.":
     raise AssertionError("mensagem de proteção do setor padrão ausente ao renomear")
+status, _ = call("DELETE", f"/inventory/catalogs/sectors/{default_sector['id']}", admin)
+expect(status, 400, "setor padrão ADCETEI não pode ser excluído")
 status, protected_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Setor Proteção Regressão"})
 expect(status, 201, "administrador cria setor auxiliar para teste de proteção")
 status, protected_sector = call("PATCH", f"/inventory/catalogs/sectors/{protected_sector['id']}", admin, {"is_active": False})
@@ -396,6 +398,14 @@ expect(supplier["is_active"], False, "fornecedor inativado")
 status, supplier = call("PATCH", f"/inventory/catalogs/suppliers/{supplier['id']}", admin, {"is_active": True})
 expect(status, 200, "administrador reativa fornecedor")
 expect(supplier["is_active"], True, "fornecedor reativado")
+status, temporary_supplier = call("POST", "/inventory/catalogs/suppliers", admin, {"name": "Fornecedor Excluir Regressão"})
+expect(status, 201, "administrador cria fornecedor temporário")
+status, _ = call("DELETE", f"/inventory/catalogs/suppliers/{temporary_supplier['id']}", admin)
+expect(status, 200, "administrador exclui fornecedor sem vínculo")
+status, catalogs_after_delete = call("GET", "/inventory/catalogs", admin)
+expect(status, 200, "administrador consulta catálogos após exclusão")
+if any(item["id"] == temporary_supplier["id"] for item in catalogs_after_delete["suppliers"]):
+    raise AssertionError("fornecedor temporário não foi excluído")
 
 status, equipment_type = call("POST", "/inventory/catalogs/equipment-types", admin, {"name": "Notebook"})
 expect(status, 201, "administrador cria tipo de equipamento")
@@ -468,6 +478,25 @@ expect(modular_asset["equipment_model"]["name"], equipment_model["name"], "model
 expect(modular_asset["sector"]["name"], "ADCETEI", "setor padrão no contrato novo")
 if "Latitude 5440" not in modular_asset["display_name"] or "SN MOD-001" not in modular_asset["display_name"]:
     raise AssertionError(f"display name incompleto: {modular_asset['display_name']}")
+
+status, deletable_asset = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-EXCLUIR-001",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "notes": "Equipamento temporário para teste de exclusão.",
+    },
+)
+expect(status, 201, "administrador cria equipamento temporário")
+status, _ = call("DELETE", f"/inventory/assets/{deletable_asset['id']}", admin)
+expect(status, 200, "administrador exclui equipamento sem chamado vinculado")
+status, _ = call("GET", f"/inventory/assets/{deletable_asset['id']}", admin)
+expect(status, 404, "equipamento excluído não aparece no detalhe")
 
 status, _ = call(
     "POST",
@@ -759,6 +788,10 @@ status, ticket_with_modular_asset = call(
     },
 )
 expect(status, 201, "ticket.asset_id segue compatível com equipamento modular")
+status, _ = call("DELETE", f"/inventory/assets/{allocated_asset['id']}", admin)
+expect(status, 409, "equipamento vinculado a chamado não pode ser excluído")
+status, _ = call("DELETE", f"/admin/catalog/{general_service['id']}", admin)
+expect(status, 409, "serviço vinculado a chamado não pode ser excluído")
 expect(ticket_with_modular_asset["asset"]["id"], allocated_asset["id"], "chamado preserva vínculo com asset modular")
 
 # Campos administrativos continuam proibidos na abertura.
@@ -1042,6 +1075,10 @@ status, _ = call("POST", "/auth/login", payload={"username": "teste.admin2@adcet
 expect(status, 401, "usuário bloqueado não autentica")
 status, _ = call("PATCH", f"/admin/users/{admin_user['id']}", admin, {"active": False})
 expect(status, 409, "administrador não desativa a própria conta")
+status, _ = call("DELETE", f"/admin/users/{admin_user['id']}", admin)
+expect(status, 409, "administrador não exclui a própria conta")
+status, _ = call("DELETE", f"/admin/users/{created_user['id']}", admin)
+expect(status, 200, "administrador exclui usuário sem histórico")
 
 status, created_asset = call(
     "POST",
@@ -1124,6 +1161,8 @@ status, updated_service = call(
 )
 expect(status, 200, "administrador atualiza serviço")
 expect(updated_service["active"], False, "serviço arquivado")
+status, _ = call("DELETE", f"/admin/catalog/{created_service['id']}", admin)
+expect(status, 200, "administrador exclui serviço sem chamado vinculado")
 
 status, roles = call("GET", "/admin/roles", admin)
 expect(status, 200, "administrador consulta perfis")

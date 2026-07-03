@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from .database import get_db
@@ -38,6 +38,7 @@ from .models import (
     InventoryManufacturer,
     InventorySector,
     InventorySupplier,
+    Ticket,
     User,
 )
 from .permissions import require_permission
@@ -105,6 +106,10 @@ def get_item(db: Session, model: type[Any], item_id: int) -> Any:
     return item
 
 
+def has_rows(db: Session, query: Any) -> bool:
+    return db.scalar(select(query.exists())) or False
+
+
 def create_item(db: Session, model: type[Any], payload: InventoryCatalogItemCreate) -> Any:
     name = catalog_name(payload.name)
     normalized_name = ensure_unique_name(db, model, name)
@@ -126,6 +131,15 @@ def update_item(db: Session, model: type[Any], item_id: int, payload: InventoryC
     db.commit()
     db.refresh(item)
     return item
+
+
+def delete_item(db: Session, model: type[Any], item_id: int, blocked_queries: tuple[Any, ...]) -> dict[str, str]:
+    item = get_item(db, model, item_id)
+    if any(has_rows(db, query) for query in blocked_queries):
+        raise HTTPException(status_code=409, detail="Cadastro possui vínculos. Inative em vez de excluir.")
+    db.delete(item)
+    db.commit()
+    return {"message": "Cadastro excluído com sucesso"}
 
 
 def ensure_model_references(db: Session, manufacturer_id: int, equipment_type_id: int) -> None:
@@ -606,6 +620,23 @@ def update_inventory_asset(
     return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
 
 
+@router.delete("/assets/{asset_id}")
+def delete_inventory_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.edit")),
+):
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    if has_rows(db, select(Ticket.id).where(Ticket.asset_id == asset.id)):
+        raise HTTPException(status_code=409, detail="Equipamento possui chamados vinculados. Baixe ou arquive em vez de excluir.")
+    db.execute(delete(AssetMovement).where(AssetMovement.asset_id == asset.id))
+    db.delete(asset)
+    db.commit()
+    return {"message": "Equipamento excluído com sucesso"}
+
+
 @router.get("/assets/{asset_id}/movements", response_model=list[InventoryMovementOut])
 def list_inventory_asset_movements(
     asset_id: int,
@@ -758,6 +789,15 @@ def update_supplier(
     return update_item(db, InventorySupplier, item_id, payload)
 
 
+@router.delete("/catalogs/suppliers/{item_id}")
+def delete_supplier(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(db, InventorySupplier, item_id, (select(Asset.id).where(Asset.supplier_id == item_id),))
+
+
 @router.post("/catalogs/equipment-types", response_model=InventoryCatalogItemOut, status_code=201)
 def create_equipment_type(
     payload: InventoryCatalogItemCreate,
@@ -777,6 +817,23 @@ def update_equipment_type(
     return update_item(db, InventoryEquipmentType, item_id, payload)
 
 
+@router.delete("/catalogs/equipment-types/{item_id}")
+def delete_equipment_type(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(
+        db,
+        InventoryEquipmentType,
+        item_id,
+        (
+            select(Asset.id).where(Asset.equipment_type_id == item_id),
+            select(InventoryEquipmentModel.id).where(InventoryEquipmentModel.equipment_type_id == item_id),
+        ),
+    )
+
+
 @router.post("/catalogs/manufacturers", response_model=InventoryCatalogItemOut, status_code=201)
 def create_manufacturer(
     payload: InventoryCatalogItemCreate,
@@ -794,6 +851,23 @@ def update_manufacturer(
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
     return update_item(db, InventoryManufacturer, item_id, payload)
+
+
+@router.delete("/catalogs/manufacturers/{item_id}")
+def delete_manufacturer(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(
+        db,
+        InventoryManufacturer,
+        item_id,
+        (
+            select(Asset.id).where(Asset.manufacturer_id == item_id),
+            select(InventoryEquipmentModel.id).where(InventoryEquipmentModel.manufacturer_id == item_id),
+        ),
+    )
 
 
 @router.post("/catalogs/models", response_model=InventoryEquipmentModelOut, status_code=201)
@@ -843,6 +917,15 @@ def update_equipment_model(
     return model
 
 
+@router.delete("/catalogs/models/{item_id}")
+def delete_equipment_model(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(db, InventoryEquipmentModel, item_id, (select(Asset.id).where(Asset.equipment_model_id == item_id),))
+
+
 @router.post("/catalogs/sectors", response_model=InventoryCatalogItemOut, status_code=201)
 def create_sector(
     payload: InventoryCatalogItemCreate,
@@ -865,3 +948,23 @@ def update_sector(
     if error:
         raise HTTPException(status_code=400, detail=error)
     return update_item(db, InventorySector, item_id, payload)
+
+
+@router.delete("/catalogs/sectors/{item_id}")
+def delete_sector(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    sector = get_item(db, InventorySector, item_id)
+    if normalize_catalog_name(sector.name) == normalize_catalog_name(DEFAULT_INVENTORY_SECTOR):
+        raise HTTPException(status_code=400, detail="O setor ADCETEI é o estoque padrão e não pode ser excluído")
+    return delete_item(
+        db,
+        InventorySector,
+        item_id,
+        (
+            select(Asset.id).where(Asset.sector_id == item_id),
+            select(AssetMovement.id).where(or_(AssetMovement.from_sector_id == item_id, AssetMovement.to_sector_id == item_id)),
+        ),
+    )

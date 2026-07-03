@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Building2, CircleOff, Factory, Layers3, Package, Pencil, Plus, Truck } from "lucide-react";
+import { ArrowLeft, Building2, CircleOff, Factory, Layers3, Package, Pencil, Plus, Trash2, Truck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import AccessDenied from "@/components/AccessDenied";
@@ -15,6 +15,7 @@ import type { InventoryCatalogItem, InventoryCatalogs, InventoryEquipmentModel }
 const DEFAULT_INVENTORY_SECTOR = "ADCETEI";
 
 type CatalogTab = "suppliers" | "equipment_types" | "manufacturers" | "models" | "sectors";
+type DeleteTarget = { tab: CatalogTab; item: InventoryCatalogItem | InventoryEquipmentModel };
 
 type SimpleDraft = {
   name: string;
@@ -69,6 +70,7 @@ export default function InventoryCatalogsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [editingSimple, setEditingSimple] = useState<InventoryCatalogItem | null>(null);
   const [editingModel, setEditingModel] = useState<InventoryEquipmentModel | null>(null);
   const [simpleDraft, setSimpleDraft] = useState<SimpleDraft>(emptySimpleDraft);
@@ -217,6 +219,28 @@ export default function InventoryCatalogsPage() {
 
   const save = () => (tab === "models" ? saveModel() : saveSimple());
 
+  const deleteSelected = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const id = deleting.item.id;
+      if (deleting.tab === "suppliers") await api.deleteInventorySupplier(id);
+      else if (deleting.tab === "equipment_types") await api.deleteInventoryEquipmentType(id);
+      else if (deleting.tab === "manufacturers") await api.deleteInventoryManufacturer(id);
+      else if (deleting.tab === "models") await api.deleteInventoryModel(id);
+      else await api.deleteInventorySector(id);
+      setDeleting(null);
+      setMessage("Cadastro excluído com sucesso.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível excluir o cadastro");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <LoadingScreen label="Carregando cadastros do inventário..." />;
   if (!canManage) return <AccessDenied />;
 
@@ -262,7 +286,7 @@ export default function InventoryCatalogsPage() {
       <Card className="overflow-hidden">
         <SectionHeader
           title={tabMeta.label}
-          description={`${currentItems.length} registro(s). Use desativação em vez de exclusão.`}
+          description={`${currentItems.length} registro(s). Exclusão é permitida apenas sem vínculos.`}
           action={<Button size="sm" onClick={openCreate}><Plus size={15} />Novo cadastro</Button>}
         />
 
@@ -288,10 +312,16 @@ export default function InventoryCatalogsPage() {
                       <td className="text-[#5c6b7e]">{equipmentTypeNameById.get(model.equipment_type_id) || "—"}</td>
                       <td><Badge className={activeBadge(model.is_active)}>{model.is_active ? "Ativo" : "Inativo"}</Badge></td>
                       <td>
-                        <Button variant="ghost" size="sm" onClick={() => openEditModel(model)} aria-label={`Editar ${model.name}`}>
-                          <Pencil size={15} />
-                          Editar
-                        </Button>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Button variant="ghost" size="sm" onClick={() => openEditModel(model)} aria-label={`Editar ${model.name}`}>
+                            <Pencil size={15} />
+                            Editar
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleting({ tab: "models", item: model })} aria-label={`Excluir ${model.name}`}>
+                            <Trash2 size={15} />
+                            Excluir
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -321,10 +351,22 @@ export default function InventoryCatalogsPage() {
                       </td>
                     )}
                     <td>
-                      <Button variant="ghost" size="sm" onClick={() => openEditSimple(item)} aria-label={`Editar ${item.name}`}>
-                        <Pencil size={15} />
-                        Editar
-                      </Button>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button variant="ghost" size="sm" onClick={() => openEditSimple(item)} aria-label={`Editar ${item.name}`}>
+                          <Pencil size={15} />
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={tab === "sectors" && isDefaultSector(item.name)}
+                          onClick={() => setDeleting({ tab, item })}
+                          aria-label={`Excluir ${item.name}`}
+                        >
+                          <Trash2 size={15} />
+                          Excluir
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -409,6 +451,21 @@ export default function InventoryCatalogsPage() {
           </div>
         )}
         {error && <Alert tone="danger" className="mt-4">{error}</Alert>}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+          setError("");
+        }}
+        onConfirm={deleteSelected}
+        loading={saving}
+        title="Excluir cadastro"
+        description={`Excluir ${deleting?.item.name || "este cadastro"} permanentemente? Cadastros com vínculos no inventário não podem ser excluídos.`}
+        confirmLabel="Excluir cadastro"
+      >
+        {error && <Alert tone="danger">{error}</Alert>}
       </ConfirmDialog>
     </>
   );

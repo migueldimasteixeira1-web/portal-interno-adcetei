@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from .audit import add_audit
@@ -9,7 +9,7 @@ from .auth import hash_password, validate_institutional_email
 from .catalog_forms import catalog_options_payload, catalog_payload, normalize_form_schema
 from .database import get_db
 from .email_verification import send_user_verification
-from .models import Asset, AuditLog, RoleConfig, ServiceCatalog, User
+from .models import Asset, AssetMovement, AuditLog, RoleConfig, ServiceCatalog, Ticket, TicketComment, User
 from .permissions import ALL_PERMISSIONS, DEFAULT_ROLE_CONFIGS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
 from .schemas import (
     AssetCreate,
@@ -84,6 +84,10 @@ def validate_assigned_user(db: Session, user_id: int | None) -> None:
     user = db.get(User, user_id)
     if not user or not user.active:
         raise HTTPException(status_code=400, detail="Usuário responsável inválido")
+
+
+def has_rows(db: Session, query: Any) -> bool:
+    return db.scalar(select(query.exists())) or False
 
 
 @router.get("/catalog/options", response_model=CatalogOptionsOut)
@@ -240,6 +244,51 @@ def resend_user_verification(
     return user
 
 
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_permission("users.manage")),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if user.id == actor.id:
+        raise HTTPException(status_code=409, detail="Você não pode excluir sua própria conta")
+    ensure_last_admin(db, user, {"active": False})
+    if any(
+        has_rows(db, query)
+        for query in (
+            select(Ticket.id).where(or_(Ticket.requester_id == user.id, Ticket.assignee_id == user.id)),
+            select(TicketComment.id).where(TicketComment.author_id == user.id),
+            select(Asset.id).where(Asset.assigned_user_id == user.id),
+            select(AssetMovement.id).where(
+                or_(
+                    AssetMovement.from_user_id == user.id,
+                    AssetMovement.to_user_id == user.id,
+                    AssetMovement.actor_id == user.id,
+                )
+            ),
+            select(AuditLog.id).where(AuditLog.actor_id == user.id),
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Usuário possui histórico vinculado. Bloqueie a conta em vez de excluir.")
+
+    deleted_name = user.full_name
+    db.delete(user)
+    add_audit(
+        db,
+        actor,
+        "delete",
+        "user",
+        user_id,
+        f"{actor.full_name} excluiu o usuário {deleted_name}.",
+        {"username": user.username, "email": user.email},
+    )
+    db.commit()
+    return {"message": "Usuário excluído com sucesso"}
+
+
 @router.post("/assets", response_model=AssetOut, status_code=201)
 def create_asset(
     payload: AssetCreate,
@@ -317,6 +366,34 @@ def update_asset(
         )
         db.commit()
     return db.scalar(select(Asset).where(Asset.id == asset.id).options(joinedload(Asset.assigned_user)))
+
+
+@router.delete("/assets/{asset_id}")
+def delete_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_permission("assets.manage")),
+):
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    if has_rows(db, select(Ticket.id).where(Ticket.asset_id == asset.id)):
+        raise HTTPException(status_code=409, detail="Equipamento possui chamados vinculados. Baixe ou arquive em vez de excluir.")
+
+    deleted_name = asset.name
+    db.execute(delete(AssetMovement).where(AssetMovement.asset_id == asset.id))
+    db.delete(asset)
+    add_audit(
+        db,
+        actor,
+        "delete",
+        "asset",
+        asset_id,
+        f"{actor.full_name} excluiu o equipamento {deleted_name}.",
+        {"serial_number": asset.serial_number, "patrimony": asset.patrimony},
+    )
+    db.commit()
+    return {"message": "Equipamento excluído com sucesso"}
 
 
 @router.post("/catalog", response_model=CatalogOut, status_code=201)
@@ -398,6 +475,33 @@ def update_catalog_service(
         )
         db.commit()
     return catalog_payload(service)
+
+
+@router.delete("/catalog/{service_id}")
+def delete_catalog_service(
+    service_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_permission("catalog.manage")),
+):
+    service = db.get(ServiceCatalog, service_id)
+    if not service:
+        raise HTTPException(status_code=404, detail="Serviço não encontrado")
+    if has_rows(db, select(Ticket.id).where(Ticket.service_id == service.id)):
+        raise HTTPException(status_code=409, detail="Serviço possui chamados vinculados. Arquive em vez de excluir.")
+
+    deleted_name = service.name
+    db.delete(service)
+    add_audit(
+        db,
+        actor,
+        "delete",
+        "catalog",
+        service_id,
+        f"{actor.full_name} excluiu o serviço {deleted_name}.",
+        {"name": deleted_name, "category": service.category},
+    )
+    db.commit()
+    return {"message": "Serviço excluído com sucesso"}
 
 
 @router.get("/roles", response_model=list[RoleConfigOut])

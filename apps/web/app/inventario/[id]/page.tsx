@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, Boxes, PackageCheck, Send, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, Boxes, PackageCheck, Send, Trash2, UserRound, Wrench } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AccessDenied from "@/components/AccessDenied";
 import { useAuth } from "@/components/AuthProvider";
@@ -68,8 +68,10 @@ function transitionLabel(fromValue: string, toValue: string) {
 
 export default function InventoryAssetDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { user } = useAuth();
   const canView = hasPermission(user, "inventory.view");
+  const canEdit = hasPermission(user, "inventory.edit");
   const canMove = hasPermission(user, "inventory.move");
   const canViewUsers = hasPermission(user, "users.view");
   const [asset, setAsset] = useState<InventoryAsset | null>(null);
@@ -77,6 +79,7 @@ export default function InventoryAssetDetailPage() {
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyCatalogs);
   const [users, setUsers] = useState<User[]>([]);
   const [activeAction, setActiveAction] = useState<MovementAction | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [draft, setDraft] = useState<MovementDraft>({ sector_id: "", assigned_user_id: "", movement_date: todayInputValue(), notes: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -171,12 +174,33 @@ export default function InventoryAssetDetailPage() {
     }
   };
 
-  const actionButtons = canMove && asset ? (
+  const deleteAsset = async () => {
+    if (!asset) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await api.deleteInventoryAsset(params.id);
+      router.push("/inventario");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível excluir o equipamento.");
+      setDeleteOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const actionButtons = (canMove || canEdit) && asset ? (
     <div className="flex flex-wrap gap-2">
-      <Button variant="secondary" onClick={() => openAction("allocate")}><Send size={16} />Enviar para setor</Button>
-      <Button variant="secondary" disabled={!canViewUsers} title={!canViewUsers ? "Seu perfil não possui acesso à lista de usuários." : undefined} onClick={() => openAction("responsible")}><UserRound size={16} />Trocar responsável</Button>
-      <Button variant="secondary" onClick={() => openAction("stock")}><PackageCheck size={16} />Devolver ao estoque</Button>
-      <Button variant="secondary" onClick={() => openAction("maintenance")}><Wrench size={16} />Manutenção</Button>
+      {canMove && (
+        <>
+          <Button variant="secondary" onClick={() => openAction("allocate")}><Send size={16} />Enviar para setor</Button>
+          <Button variant="secondary" disabled={!canViewUsers} title={!canViewUsers ? "Seu perfil não possui acesso à lista de usuários." : undefined} onClick={() => openAction("responsible")}><UserRound size={16} />Trocar responsável</Button>
+          <Button variant="secondary" onClick={() => openAction("stock")}><PackageCheck size={16} />Devolver ao estoque</Button>
+          <Button variant="secondary" onClick={() => openAction("maintenance")}><Wrench size={16} />Manutenção</Button>
+        </>
+      )}
+      {canEdit && <Button variant="danger" onClick={() => setDeleteOpen(true)}><Trash2 size={16} />Excluir</Button>}
       <Link href="/inventario" className={buttonStyles({ variant: "secondary" })}><ArrowLeft size={16} />Voltar</Link>
     </div>
   ) : <Link href="/inventario" className={buttonStyles({ variant: "secondary" })}><ArrowLeft size={16} />Voltar para inventário</Link>;
@@ -302,6 +326,16 @@ export default function InventoryAssetDetailPage() {
           {requiredMissing && <Alert tone="warning" className="sm:col-span-2">Preencha os campos obrigatórios antes de registrar.</Alert>}
         </div>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={deleteAsset}
+        loading={saving}
+        title="Excluir equipamento"
+        description={`Excluir ${asset?.serial_number || "este equipamento"} permanentemente? Equipamentos vinculados a chamados não podem ser excluídos.`}
+        confirmLabel="Excluir equipamento"
+      />
     </>
   );
 }
