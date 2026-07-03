@@ -1,7 +1,8 @@
 "use client";
 
-import { BookOpen, CircleOff, Layers3, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, BookOpen, CircleOff, Layers3, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import CatalogIcon from "@/components/CatalogIcon";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
@@ -10,7 +11,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
-import type { CatalogFormField, CatalogService } from "@/lib/types";
+import type { CatalogFormField, CatalogOptions, CatalogService } from "@/lib/types";
 
 type CatalogDraft = {
   name: string;
@@ -26,20 +27,16 @@ const emptyDraft: CatalogDraft = {
   name: "",
   category: "",
   description: "",
-  icon: "support_agent",
+  icon: "Headphones",
   color: "#1f5eff",
   active: true,
   fields: [],
 };
 
-const emptyField: CatalogFormField = {
-  key: "",
-  label: "",
-  type: "text",
-  required: false,
-  placeholder: "",
-  options: [],
-  max_length: 500,
+const emptyOptions: CatalogOptions = {
+  categories: [],
+  icons: [],
+  fields: [],
 };
 
 export default function CatalogPage() {
@@ -53,10 +50,14 @@ export default function CatalogPage() {
   const [editing, setEditing] = useState<CatalogService | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<CatalogDraft>(emptyDraft);
+  const [options, setOptions] = useState<CatalogOptions>(emptyOptions);
+  const [selectedFieldKey, setSelectedFieldKey] = useState("");
 
   const load = async () => {
     try {
-      setServices(await api.catalog(true));
+      const [serviceData, optionData] = await Promise.all([api.catalog(true), api.catalogOptions()]);
+      setServices(serviceData);
+      setOptions(optionData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar catálogo");
     } finally {
@@ -74,6 +75,7 @@ export default function CatalogPage() {
   const openCreate = () => {
     setEditing(null);
     setDraft(emptyDraft);
+    setSelectedFieldKey("");
     setError("");
     setDialogOpen(true);
   };
@@ -89,15 +91,35 @@ export default function CatalogPage() {
       active: service.active,
       fields: service.form_schema.fields || [],
     });
+    setSelectedFieldKey("");
     setError("");
     setDialogOpen(true);
   };
 
-  const updateField = (index: number, patch: Partial<CatalogFormField>) => {
+  const updateFieldRequired = (index: number, required: boolean) => {
     setDraft((old) => ({
       ...old,
-      fields: old.fields.map((field, fieldIndex) => fieldIndex === index ? { ...field, ...patch } : field),
+      fields: old.fields.map((field, fieldIndex) => fieldIndex === index ? { ...field, required } : field),
     }));
+  };
+
+  const moveField = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= draft.fields.length) return;
+    const nextFields = [...draft.fields];
+    [nextFields[index], nextFields[nextIndex]] = [nextFields[nextIndex], nextFields[index]];
+    setDraft({ ...draft, fields: nextFields });
+  };
+
+  const addPredefinedField = () => {
+    const field = options.fields.find((item) => item.key === selectedFieldKey);
+    if (!field) return;
+    if (draft.fields.some((item) => item.key === field.key)) {
+      setError("Este campo já foi adicionado ao serviço.");
+      return;
+    }
+    setDraft({ ...draft, fields: [...draft.fields, { ...field }] });
+    setSelectedFieldKey("");
   };
 
   const save = async () => {
@@ -133,6 +155,13 @@ export default function CatalogPage() {
   if (loading) return <LoadingScreen label="Carregando catálogo de serviços..." />;
   if (!canManage) return <AccessDenied />;
 
+  const categoryOptions = Array.from(new Set([...options.categories, ...services.map((service) => service.category), draft.category].filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const iconOptions = [...options.icons];
+  if (draft.icon && !iconOptions.some((item) => item.key === draft.icon)) {
+    iconOptions.push({ key: draft.icon, label: `${draft.icon} (legado)` });
+  }
+  const availableFields = options.fields.filter((field) => !draft.fields.some((item) => item.key === field.key));
+
   return (
     <>
       <PageHeader
@@ -160,7 +189,9 @@ export default function CatalogPage() {
                 {categoryServices.map((service) => (
                   <article key={service.id} className="border-b border-[#e8edf2] p-4 md:border-b-0 md:border-r">
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <div className="grid h-8 w-8 place-items-center rounded-md text-sm font-semibold text-white" style={{ backgroundColor: service.color }}>{service.name.charAt(0)}</div>
+                      <div className="grid h-8 w-8 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]">
+                        <CatalogIcon name={service.icon} size={16} />
+                      </div>
                       <div className="flex items-center gap-1">
                         <Badge className={service.active ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]"}>{service.active ? "Ativo" : "Arquivado"}</Badge>
                         <Button variant="ghost" size="sm" onClick={() => openEdit(service)} aria-label={`Editar ${service.name}`}><Pencil size={15} /></Button>
@@ -195,9 +226,21 @@ export default function CatalogPage() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nome"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
-          <Field label="Categoria"><Input value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} /></Field>
+          <Field label="Categoria">
+            <Select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+              <option value="">Selecione</option>
+              {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+            </Select>
+          </Field>
           <div className="sm:col-span-2"><Field label="Descrição"><Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field></div>
-          <Field label="Ícone interno"><Input value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })} /></Field>
+          <Field label="Ícone">
+            <div className="flex gap-2">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]"><CatalogIcon name={draft.icon} size={17} /></span>
+              <Select value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })}>
+                {iconOptions.map((icon) => <option key={icon.key} value={icon.key}>{icon.label}</option>)}
+              </Select>
+            </div>
+          </Field>
           <Field label="Cor"><Input type="color" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></Field>
           <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />Disponível para abertura</label>
         </div>
@@ -205,26 +248,36 @@ export default function CatalogPage() {
         <div className="mt-5 border-t border-[#e8edf2] pt-4">
           <div className="mb-3 flex items-center justify-between">
             <div><p className="text-sm font-semibold text-[#1a2332]">Campos específicos</p><p className="text-xs text-[#5c6b7e]">A descrição geral continua obrigatória.</p></div>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setDraft({ ...draft, fields: [...draft.fields, { ...emptyField }] })}><Plus size={14} />Adicionar campo</Button>
+            <div className="flex gap-2">
+              <Select value={selectedFieldKey} onChange={(e) => setSelectedFieldKey(e.target.value)} className="w-56">
+                <option value="">Selecionar campo</option>
+                {availableFields.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}
+              </Select>
+              <Button type="button" variant="secondary" size="sm" disabled={!selectedFieldKey} onClick={addPredefinedField}><Plus size={14} />Adicionar</Button>
+            </div>
           </div>
           <div className="space-y-3">
             {draft.fields.map((field, index) => (
               <div key={index} className="rounded-md border border-[#d4dbe4] bg-[#f7f9fb] p-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Identificador"><Input placeholder="ex.: software_name" value={field.key} onChange={(e) => updateField(index, { key: e.target.value.toLowerCase().replace(/\s+/g, "_") })} /></Field>
-                  <Field label="Rótulo"><Input placeholder="Ex.: Nome do sistema" value={field.label} onChange={(e) => updateField(index, { label: e.target.value })} /></Field>
-                  <Field label="Tipo">
-                    <Select value={field.type} onChange={(e) => updateField(index, { type: e.target.value as CatalogFormField["type"] })}>
-                      <option value="text">Texto curto</option><option value="textarea">Texto longo</option><option value="email">E-mail</option><option value="date">Data</option><option value="select">Lista de opções</option>
-                    </Select>
-                  </Field>
-                  <Field label="Limite de caracteres"><Input type="number" min={1} max={5000} value={field.max_length} onChange={(e) => updateField(index, { max_length: Number(e.target.value) || 500 })} /></Field>
-                  <div className="sm:col-span-2"><Field label="Texto de ajuda"><Input value={field.placeholder} onChange={(e) => updateField(index, { placeholder: e.target.value })} /></Field></div>
-                  {field.type === "select" && <div className="sm:col-span-2"><Field label="Opções" help="Separe por vírgula."><Input value={field.options.join(", ")} onChange={(e) => updateField(index, { options: e.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></Field></div>}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#1a2332]">{field.label}</p>
+                    <p className="mt-0.5 text-xs text-[#5c6b7e]">{field.placeholder || field.help || "Campo predefinido do catálogo."}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge className="border border-[#d4dbe4] bg-white text-[#5c6b7e]">{field.key}</Badge>
+                      <Badge className="border border-[#d4dbe4] bg-white text-[#5c6b7e]">{field.type}</Badge>
+                      {!options.fields.some((item) => item.key === field.key) && <Badge className="border border-[#fcd9a8] bg-[#fffbeb] text-[#92400e]">Legado</Badge>}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => moveField(index, -1)}><ArrowUp size={14} />Subir</Button>
+                    <Button type="button" variant="ghost" size="sm" disabled={index === draft.fields.length - 1} onClick={() => moveField(index, 1)}><ArrowDown size={14} />Descer</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setDraft({ ...draft, fields: draft.fields.filter((_, fieldIndex) => fieldIndex !== index) })}><Trash2 size={14} />Remover</Button>
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm text-[#1a2332]"><input type="checkbox" checked={field.required} onChange={(e) => updateField(index, { required: e.target.checked })} />Obrigatório</label>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setDraft({ ...draft, fields: draft.fields.filter((_, fieldIndex) => fieldIndex !== index) })}><Trash2 size={14} />Remover campo</Button>
+                  <label className="flex items-center gap-2 text-sm text-[#1a2332]"><input type="checkbox" checked={field.required} onChange={(e) => updateFieldRequired(index, e.target.checked)} />Obrigatório</label>
+                  {field.type === "select" && !!field.options.length && <span className="text-xs text-[#8b97a8]">Opções: {field.options.join(", ")}</span>}
                 </div>
               </div>
             ))}

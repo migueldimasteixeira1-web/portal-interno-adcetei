@@ -1061,6 +1061,17 @@ status, _ = call(
 )
 expect(status, 422, "campo obrigatório nulo rejeitado")
 
+status, catalog_options = call("GET", "/admin/catalog/options", admin)
+expect(status, 200, "administrador consulta opções guiadas do catálogo")
+if "Hardware" not in catalog_options["categories"] or "Impressoras" not in catalog_options["categories"]:
+    raise AssertionError(f"categorias oficiais ausentes: {catalog_options['categories']}")
+icon_keys = {item["key"] for item in catalog_options["icons"]}
+if not {"Computer", "Printer", "Mail", "Headphones"} <= icon_keys:
+    raise AssertionError(f"ícones oficiais ausentes: {icon_keys}")
+field_keys = {item["key"] for item in catalog_options["fields"]}
+if not {"details", "computer", "email_account", "printer_ip"} <= field_keys:
+    raise AssertionError(f"campos oficiais ausentes: {field_keys}")
+
 status, created_service = call(
     "POST",
     "/admin/catalog",
