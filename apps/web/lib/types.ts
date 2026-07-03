@@ -270,9 +270,9 @@ export interface TicketPage {
   page_size: number;
   summary: {
     new: number;
-    unassigned: number;
-    urgent: number;
-    waiting_user: number;
+    assigned: number;
+    closed: number;
+    cancelled: number;
   };
 }
 
@@ -280,9 +280,9 @@ export interface DashboardData {
   total: number;
   new: number;
   assigned: number;
-  pending: number;
+  closed: number;
+  cancelled: number;
   overdue: number;
-  solved_today: number;
   my_open: number;
   by_category: Array<{ name: string; value: number }>;
   by_status: Array<{ name: string; value: number }>;

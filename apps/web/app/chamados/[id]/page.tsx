@@ -129,7 +129,7 @@ export default function TicketDetailPage() {
     return <LoadingScreen label="Abrindo chamado..." />;
   }
 
-  const overdue = ticket.due_at && new Date(ticket.due_at) < new Date() && !["resolved", "closed", "cancelled"].includes(ticket.status);
+  const overdue = ticket.due_at && new Date(ticket.due_at) < new Date() && !["closed", "cancelled"].includes(ticket.status);
   const isUserProfile = user.role === "user";
   const formFieldLabels = Object.fromEntries(
     (ticket.form_schema_snapshot?.fields || []).map((field) => [field.key, field.label]),

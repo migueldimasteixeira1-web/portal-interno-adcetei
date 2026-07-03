@@ -21,7 +21,7 @@ export default function TicketsPage() {
   const [priority, setPriority] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ search: "", status: "", priority: "" });
   const [page, setPage] = useState(1);
-  const [summary, setSummary] = useState({ new: 0, unassigned: 0, urgent: 0, waiting_user: 0 });
+  const [summary, setSummary] = useState({ new: 0, assigned: 0, closed: 0, cancelled: 0 });
   const [initialLoading, setInitialLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +75,8 @@ export default function TicketsPage() {
     if (ticket.priority === "critical") return "border-l-[#b91c1c]";
     if (ticket.priority === "high") return "border-l-[#b45309]";
     if (!ticket.assignee && !isUserProfile) return "border-l-[#b45309]";
-    if (ticket.status === "resolved" || ticket.status === "closed") return "border-l-[#0d7a6a]";
+    if (ticket.status === "closed") return "border-l-[#0d7a6a]";
+    if (ticket.status === "cancelled") return "border-l-[#991b1b]";
     return "border-l-[#1a5f9e]";
   };
 
@@ -90,16 +91,16 @@ export default function TicketsPage() {
 
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
         <div className="panel-flat px-3.5 py-2.5">
-          <p className="text-xs font-medium text-[#5c6b7e]">{isUserProfile ? "Novos" : "Entrada da fila"}</p>
+          <p className="text-xs font-medium text-[#5c6b7e]">Novos</p>
           <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{summary.new}</p>
         </div>
         <div className="panel-flat px-3.5 py-2.5">
-          <p className="text-xs font-medium text-[#5c6b7e]">{isUserProfile ? "Aguardando você" : "Sem responsável"}</p>
-          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{isUserProfile ? summary.waiting_user : summary.unassigned}</p>
+          <p className="text-xs font-medium text-[#5c6b7e]">Atribuídos</p>
+          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{summary.assigned}</p>
         </div>
         <div className="panel-flat px-3.5 py-2.5">
-          <p className="text-xs font-medium text-[#5c6b7e]">{isUserProfile ? "Em acompanhamento" : "Alta ou crítica"}</p>
-          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{isUserProfile ? Math.max(0, total - summary.new) : summary.urgent}</p>
+          <p className="text-xs font-medium text-[#5c6b7e]">Fechados</p>
+          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{summary.closed}</p>
         </div>
       </div>
 
@@ -129,9 +130,9 @@ export default function TicketsPage() {
           {[
             ["", "Todos"],
             ["new", "Novos"],
-            ["in_progress", "Em atendimento"],
-            ["waiting_user", "Aguardando solicitante"],
-            ["resolved", "Resolvidos"],
+            ["assigned", "Atribuídos"],
+            ["closed", "Fechados"],
+            ["cancelled", "Cancelados"],
           ].map(([value, label]) => (
             <FilterChip key={value} active={status === value} onClick={() => applyQuickStatus(value)}>
               {label}
