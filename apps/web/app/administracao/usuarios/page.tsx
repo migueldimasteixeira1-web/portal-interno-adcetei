@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleOff, MailCheck, MailWarning, Pencil, RefreshCcw, Search, UserCheck, UserPlus, Users } from "lucide-react";
+import { CircleOff, MailCheck, MailWarning, Pencil, RefreshCcw, Search, Trash2, UserCheck, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
@@ -51,6 +51,7 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState<User | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<UserDraft>(emptyDraft);
 
@@ -147,6 +148,23 @@ export default function UsersPage() {
     }
   };
 
+  const deleteSelected = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await api.deleteUser(deleting.id);
+      setDeleting(null);
+      setMessage("Usuário excluído com sucesso.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível excluir o usuário");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <LoadingScreen label="Carregando usuários..." />;
   if (!canView) return <AccessDenied />;
 
@@ -181,7 +199,7 @@ export default function UsersPage() {
       </Toolbar>
 
       <Card className="overflow-hidden">
-        <SectionHeader title={`${filtered.length} usuário(s)`} description="Contas não são excluídas: desative o acesso para preservar o histórico." />
+        <SectionHeader title={`${filtered.length} usuário(s)`} description="Exclusão é permitida apenas para contas sem histórico vinculado." />
         <div className="overflow-x-auto soft-scrollbar">
           <table className="data-table min-w-[940px]">
             <thead><tr><th>Usuário</th><th>Perfil</th><th>Lotação</th><th>Verificação</th><th>Status</th>{canManage && <th>Ações</th>}</tr></thead>
@@ -193,7 +211,7 @@ export default function UsersPage() {
                   <td><p className="font-medium text-[#1a2332]">{item.department}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{item.secretariat}</p></td>
                   <td><Badge className={item.email_verified_at ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#fcd9a8] bg-[#fffbeb] text-[#92400e]"}>{item.email_verified_at ? <MailCheck size={13} /> : <MailWarning size={13} />}{item.email_verified_at ? "Verificado" : "Pendente"}</Badge></td>
                   <td><Badge className={item.active ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]"}>{item.active ? "Ativo" : "Bloqueado"}</Badge></td>
-                  {canManage && <td><div className="flex flex-wrap gap-1.5"><Button variant="ghost" size="sm" onClick={() => openEdit(item)}><Pencil size={15} />Editar</Button>{!item.email_verified_at && <Button variant="ghost" size="sm" onClick={() => resendVerification(item)}><RefreshCcw size={15} />Reenviar</Button>}</div></td>}
+                  {canManage && <td><div className="flex flex-wrap gap-1.5"><Button variant="ghost" size="sm" onClick={() => openEdit(item)}><Pencil size={15} />Editar</Button>{!item.email_verified_at && <Button variant="ghost" size="sm" onClick={() => resendVerification(item)}><RefreshCcw size={15} />Reenviar</Button>}<Button variant="ghost" size="sm" onClick={() => setDeleting(item)}><Trash2 size={15} />Excluir</Button></div></td>}
                 </tr>
               ))}
             </tbody>
@@ -228,6 +246,21 @@ export default function UsersPage() {
           <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.email_verified} onChange={(e) => setDraft({ ...draft, email_verified: e.target.checked })} />E-mail verificado</label>
         </div>
         {error && <Alert tone="danger" className="mt-4">{error}</Alert>}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+          setError("");
+        }}
+        onConfirm={deleteSelected}
+        loading={saving}
+        title="Excluir usuário"
+        description={`Excluir ${deleting?.full_name || "este usuário"} permanentemente? Se houver histórico vinculado, o sistema vai bloquear a exclusão.`}
+        confirmLabel="Excluir usuário"
+      >
+        {error && <Alert tone="danger">{error}</Alert>}
       </ConfirmDialog>
     </>
   );

@@ -48,6 +48,7 @@ export default function CatalogPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState<CatalogService | null>(null);
+  const [deleting, setDeleting] = useState<CatalogService | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<CatalogDraft>(emptyDraft);
   const [options, setOptions] = useState<CatalogOptions>(emptyOptions);
@@ -152,6 +153,23 @@ export default function CatalogPage() {
     }
   };
 
+  const deleteSelected = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await api.deleteCatalogService(deleting.id);
+      setDeleting(null);
+      setMessage("Serviço excluído com sucesso.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível excluir o serviço");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <LoadingScreen label="Carregando catálogo de serviços..." />;
   if (!canManage) return <AccessDenied />;
 
@@ -195,6 +213,7 @@ export default function CatalogPage() {
                       <div className="flex items-center gap-1">
                         <Badge className={service.active ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]"}>{service.active ? "Ativo" : "Arquivado"}</Badge>
                         <Button variant="ghost" size="sm" onClick={() => openEdit(service)} aria-label={`Editar ${service.name}`}><Pencil size={15} /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => setDeleting(service)} aria-label={`Excluir ${service.name}`}><Trash2 size={15} /></Button>
                       </div>
                     </div>
                     <h3 className="font-semibold text-[#1a2332]">{service.name}</h3>
@@ -284,6 +303,21 @@ export default function CatalogPage() {
           </div>
         </div>
         {error && <Alert tone="danger" className="mt-4">{error}</Alert>}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+          setError("");
+        }}
+        onConfirm={deleteSelected}
+        loading={saving}
+        title="Excluir serviço"
+        description={`Excluir ${deleting?.name || "este serviço"} permanentemente? Serviços já usados em chamados não podem ser excluídos.`}
+        confirmLabel="Excluir serviço"
+      >
+        {error && <Alert tone="danger">{error}</Alert>}
       </ConfirmDialog>
     </>
   );

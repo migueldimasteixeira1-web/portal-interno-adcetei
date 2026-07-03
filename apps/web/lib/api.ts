@@ -87,6 +87,8 @@ export const api = {
     request<User>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
   updateUser: (id: number, payload: Record<string, unknown>) =>
     request<User>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteUser: (id: number) =>
+    request<{ message: string }>(`/admin/users/${id}`, { method: "DELETE" }),
   resendUserVerification: (id: number) =>
     request<User>(`/admin/users/${id}/resend-verification`, { method: "POST" }),
   assets: (params: Record<string, string> = {}) => {
@@ -97,32 +99,46 @@ export const api = {
     request<Asset>("/admin/assets", { method: "POST", body: JSON.stringify(payload) }),
   updateAsset: (id: number, payload: Record<string, unknown>) =>
     request<Asset>(`/admin/assets/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteAsset: (id: number) =>
+    request<{ message: string }>(`/admin/assets/${id}`, { method: "DELETE" }),
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
   createInventorySupplier: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/suppliers", { method: "POST", body: JSON.stringify(payload) }),
   updateInventorySupplier: (id: number, payload: InventoryCatalogUpdatePayload) =>
     request<InventoryCatalogItem>(`/inventory/catalogs/suppliers/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventorySupplier: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/suppliers/${id}`, { method: "DELETE" }),
   createInventoryEquipmentType: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/equipment-types", { method: "POST", body: JSON.stringify(payload) }),
   updateInventoryEquipmentType: (id: number, payload: InventoryCatalogUpdatePayload) =>
     request<InventoryCatalogItem>(`/inventory/catalogs/equipment-types/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventoryEquipmentType: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/equipment-types/${id}`, { method: "DELETE" }),
   createInventoryManufacturer: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/manufacturers", { method: "POST", body: JSON.stringify(payload) }),
   updateInventoryManufacturer: (id: number, payload: InventoryCatalogUpdatePayload) =>
     request<InventoryCatalogItem>(`/inventory/catalogs/manufacturers/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventoryManufacturer: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/manufacturers/${id}`, { method: "DELETE" }),
   createInventoryModel: (payload: InventoryEquipmentModelCreatePayload) =>
     request<InventoryEquipmentModel>("/inventory/catalogs/models", { method: "POST", body: JSON.stringify(payload) }),
   updateInventoryModel: (id: number, payload: InventoryEquipmentModelUpdatePayload) =>
     request<InventoryEquipmentModel>(`/inventory/catalogs/models/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventoryModel: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/models/${id}`, { method: "DELETE" }),
   createInventorySector: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/sectors", { method: "POST", body: JSON.stringify(payload) }),
   updateInventorySector: (id: number, payload: InventoryCatalogUpdatePayload) =>
     request<InventoryCatalogItem>(`/inventory/catalogs/sectors/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventorySector: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/sectors/${id}`, { method: "DELETE" }),
   inventoryAssets: () => request<InventoryAsset[]>("/inventory/assets"),
   inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
   inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),
   createInventoryAsset: (payload: InventoryAssetCreatePayload) =>
     request<InventoryAsset>("/inventory/assets", { method: "POST", body: JSON.stringify(payload) }),
+  deleteInventoryAsset: (id: number | string) =>
+    request<{ message: string }>(`/inventory/assets/${id}`, { method: "DELETE" }),
   previewInventoryBulkScan: (payload: InventoryBulkScanPayload) =>
     request<InventoryBulkScanPreview>("/inventory/assets/bulk-scan/preview", { method: "POST", body: JSON.stringify(payload) }),
   confirmInventoryBulkScan: (payload: InventoryBulkScanPayload) =>
@@ -142,6 +158,8 @@ export const api = {
     request<CatalogService>("/admin/catalog", { method: "POST", body: JSON.stringify(payload) }),
   updateCatalogService: (id: number, payload: Record<string, unknown>) =>
     request<CatalogService>(`/admin/catalog/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteCatalogService: (id: number) =>
+    request<{ message: string }>(`/admin/catalog/${id}`, { method: "DELETE" }),
   roles: () => request<RoleConfig[]>("/admin/roles"),
   permissions: () => request<PermissionDefinition[]>("/admin/permissions"),
   updateRole: (role: string, payload: Record<string, unknown>) =>
