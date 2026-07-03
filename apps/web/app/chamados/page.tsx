@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, CircleOff, Filter, LoaderCircle, Plus, Search, Tickets, UserRoundX, X } from "lucide-react";
+import { Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleOff, Eye, Filter, LoaderCircle, Plus, Search, TicketCheck, Tickets, UserCheck, UserRoundX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
+import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
 import { PriorityChip, StatusChip } from "@/components/StatusChip";
 import { useAuth } from "@/components/AuthProvider";
-import { Alert, Badge, Button, Card, EmptyState, FilterChip, Input, SectionHeader, Select, Toolbar, buttonStyles, cn } from "@/components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Input, SectionHeader, Select, Toolbar, buttonStyles, cn } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, priorityOptions, relativeTime, statusOptions } from "@/lib/format";
 import type { Ticket } from "@/lib/types";
@@ -21,7 +22,7 @@ export default function TicketsPage() {
   const [priority, setPriority] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ search: "", status: "", priority: "" });
   const [page, setPage] = useState(1);
-  const [summary, setSummary] = useState({ new: 0, unassigned: 0, urgent: 0, waiting_user: 0 });
+  const [summary, setSummary] = useState({ new: 0, assigned: 0, closed: 0, cancelled: 0 });
   const [initialLoading, setInitialLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
@@ -66,19 +67,14 @@ export default function TicketsPage() {
     setPriority("");
     void load({ search: "", status: "", priority: "" }, 1);
   };
-  const applyQuickStatus = (nextStatus: string) => {
-    setStatus(nextStatus);
-    void load({ search, status: nextStatus, priority: isUserProfile ? "" : priority }, 1);
-  };
-
   const rowAccent = (ticket: Ticket) => {
     if (ticket.priority === "critical") return "border-l-[#b91c1c]";
     if (ticket.priority === "high") return "border-l-[#b45309]";
     if (!ticket.assignee && !isUserProfile) return "border-l-[#b45309]";
-    if (ticket.status === "resolved" || ticket.status === "closed") return "border-l-[#0d7a6a]";
+    if (ticket.status === "closed") return "border-l-[#0d7a6a]";
+    if (ticket.status === "cancelled") return "border-l-[#991b1b]";
     return "border-l-[#1a5f9e]";
   };
-
   return (
     <>
       <PageHeader
@@ -88,23 +84,16 @@ export default function TicketsPage() {
         actions={<Link href="/chamados/novo" className={buttonStyles()}><Plus size={16} /> Abrir chamado</Link>}
       />
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
-        <div className="panel-flat px-3.5 py-2.5">
-          <p className="text-xs font-medium text-[#5c6b7e]">{isUserProfile ? "Novos" : "Entrada da fila"}</p>
-          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{summary.new}</p>
-        </div>
-        <div className="panel-flat px-3.5 py-2.5">
-          <p className="text-xs font-medium text-[#5c6b7e]">{isUserProfile ? "Aguardando você" : "Sem responsável"}</p>
-          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{isUserProfile ? summary.waiting_user : summary.unassigned}</p>
-        </div>
-        <div className="panel-flat px-3.5 py-2.5">
-          <p className="text-xs font-medium text-[#5c6b7e]">{isUserProfile ? "Em acompanhamento" : "Alta ou crítica"}</p>
-          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[#1a2332]">{isUserProfile ? Math.max(0, total - summary.new) : summary.urgent}</p>
-        </div>
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Chamados" value={total} icon={<Tickets size={17} />} hint="Total encontrado" tone="blue" />
+        <MetricCard label="Novos" value={summary.new} icon={<TicketCheck size={17} />} hint="Aguardando atribuição" tone="cyan" />
+        <MetricCard label="Atribuídos" value={summary.assigned} icon={<UserCheck size={17} />} hint="Com responsável" tone="amber" />
+        <MetricCard label="Fechados" value={summary.closed} icon={<CheckCircle2 size={17} />} hint="Encerrados" tone="green" />
+        <MetricCard label="Cancelados" value={summary.cancelled} icon={<Ban size={17} />} hint="Interrompidos" tone="slate" />
       </div>
 
       <Toolbar className="mb-4">
-        <form onSubmit={(event) => { event.preventDefault(); void load({ search, status, priority: isUserProfile ? "" : priority }, 1); }} className={cn("grid w-full gap-2", isUserProfile ? "lg:grid-cols-[minmax(240px,1fr)_180px_auto]" : "lg:grid-cols-[minmax(240px,1fr)_180px_180px_auto]")}>
+        <form onSubmit={(event) => { event.preventDefault(); void load({ search, status, priority: isUserProfile ? "" : priority }, 1); }} className={cn("grid w-full gap-2", isUserProfile ? "xl:grid-cols-[minmax(240px,1fr)_180px_auto]" : "xl:grid-cols-[minmax(240px,1fr)_180px_180px_auto]")}>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
             <Input aria-label="Buscar chamados" className="pl-8" placeholder="Buscar por título, descrição ou categoria" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -124,20 +113,6 @@ export default function TicketsPage() {
             {hasFilters && <Button type="button" variant="ghost" onClick={clearFilters} aria-label="Limpar filtros"><X size={16} /></Button>}
           </div>
         </form>
-        <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-[#e8edf2] pt-2">
-          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-[#8b97a8]">Rápidos</span>
-          {[
-            ["", "Todos"],
-            ["new", "Novos"],
-            ["in_progress", "Em atendimento"],
-            ["waiting_user", "Aguardando solicitante"],
-            ["resolved", "Resolvidos"],
-          ].map(([value, label]) => (
-            <FilterChip key={value} active={status === value} onClick={() => applyQuickStatus(value)}>
-              {label}
-            </FilterChip>
-          ))}
-        </div>
       </Toolbar>
 
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
@@ -174,7 +149,7 @@ export default function TicketsPage() {
           </div>
 
           <div className="hidden overflow-x-auto soft-scrollbar md:block">
-            <table className="data-table min-w-[920px]">
+            <table className="data-table min-w-[1040px]">
               <thead>
                 <tr>
                   <th>Chamado</th>
@@ -184,12 +159,13 @@ export default function TicketsPage() {
                   <th>Responsável</th>
                   <th>Aberto</th>
                   <th>Prazo</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {tickets.map((ticket) => (
                   <tr key={ticket.id}>
-                    <td className={cn("border-l-[3px]", rowAccent(ticket))}>
+                    <td>
                       <Link href={`/chamados/${ticket.id}`} className="font-semibold text-[#1a2332] hover:text-[#1a5f9e]">
                         #{String(ticket.id).padStart(4, "0")} · {ticket.title}
                       </Link>
@@ -211,6 +187,11 @@ export default function TicketsPage() {
                     </td>
                     <td className="text-[#5c6b7e]">{relativeTime(ticket.created_at)}</td>
                     <td className="text-[#5c6b7e]">{formatDate(ticket.due_at, false)}</td>
+                    <td>
+                      <Link href={`/chamados/${ticket.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })}>
+                        <Eye size={15} />Ver detalhes
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -851,13 +851,18 @@ tech_id = next(item["id"] for item in users if item["username"] == "tecnico")
 
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "valor_invalido"})
 expect(status, 422, "status inválido")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "in_progress"})
+expect(status, 422, "status antigo rejeitado")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "closed", "resolution_message": "Atendimento concluído."})
+expect(status, 409, "encerramento exige responsável")
 status, updated = call(
     "PATCH",
     f"/tickets/{ticket['id']}",
     operator,
-    {"status": "assigned", "priority": "high", "assignee_id": tech_id},
+    {"status": "new", "priority": "high", "assignee_id": tech_id},
 )
 expect(status, 200, "triagem do técnico")
+expect(updated["status"], "assigned", "atribuição promove status novo")
 events = [item for item in updated["comments"] if item["event_type"] == "update"]
 expect(len(events), 3, "eventos administrativos")
 if not all("Maiana Ignácio" in item["body"] and not item["internal"] for item in events):
@@ -881,8 +886,19 @@ status, _ = call("GET", f"/tickets/{ticket['id']}", technician)
 expect(status, 200, "técnico acessa chamado atribuído")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"priority": "critical"})
 expect(status, 200, "técnico altera prioridade")
-status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "in_progress"})
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "closed"})
+expect(status, 422, "encerramento exige mensagem")
+status, closed_ticket = call(
+    "PATCH",
+    f"/tickets/{ticket['id']}",
+    technician,
+    {"status": "closed", "resolution_message": "Atendimento validado e chamado encerrado."},
+)
 expect(status, 200, "técnico altera status permitido")
+expect(closed_ticket["status"], "closed", "chamado encerrado")
+expect(any("Mensagem de encerramento" in item["body"] for item in closed_ticket["comments"]), True, "mensagem de encerramento registrada")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "assigned"})
+expect(status, 409, "chamado fechado não altera status")
 
 _, page = call("GET", "/tickets", operator, params={"page_size": 100})
 foreign_ticket = next(
@@ -926,7 +942,7 @@ if {item["id"] for item in first_page["items"]} & {item["id"] for item in second
 status, new_page = call("GET", "/tickets", requester, params={"status": "new", "page_size": 5})
 expect(status, 200, "filtro paginado")
 expect(new_page["summary"]["new"], new_page["total"], "resumo agregado de novos")
-expect(new_page["summary"]["waiting_user"], 0, "resumo respeita filtro de status")
+expect(new_page["summary"]["closed"], 0, "resumo respeita filtro de status")
 if new_page["summary"]["new"] <= len(new_page["items"]):
     raise AssertionError("resumo foi calculado somente com a página carregada")
 

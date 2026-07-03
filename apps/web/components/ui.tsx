@@ -157,6 +157,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
   loading,
+  confirmDisabled,
   onOpenChange,
   onConfirm,
 }: {
@@ -167,6 +168,7 @@ export function ConfirmDialog({
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  confirmDisabled?: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
@@ -186,7 +188,7 @@ export function ConfirmDialog({
             {children && <div className="mt-4">{children}</div>}
             <div className="mt-5 flex justify-end gap-2 border-t border-[#e8edf2] pt-4">
               <Button variant="secondary" disabled={loading} onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
-              <Button disabled={loading} onClick={onConfirm}>{loading ? "Salvando..." : confirmLabel}</Button>
+              <Button disabled={loading || confirmDisabled} onClick={onConfirm}>{loading ? "Salvando..." : confirmLabel}</Button>
             </div>
           </div>
         </Dialog.Content>

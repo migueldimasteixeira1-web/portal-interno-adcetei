@@ -44,9 +44,9 @@ export default function DashboardPage() {
   );
   const hubStats = data ? [
     { label: "Chamados abertos", value: data.total, hint: user?.role === "user" ? "Suas solicitações" : "Na operação" },
-    { label: "Novos", value: data.new, hint: "Aguardando triagem" },
-    { label: "Pendências", value: data.pending, hint: "Aguardando retorno" },
-    { label: "Resolvidos hoje", value: data.solved_today, hint: "Fechamentos do dia" },
+    { label: "Novos", value: data.new, hint: "Aguardando atribuição" },
+    { label: "Atribuídos", value: data.assigned, hint: "Com responsável" },
+    { label: "Fechados", value: data.closed, hint: "Encerrados" },
   ] : [];
 
   return (

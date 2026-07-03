@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .admin_api import router as admin_router
@@ -49,7 +49,7 @@ from .schemas import (
     VerifyEmailIn,
 )
 from .seed import seed_database
-from .time_utils import ensure_utc, sao_paulo_day_bounds_utc, utc_now
+from .time_utils import ensure_utc, utc_now
 
 app = FastAPI(
     title=settings.app_name,
@@ -80,7 +80,8 @@ FIELD_LABELS = {
     "asset_id": "o equipamento",
 }
 
-TECHNICIAN_UPDATE_FIELDS = {"status"}
+FINAL_TICKET_STATUSES = {"closed", "cancelled"}
+TECHNICIAN_UPDATE_FIELDS = {"status", "resolution_message"}
 NON_NULLABLE_UPDATE_FIELDS = {"status", "priority", "urgency", "impact", "category", "team", "location"}
 
 
@@ -272,7 +273,6 @@ def startup() -> None:
         ensure_role_configs(db)
         if settings.demo_seed_enabled:
             seed_database(db)
-        db.execute(update(Ticket).where(Ticket.status == "solved").values(status="resolved"))
         db.commit()
 
 
@@ -478,6 +478,9 @@ def ticket_filter_conditions(
     conditions = ticket_visibility_conditions(current_user, db)
     if status_filter:
         statuses = [item.strip() for item in status_filter.split(",") if item.strip()]
+        invalid_statuses = [item for item in statuses if item not in STATUS_LABELS]
+        if invalid_statuses:
+            raise HTTPException(status_code=422, detail="Status inválido")
         conditions.append(Ticket.status.in_(statuses))
     if priority:
         conditions.append(Ticket.priority == priority)
@@ -525,9 +528,9 @@ def list_tickets(
         page_size=page_size,
         summary={
             "new": aggregate_count(Ticket.status == "new"),
-            "unassigned": aggregate_count(Ticket.assignee_id.is_(None)),
-            "urgent": aggregate_count(Ticket.priority.in_(["high", "critical"])),
-            "waiting_user": aggregate_count(Ticket.status == "waiting_user"),
+            "assigned": aggregate_count(Ticket.status == "assigned"),
+            "closed": aggregate_count(Ticket.status == "closed"),
+            "cancelled": aggregate_count(Ticket.status == "cancelled"),
         },
     )
 
@@ -631,6 +634,7 @@ def update_ticket(
     ensure_ticket_access(ticket, current_user, db)
 
     data = payload.model_dump(exclude_unset=True)
+    resolution_message = (data.pop("resolution_message", None) or "").strip()
     null_fields = NON_NULLABLE_UPDATE_FIELDS.intersection(
         field for field, value in data.items() if value is None
     )
@@ -645,7 +649,22 @@ def update_ticket(
         if data.get("status") not in TECHNICIAN_STATUSES:
             raise HTTPException(status_code=403, detail="Status não permitido para técnico")
 
+    if ticket.status in FINAL_TICKET_STATUSES and data:
+        raise HTTPException(status_code=409, detail="Chamado finalizado não pode ser alterado")
+
     validate_ticket_references(data, db)
+    if resolution_message and data.get("status") != "closed":
+        raise HTTPException(status_code=422, detail="Mensagem de encerramento só é aceita ao encerrar chamado")
+
+    if data.get("status") == "closed":
+        if not (data.get("assignee_id") or ticket.assignee_id):
+            raise HTTPException(status_code=409, detail="Atribua um responsável antes de encerrar o chamado")
+        if not resolution_message:
+            raise HTTPException(status_code=422, detail="Informe a mensagem de encerramento")
+
+    if data.get("assignee_id") and ticket.status == "new" and data.get("status", "new") == "new":
+        data["status"] = "assigned"
+
     changes: list[tuple[str, Any, Any]] = []
     for field, value in data.items():
         old = getattr(ticket, field)
@@ -657,25 +676,34 @@ def update_ticket(
         ticket.due_at = due_for_priority(ticket.priority)
 
     if "status" in data:
-        if ticket.status in {"resolved", "closed"}:
+        if ticket.status in {"closed", "cancelled"}:
             ticket.closed_at = now_utc()
         else:
             ticket.closed_at = None
 
     if changes:
         ticket.updated_at = now_utc()
-        db.add_all(
-            [
+        update_comments = [
+            TicketComment(
+                ticket_id=ticket.id,
+                author_id=current_user.id,
+                body=change_message(current_user, field, old, new, db),
+                internal=False,
+                event_type="update",
+            )
+            for field, old, new in changes
+        ]
+        if data.get("status") == "closed":
+            update_comments.append(
                 TicketComment(
                     ticket_id=ticket.id,
                     author_id=current_user.id,
-                    body=change_message(current_user, field, old, new, db),
+                    body=f"Mensagem de encerramento: {resolution_message}",
                     internal=False,
-                    event_type="update",
+                    event_type="event",
                 )
-                for field, old, new in changes
-            ]
-        )
+            )
+        db.add_all(update_comments)
     db.commit()
     return get_ticket(ticket_id, db, current_user)
 
@@ -708,7 +736,6 @@ def dashboard(
     current_user: User = Depends(get_current_user),
 ):
     current_time = now_utc()
-    day_start, day_end = sao_paulo_day_bounds_utc(current_time)
     visibility = ticket_visibility_conditions(current_user, db)
 
     def count(*conditions):
@@ -743,10 +770,10 @@ def dashboard(
     return DashboardOut(
         total=count(),
         new=count(Ticket.status == "new"),
-        assigned=count(Ticket.status.in_(["assigned", "in_progress", "triage"])),
-        pending=count(Ticket.status == "waiting_user"),
+        assigned=count(Ticket.status == "assigned"),
+        closed=count(Ticket.status == "closed"),
+        cancelled=count(Ticket.status == "cancelled"),
         overdue=count(Ticket.due_at < current_time, Ticket.status.in_(OPEN_STATUSES)),
-        solved_today=count(Ticket.closed_at >= day_start, Ticket.closed_at <= day_end),
         my_open=count(Ticket.assignee_id == current_user.id, Ticket.status.in_(OPEN_STATUSES))
         if current_user.role != "user"
         else count(Ticket.status.in_(OPEN_STATUSES)),
