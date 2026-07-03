@@ -5,6 +5,7 @@ import { Building2, Headphones, KeyRound, ShieldCheck, TicketCheck } from "lucid
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import AuthBrandHeader from "@/components/AuthBrandHeader";
+import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { SESSION_MESSAGE_KEY } from "@/lib/api";
 
@@ -105,7 +106,7 @@ export default function LoginPage() {
             {sessionMessage && <Alert tone="warning">{sessionMessage}</Alert>}
             {error && <Alert tone="danger">{error}</Alert>}
             <Field label="E-mail institucional">
-              <Input type="email" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="email" autoFocus />
+              <InstitutionalEmailInput value={username} onChangeValue={setUsername} autoComplete="email" autoFocus />
             </Field>
             <Field label="Senha">
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />

@@ -5,8 +5,9 @@ import { MailCheck, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AuthCardShell from "@/components/AuthCardShell";
+import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
 import SearchParamsSuspense from "@/components/SearchParamsSuspense";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { Alert, Button, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 
 function CheckEmailContent() {
@@ -43,7 +44,7 @@ function CheckEmailContent() {
           {error && <Alert tone="danger">{error}</Alert>}
           <form onSubmit={resend} className="space-y-4">
             <Field label="E-mail institucional">
-              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              <InstitutionalEmailInput value={email} onChangeValue={setEmail} required />
             </Field>
             <Button className="w-full" variant="secondary" disabled={loading}>
               <RefreshCcw size={16} />
