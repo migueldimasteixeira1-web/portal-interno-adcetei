@@ -67,9 +67,9 @@ def ensure_schema_compatibility() -> None:
                 text(
                     """
                     INSERT INTO inventory_sectors (name, normalized_name, is_active, created_at, updated_at)
-                    SELECT :name, :normalized_name, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    SELECT CAST(:name AS VARCHAR), CAST(:normalized_name AS VARCHAR), 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                     WHERE NOT EXISTS (
-                        SELECT 1 FROM inventory_sectors WHERE normalized_name = :normalized_name
+                        SELECT 1 FROM inventory_sectors WHERE normalized_name = CAST(:normalized_name AS VARCHAR)
                     )
                     """
                 ),
