@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from .auth import get_current_user
 from .database import get_db
+from .inventory_constants import INVENTORY_PERMISSIONS
 from .models import RoleConfig, User
 
 PERMISSION_DEFINITIONS = [
@@ -15,6 +16,14 @@ PERMISSION_DEFINITIONS = [
     {"key": "catalog.manage", "label": "Gerenciar catálogo e formulários", "group": "Administração"},
     {"key": "assets.view", "label": "Consultar inventário completo", "group": "Inventário"},
     {"key": "assets.manage", "label": "Cadastrar e editar equipamentos", "group": "Inventário"},
+    {"key": "inventory.view", "label": "Consultar módulo de inventário", "group": "Inventário"},
+    {"key": "inventory.create", "label": "Cadastrar equipamento no inventário", "group": "Inventário"},
+    {"key": "inventory.bulk_scan", "label": "Registrar entrada em lote por série", "group": "Inventário"},
+    {"key": "inventory.import", "label": "Importar equipamentos por planilha", "group": "Inventário"},
+    {"key": "inventory.move", "label": "Movimentar equipamentos", "group": "Inventário"},
+    {"key": "inventory.edit", "label": "Editar equipamentos do inventário", "group": "Inventário"},
+    {"key": "inventory.manage_catalogs", "label": "Gerenciar cadastros base do inventário", "group": "Inventário"},
+    {"key": "inventory.audit", "label": "Consultar histórico do inventário", "group": "Inventário"},
     {"key": "roles.manage", "label": "Configurar perfis e permissões", "group": "Segurança"},
     {"key": "audit.view", "label": "Consultar auditoria administrativa", "group": "Segurança"},
 ]
@@ -25,6 +34,7 @@ PERMISSION_DEPENDENCIES = {
     "tickets.triage": {"tickets.view_all", "users.view", "assets.view"},
     "users.manage": {"users.view"},
     "assets.manage": {"assets.view"},
+    **{permission: {"inventory.view"} for permission in INVENTORY_PERMISSIONS if permission != "inventory.view"},
 }
 
 DEFAULT_ROLE_CONFIGS = {
@@ -44,6 +54,7 @@ DEFAULT_ROLE_CONFIGS = {
             "tickets.internal_notes",
             "users.view",
             "assets.view",
+            "inventory.view",
         ],
     },
     "user": {

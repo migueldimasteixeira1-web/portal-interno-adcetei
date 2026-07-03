@@ -75,10 +75,17 @@ fi
 
 "$API_PYTHON" -c "import uvicorn" >/dev/null
 
-echo "[1/9] Validando helpers de formulário e e-mail institucional..."
+echo "[1/9] Validando helpers de formulário, e-mail e inventário..."
 ENVIRONMENT=test "$API_PYTHON" - <<'PY'
 from apps.api.app.catalog_forms import normalize_form_schema, validate_form_data
 from apps.api.app.auth import validate_institutional_email
+from apps.api.app.inventory_service import (
+    build_asset_display_name,
+    default_sector_update_error,
+    initial_inventory_status,
+    normalize_serial_number,
+    validate_shipping_date_for_status,
+)
 
 schema = normalize_form_schema({
     "fields": [
@@ -107,6 +114,22 @@ for email in ("usuario@cabofrio.rj.gov.br", "usuario@gmail.com", "usuario@adcete
         pass
     else:
         raise AssertionError(f"e-mail institucional inválido aceito: {email}")
+assert normalize_serial_number("  AB  123  / Série  ") == "ab 123 / série"
+assert initial_inventory_status(" ADCETEI ", None) == "stock"
+assert initial_inventory_status("Escola Municipal", None) == "allocated"
+assert initial_inventory_status("ADCETEI", 12) == "allocated"
+try:
+    validate_shipping_date_for_status("allocated", None)
+except ValueError:
+    pass
+else:
+    raise AssertionError("equipamento alocado sem data de envio foi aceito")
+assert build_asset_display_name("Notebook", "Dell", "Latitude", " SN 123 ") == "Notebook - Dell - Latitude - SN 123"
+assert "PAT" not in build_asset_display_name(serial_number="SN-9")
+assert default_sector_update_error({"is_active": False}, current_name="ADCETEI") is not None
+assert default_sector_update_error({"name": "Outro setor"}, current_name=" ADCETEI ") is not None
+assert default_sector_update_error({"is_active": True}, current_name="ADCETEI") is None
+assert default_sector_update_error({"is_active": False}, current_name="Escola Municipal") is None
 print("Helpers: OK")
 PY
 
@@ -321,6 +344,388 @@ if not full_inventory or "ip_address" not in full_inventory[0]:
     raise AssertionError("inventário administrativo não contém os dados completos")
 foreign_asset = next(item for item in full_inventory if item.get("assigned_user_id") != requester_user["id"])
 
+status, _ = call("GET", "/inventory/meta", requester)
+expect(status, 403, "metadados do inventário exigem inventory.view")
+status, _ = call("GET", "/inventory/catalogs", requester)
+expect(status, 403, "usuário comum não acessa catálogos de inventário")
+
+status, inventory_meta = call("GET", "/inventory/meta", operator)
+expect(status, 200, "metadados do módulo de inventário")
+expect(inventory_meta["default_sector"], "ADCETEI", "setor padrão do inventário")
+expect(set(inventory_meta["statuses"]), {"stock", "allocated", "maintenance", "retired"}, "status planejados do inventário")
+for permission in ("inventory.view", "inventory.create", "inventory.bulk_scan", "inventory.import", "inventory.move", "inventory.edit", "inventory.manage_catalogs", "inventory.audit"):
+    if permission not in inventory_meta["permissions"]:
+        raise AssertionError(f"permissão de inventário ausente nos metadados: {permission}")
+
+status, catalogs = call("GET", "/inventory/catalogs", admin)
+expect(status, 200, "administrador consulta catálogos de inventário")
+if not any(item["name"] == "ADCETEI" and item["is_active"] for item in catalogs["sectors"]):
+    raise AssertionError("setor padrão ADCETEI ausente")
+default_sector = next(item for item in catalogs["sectors"] if item["name"] == "ADCETEI")
+status, body = call("PATCH", f"/inventory/catalogs/sectors/{default_sector['id']}", admin, {"is_active": False})
+expect(status, 400, "setor padrão ADCETEI não pode ser desativado")
+if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou desativado.":
+    raise AssertionError("mensagem de proteção do setor padrão ausente ao desativar")
+status, body = call("PATCH", f"/inventory/catalogs/sectors/{default_sector['id']}", admin, {"name": "Estoque Central"})
+expect(status, 400, "setor padrão ADCETEI não pode ser renomeado")
+if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou desativado.":
+    raise AssertionError("mensagem de proteção do setor padrão ausente ao renomear")
+status, protected_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Setor Proteção Regressão"})
+expect(status, 201, "administrador cria setor auxiliar para teste de proteção")
+status, protected_sector = call("PATCH", f"/inventory/catalogs/sectors/{protected_sector['id']}", admin, {"is_active": False})
+expect(status, 200, "outros setores podem ser desativados")
+expect(protected_sector["is_active"], False, "setor auxiliar desativado")
+status, protected_sector = call(
+    "PATCH",
+    f"/inventory/catalogs/sectors/{protected_sector['id']}",
+    admin,
+    {"name": "Setor Proteção Renomeado", "is_active": True},
+)
+expect(status, 200, "outros setores podem ser renomeados e reativados")
+expect(protected_sector["name"], "Setor Proteção Renomeado", "setor auxiliar renomeado")
+status, _ = call("POST", "/inventory/catalogs/sectors", admin, {"name": "  adcetei  "})
+expect(status, 409, "setor padrão não pode ser duplicado")
+
+status, supplier = call("POST", "/inventory/catalogs/suppliers", admin, {"name": "Fornecedor Teste"})
+expect(status, 201, "administrador cria fornecedor")
+status, _ = call("POST", "/inventory/catalogs/suppliers", admin, {"name": " fornecedor   teste "})
+expect(status, 409, "fornecedor duplicado bloqueado")
+status, supplier = call("PATCH", f"/inventory/catalogs/suppliers/{supplier['id']}", admin, {"is_active": False})
+expect(status, 200, "administrador inativa fornecedor")
+expect(supplier["is_active"], False, "fornecedor inativado")
+status, supplier = call("PATCH", f"/inventory/catalogs/suppliers/{supplier['id']}", admin, {"is_active": True})
+expect(status, 200, "administrador reativa fornecedor")
+expect(supplier["is_active"], True, "fornecedor reativado")
+
+status, equipment_type = call("POST", "/inventory/catalogs/equipment-types", admin, {"name": "Notebook"})
+expect(status, 201, "administrador cria tipo de equipamento")
+status, manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Dell"})
+expect(status, 201, "administrador cria fabricante")
+status, _ = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": "Latitude 5440", "manufacturer_id": 999999, "equipment_type_id": equipment_type["id"]},
+)
+expect(status, 400, "modelo com fabricante inexistente bloqueado")
+status, _ = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": "Latitude 5440", "manufacturer_id": manufacturer["id"], "equipment_type_id": 999999},
+)
+expect(status, 400, "modelo com tipo inexistente bloqueado")
+status, equipment_model = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": "Latitude 5440", "manufacturer_id": manufacturer["id"], "equipment_type_id": equipment_type["id"]},
+)
+expect(status, 201, "administrador cria modelo")
+expect(equipment_model["manufacturer_id"], manufacturer["id"], "fabricante vinculado ao modelo")
+status, _ = call(
+    "POST",
+    "/inventory/catalogs/models",
+    admin,
+    {"name": " latitude   5440 ", "manufacturer_id": manufacturer["id"], "equipment_type_id": equipment_type["id"]},
+)
+expect(status, 409, "modelo duplicado bloqueado")
+
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    requester,
+    {
+        "serial_number": "REQ-SEM-PERMISSAO",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+    },
+)
+expect(status, 403, "usuário comum não cria equipamento")
+
+status, modular_asset = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "  SN   MOD-001  ",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "notes": "Criado pela regressão do contrato modular.",
+    },
+)
+expect(status, 201, "administrador cria equipamento modular")
+expect(modular_asset["serial_number"], "SN MOD-001", "serial normalizado sem destruir caracteres")
+expect(modular_asset["status"], "stock", "equipamento sem setor externo e responsável entra em estoque")
+expect(modular_asset["supplier"]["name"], supplier["name"], "fornecedor no contrato novo")
+expect(modular_asset["equipment_type"]["name"], equipment_type["name"], "tipo no contrato novo")
+expect(modular_asset["manufacturer"]["name"], manufacturer["name"], "fabricante no contrato novo")
+expect(modular_asset["equipment_model"]["name"], equipment_model["name"], "modelo no contrato novo")
+expect(modular_asset["sector"]["name"], "ADCETEI", "setor padrão no contrato novo")
+if "Latitude 5440" not in modular_asset["display_name"] or "SN MOD-001" not in modular_asset["display_name"]:
+    raise AssertionError(f"display name incompleto: {modular_asset['display_name']}")
+
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "sn mod-001",
+        "supplier_id": supplier["id"],
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+    },
+)
+expect(status, 409, "serial duplicado bloqueado por comparação normalizada")
+
+status, other_manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Lenovo"})
+expect(status, 201, "administrador cria fabricante alternativo")
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-MODELO-INCOMPATIVEL",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": other_manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+    },
+)
+expect(status, 400, "modelo incompatível com fabricante bloqueado")
+
+bulk_payload = {
+    "supplier_id": supplier["id"],
+    "equipment_type_id": equipment_type["id"],
+    "manufacturer_id": manufacturer["id"],
+    "equipment_model_id": equipment_model["id"],
+    "received_at": "2026-07-02",
+    "serial_numbers": ["SN-BULK-001", "SN-BULK-002"],
+    "notes": "Entrada em lote pela regressão.",
+}
+status, _ = call("POST", "/inventory/assets/bulk-scan/preview", requester, bulk_payload)
+expect(status, 403, "usuário comum não faz preview de lote")
+status, _ = call("POST", "/inventory/assets/bulk-scan/confirm", requester, bulk_payload)
+expect(status, 403, "usuário comum não confirma lote")
+
+status, bulk_preview = call("POST", "/inventory/assets/bulk-scan/preview", admin, bulk_payload)
+expect(status, 200, "administrador faz preview de lote válido")
+expect(bulk_preview["total"], 2, "preview contabiliza total enviado")
+expect(bulk_preview["valid_count"], 2, "preview contabiliza itens válidos")
+expect(bulk_preview["invalid_count"], 0, "preview válido não tem erros")
+
+status, duplicate_preview = call(
+    "POST",
+    "/inventory/assets/bulk-scan/preview",
+    admin,
+    {**bulk_payload, "serial_numbers": ["SN-BULK-DUP", " sn-bulk-dup ", "SN-BULK-OK"]},
+)
+expect(status, 200, "preview de lote com duplicado local")
+expect(duplicate_preview["valid_count"], 2, "duplicado local mantém itens únicos válidos")
+expect(duplicate_preview["invalid_count"], 1, "duplicado local gera erro")
+if duplicate_preview["errors"][0]["message"] != "Número de série duplicado no lote":
+    raise AssertionError("preview não identificou duplicado dentro do lote")
+
+status, existing_preview = call(
+    "POST",
+    "/inventory/assets/bulk-scan/preview",
+    admin,
+    {**bulk_payload, "serial_numbers": ["sn mod-001"]},
+)
+expect(status, 200, "preview de lote com serial existente")
+expect(existing_preview["valid_count"], 0, "serial existente não é válido")
+expect(existing_preview["invalid_count"], 1, "serial existente gera erro")
+if existing_preview["errors"][0]["message"] != "Número de série já cadastrado":
+    raise AssertionError("preview não identificou serial existente")
+
+status, _ = call(
+    "POST",
+    "/inventory/assets/bulk-scan/preview",
+    admin,
+    {**bulk_payload, "manufacturer_id": other_manufacturer["id"]},
+)
+expect(status, 400, "preview bloqueia modelo incompatível com fabricante")
+
+status, before_bulk_assets = call("GET", "/inventory/assets", admin)
+expect(status, 200, "lista antes do lote inválido")
+status, _ = call(
+    "POST",
+    "/inventory/assets/bulk-scan/confirm",
+    admin,
+    {**bulk_payload, "serial_numbers": ["SN-BULK-ROLLBACK", "SN MOD-001"]},
+)
+expect(status, 409, "confirm revalida e bloqueia lote com erro")
+status, after_failed_bulk_assets = call("GET", "/inventory/assets", admin)
+expect(status, 200, "lista após lote inválido")
+expect(len(after_failed_bulk_assets), len(before_bulk_assets), "confirm inválido não cria parcialmente")
+if any(item["serial_number"] == "SN-BULK-ROLLBACK" for item in after_failed_bulk_assets):
+    raise AssertionError("confirm inválido criou item parcial")
+
+status, bulk_confirm = call("POST", "/inventory/assets/bulk-scan/confirm", admin, bulk_payload)
+expect(status, 200, "administrador confirma lote válido")
+expect(bulk_confirm["created_count"], 2, "confirm retorna quantidade criada")
+expect(bulk_confirm["summary"]["valid_count"], 2, "confirm retorna resumo do preview")
+for created in bulk_confirm["assets"]:
+    expect(created["status"], "stock", "lote cria equipamento em estoque")
+    expect(created["sector"]["name"], "ADCETEI", "lote entra no setor padrão")
+    expect(created["assigned_user"], None, "lote não vincula responsável")
+    expect(created["delivered_at"], None, "lote não define data de envio")
+    expect(created["received_at"] is not None, True, "lote define data de recebimento")
+    status, created_movements = call("GET", f"/inventory/assets/{created['id']}/movements", admin)
+    expect(status, 200, "histórico de item do lote")
+    created_movement = next((item for item in created_movements if item["action"] == "created"), None)
+    if not created_movement or created_movement["to_sector"]["name"] != "ADCETEI" or created_movement["to_status"] != "stock":
+        raise AssertionError("item do lote não registrou movimento inicial created")
+
+status, external_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Escola Municipal"})
+expect(status, 201, "administrador cria setor externo")
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-SEM-ENTREGA",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "sector_id": external_sector["id"],
+    },
+)
+expect(status, 422, "setor externo exige data de entrega")
+status, _ = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-RESP-SEM-ENTREGA",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "assigned_user_id": requester_user["id"],
+    },
+)
+expect(status, 422, "responsável exige data de entrega")
+
+status, allocated_asset = call(
+    "POST",
+    "/inventory/assets",
+    admin,
+    {
+        "serial_number": "SN-ALOCADO-001",
+        "equipment_type_id": equipment_type["id"],
+        "manufacturer_id": manufacturer["id"],
+        "equipment_model_id": equipment_model["id"],
+        "assigned_user_id": requester_user["id"],
+        "delivered_at": "2026-07-02T12:00:00-03:00",
+    },
+)
+expect(status, 201, "administrador cria equipamento alocado")
+expect(allocated_asset["status"], "allocated", "responsável coloca equipamento como alocado")
+expect(allocated_asset["assigned_user"]["id"], requester_user["id"], "responsável no contrato novo")
+
+status, listed_assets = call("GET", "/inventory/assets", admin, params={"status_filter": "stock"})
+expect(status, 200, "administrador lista equipamentos no contrato novo")
+if not any(item["id"] == modular_asset["id"] for item in listed_assets):
+    raise AssertionError("equipamento em estoque não retornou no filtro do contrato novo")
+status, detailed_asset = call("GET", f"/inventory/assets/{allocated_asset['id']}", admin)
+expect(status, 200, "administrador detalha equipamento modular")
+expect(detailed_asset["status"], "allocated", "detalhe converte active legado para allocated")
+
+status, created_movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+expect(status, 200, "administrador lista histórico de equipamento")
+if not any(item["action"] == "created" for item in created_movements):
+    raise AssertionError("cadastro modular não registrou movimentação inicial")
+
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/allocate",
+    requester,
+    {"sector_id": external_sector["id"], "assigned_user_id": requester_user["id"], "movement_date": "2026-07-02"},
+)
+expect(status, 403, "usuário comum sem inventory.move não movimenta equipamento")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/allocate",
+    admin,
+    {
+        "sector_id": external_sector["id"],
+        "assigned_user_id": requester_user["id"],
+        "movement_date": "2026-07-02",
+        "notes": "Entregue ao setor pela regressão.",
+    },
+)
+expect(status, 200, "administrador aloca equipamento")
+expect(moved_asset["status"], "allocated", "alocação muda status para alocado")
+expect(moved_asset["sector"]["id"], external_sector["id"], "alocação muda setor")
+expect(moved_asset["assigned_user"]["id"], requester_user["id"], "alocação vincula responsável")
+assert_explicit_zone(moved_asset["delivered_at"], "inventário.delivered_at")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+expect(status, 200, "histórico após alocação")
+allocated_movement = next((item for item in movements if item["action"] == "allocated"), None)
+if not allocated_movement or allocated_movement["to_sector"]["id"] != external_sector["id"] or allocated_movement["to_user"]["id"] != requester_user["id"]:
+    raise AssertionError("histórico não registrou alocação com setor/responsável")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/change-responsible",
+    admin,
+    {
+        "assigned_user_id": admin_user["id"],
+        "movement_date": "2026-07-03",
+        "notes": "Troca de responsável pela regressão.",
+    },
+)
+expect(status, 200, "administrador troca responsável")
+expect(moved_asset["assigned_user"]["id"], admin_user["id"], "responsável atualizado")
+expect(moved_asset["status"], "allocated", "troca mantém equipamento alocado")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+responsible_movement = next((item for item in movements if item["action"] == "responsible_changed"), None)
+if not responsible_movement or responsible_movement["from_user"]["id"] != requester_user["id"] or responsible_movement["to_user"]["id"] != admin_user["id"]:
+    raise AssertionError("histórico não registrou troca de responsável")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/return-to-stock",
+    admin,
+    {"movement_date": "2026-07-04", "notes": "Devolvido à ADCETEI pela regressão."},
+)
+expect(status, 200, "administrador devolve ao estoque")
+expect(moved_asset["status"], "stock", "devolução muda status para estoque")
+expect(moved_asset["sector"]["name"], "ADCETEI", "devolução volta ao setor padrão")
+expect(moved_asset["assigned_user"], None, "devolução limpa responsável")
+expect(moved_asset["delivered_at"], None, "devolução limpa data de entrega")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+returned_movement = next((item for item in movements if item["action"] == "returned_to_stock"), None)
+if not returned_movement or returned_movement["to_sector"]["name"] != "ADCETEI" or returned_movement["to_user"] is not None:
+    raise AssertionError("histórico não registrou devolução ao estoque")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/maintenance",
+    admin,
+    {"movement_date": "2026-07-05", "notes": "Separado para manutenção pela regressão."},
+)
+expect(status, 200, "administrador envia para manutenção")
+expect(moved_asset["status"], "maintenance", "manutenção muda status")
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+maintenance_movement = next((item for item in movements if item["action"] == "maintenance"), None)
+if not maintenance_movement or maintenance_movement["from_status"] != "stock" or maintenance_movement["to_status"] != "maintenance":
+    raise AssertionError("histórico não registrou manutenção")
+
+status, detailed_asset = call("GET", f"/inventory/assets/{modular_asset['id']}", admin)
+expect(status, 200, "detalhe segue retornando contrato novo após movimentações")
+expect(detailed_asset["status"], "maintenance", "detalhe reflete última movimentação")
+
+status, legacy_inventory = call("GET", "/assets", operator)
+expect(status, 200, "rota antiga de assets segue funcionando")
+if not any(item["id"] == allocated_asset["id"] and item["status"] == "active" for item in legacy_inventory):
+    raise AssertionError("rota antiga não preservou status active para equipamento alocado")
+
 status, catalog = call("GET", "/catalog", requester)
 expect(status, 200, "catálogo")
 printer_service = next(item for item in catalog if item["name"] == "Instalar impressora")
@@ -341,6 +746,20 @@ status, _ = call(
     },
 )
 expect(status, 403, "equipamento de outro usuário rejeitado")
+
+status, ticket_with_modular_asset = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": general_service["id"],
+        "description": "Chamado com equipamento criado pelo contrato modular.",
+        "asset_id": allocated_asset["id"],
+        "form_data": {},
+    },
+)
+expect(status, 201, "ticket.asset_id segue compatível com equipamento modular")
+expect(ticket_with_modular_asset["asset"]["id"], allocated_asset["id"], "chamado preserva vínculo com asset modular")
 
 # Campos administrativos continuam proibidos na abertura.
 status, _ = call(
@@ -686,6 +1105,13 @@ original_permissions = technician_role["permissions"]
 for permission in ("tickets.view_all", "tickets.triage", "tickets.internal_notes", "users.view", "assets.view"):
     if permission not in original_permissions:
         raise AssertionError(f"permissão operacional ausente do técnico: {permission}")
+for permission in ("inventory.view",):
+    if permission not in original_permissions:
+        raise AssertionError(f"permissão base de inventário ausente do técnico: {permission}")
+admin_role = next(item for item in roles if item["role"] == "admin")
+for permission in ("inventory.view", "inventory.create", "inventory.bulk_scan", "inventory.import", "inventory.move", "inventory.edit", "inventory.manage_catalogs", "inventory.audit"):
+    if permission not in admin_role["permissions"]:
+        raise AssertionError(f"permissão granular de inventário ausente do admin: {permission}")
 temporary_permissions = sorted(set(original_permissions + ["users.view"]))
 status, changed_role = call(
     "PATCH",
@@ -705,6 +1131,14 @@ status, dependent_role = call(
 )
 expect(status, 200, "dependência de permissão aceita")
 expect("assets.view" in dependent_role["permissions"], True, "dependência de visualização aplicada")
+status, dependent_role = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"permissions": ["inventory.move"]},
+)
+expect(status, 200, "dependência de permissão granular aceita")
+expect("inventory.view" in dependent_role["permissions"], True, "dependência base do inventário aplicada")
 status, _ = call(
     "PATCH",
     "/admin/roles/technician",

@@ -51,9 +51,26 @@ export const priorityOptions = [
 
 export const assetStatusLabels: Record<string, string> = {
   active: "Ativo",
+  allocated: "Alocado",
   maintenance: "Em manutenção",
-  stock: "Em estoque",
+  stock: "Estoque",
   retired: "Baixado",
+};
+
+export const inventoryAssetStatusLabels: Record<string, string> = {
+  stock: "Estoque",
+  allocated: "Alocado",
+  maintenance: "Em manutenção",
+  retired: "Baixado",
+};
+
+export const inventoryMovementActionLabels: Record<string, string> = {
+  created: "Cadastro",
+  updated: "Atualização",
+  allocated: "Envio/Alocação",
+  responsible_changed: "Troca de responsável",
+  returned_to_stock: "Devolução ao estoque",
+  maintenance: "Manutenção",
 };
 
 export const assetTypeLabels: Record<string, string> = {
@@ -91,6 +108,7 @@ export const catalogFieldLabels: Record<string, string> = {
 export function assetStatusTone(status: string): string {
   const map: Record<string, string> = {
     active: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[#0d5c4f]",
+    allocated: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[#0d5c4f]",
     maintenance: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[#92400e]",
     stock: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[#164f84]",
     retired: "border border-[var(--border)] bg-[#f0f3f7] text-[var(--muted)]",

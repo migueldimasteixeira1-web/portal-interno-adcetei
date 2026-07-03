@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
@@ -208,6 +208,208 @@ class PermissionDefinitionOut(BaseModel):
     key: str
     label: str
     group: str
+
+
+class InventoryCatalogItemCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    is_active: bool = True
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryCatalogItemUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    is_active: Optional[bool] = None
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryEquipmentModelCreate(InventoryCatalogItemCreate):
+    manufacturer_id: int
+    equipment_type_id: int
+
+
+class InventoryEquipmentModelUpdate(InventoryCatalogItemUpdate):
+    manufacturer_id: Optional[int] = None
+    equipment_type_id: Optional[int] = None
+
+
+class InventoryCatalogItemOut(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_catalog_datetimes(self, value: datetime) -> str:
+        return iso_utc(value) or ""
+
+
+class InventoryEquipmentModelOut(InventoryCatalogItemOut):
+    manufacturer_id: int
+    equipment_type_id: int
+
+
+class InventoryCatalogsOut(BaseModel):
+    suppliers: list[InventoryCatalogItemOut]
+    equipment_types: list[InventoryCatalogItemOut]
+    manufacturers: list[InventoryCatalogItemOut]
+    models: list[InventoryEquipmentModelOut]
+    sectors: list[InventoryCatalogItemOut]
+
+
+InventoryAssetStatus = Literal["stock", "allocated", "maintenance", "retired"]
+InventoryMovementAction = Literal["created", "updated", "allocated", "responsible_changed", "returned_to_stock", "maintenance"]
+
+
+class InventoryAssetCatalogRefOut(BaseModel):
+    id: int
+    name: str
+
+
+class InventoryAssetUserRefOut(BaseModel):
+    id: int
+    full_name: str
+    email: EmailStr
+    department: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryAssetOut(BaseModel):
+    id: int
+    serial_number: str
+    status: InventoryAssetStatus
+    display_name: str
+    supplier_id: Optional[int] = None
+    supplier: Optional[InventoryAssetCatalogRefOut] = None
+    equipment_type_id: Optional[int] = None
+    equipment_type: Optional[InventoryAssetCatalogRefOut] = None
+    manufacturer_id: Optional[int] = None
+    manufacturer: Optional[InventoryAssetCatalogRefOut] = None
+    equipment_model_id: Optional[int] = None
+    equipment_model: Optional[InventoryAssetCatalogRefOut] = None
+    sector_id: Optional[int] = None
+    sector: Optional[InventoryAssetCatalogRefOut] = None
+    assigned_user_id: Optional[int] = None
+    assigned_user: Optional[InventoryAssetUserRefOut] = None
+    received_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: str = ""
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @field_serializer("received_at", "delivered_at", "created_at", "updated_at")
+    def serialize_inventory_asset_datetimes(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class InventoryAssetCreate(BaseModel):
+    serial_number: str = Field(min_length=1, max_length=120)
+    supplier_id: Optional[int] = None
+    equipment_type_id: int
+    manufacturer_id: int
+    equipment_model_id: int
+    sector_id: Optional[int] = None
+    assigned_user_id: Optional[int] = None
+    received_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryBulkScanRequest(BaseModel):
+    supplier_id: int
+    equipment_type_id: int
+    manufacturer_id: int
+    equipment_model_id: int
+    received_at: date
+    serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryBulkScanItemPreview(BaseModel):
+    index: int
+    serial_number: str
+    normalized_serial: str
+
+
+class InventoryBulkScanError(BaseModel):
+    index: int
+    serial_number: str
+    normalized_serial: str
+    message: str
+
+
+class InventoryBulkScanPreviewOut(BaseModel):
+    total: int
+    valid_count: int
+    invalid_count: int
+    valid_items: list[InventoryBulkScanItemPreview]
+    errors: list[InventoryBulkScanError]
+
+
+class InventoryBulkScanConfirmOut(BaseModel):
+    created_count: int
+    assets: list[InventoryAssetOut]
+    summary: InventoryBulkScanPreviewOut
+
+
+class InventoryAssetUpdate(BaseModel):
+    serial_number: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    status: Optional[InventoryAssetStatus] = None
+    supplier_id: Optional[int] = None
+    equipment_type_id: Optional[int] = None
+    manufacturer_id: Optional[int] = None
+    equipment_model_id: Optional[int] = None
+    sector_id: Optional[int] = None
+    assigned_user_id: Optional[int] = None
+    received_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryMovementCreate(BaseModel):
+    movement_date: date
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryAllocateRequest(InventoryMovementCreate):
+    sector_id: int
+    assigned_user_id: Optional[int] = None
+
+
+class InventoryChangeResponsibleRequest(InventoryMovementCreate):
+    assigned_user_id: int
+
+
+class InventoryReturnToStockRequest(InventoryMovementCreate):
+    pass
+
+
+class InventoryMaintenanceRequest(InventoryMovementCreate):
+    pass
+
+
+class InventoryMovementOut(BaseModel):
+    id: int
+    action: InventoryMovementAction
+    movement_date: datetime
+    notes: str
+    from_status: Optional[InventoryAssetStatus] = None
+    to_status: InventoryAssetStatus
+    from_sector: Optional[InventoryAssetCatalogRefOut] = None
+    to_sector: Optional[InventoryAssetCatalogRefOut] = None
+    from_user: Optional[InventoryAssetUserRefOut] = None
+    to_user: Optional[InventoryAssetUserRefOut] = None
+    actor: Optional[InventoryAssetUserRefOut] = None
+    created_at: datetime
+
+    @field_serializer("movement_date", "created_at")
+    def serialize_movement_datetimes(self, value: datetime) -> str:
+        return iso_utc(value) or ""
 
 
 class AuditLogOut(BaseModel):

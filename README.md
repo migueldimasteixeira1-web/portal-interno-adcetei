@@ -101,6 +101,22 @@ Disponíveis somente quando `SEED_DEMO_DATA=true`:
 
 ## Segurança do inventário
 
+O Inventário está sendo modularizado em etapas. A tabela `assets` continua sendo a base dos equipamentos por compatibilidade com chamados e as rotas atuais de assets seguem disponíveis durante a transição.
+
+Direção planejada do módulo: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
+
+Os cadastros base do inventário já existem no backend para fornecedores, tipos de equipamento, fabricantes, modelos e setores. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
+
+`assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente.
+
+A Parte 6 adicionou histórico e movimentações em `asset_movements`. Alocação, troca de responsável, devolução ao estoque e manutenção registram ator, data operacional, setor/responsável/status de origem e destino. Entrada em lote por leitura de série e importação por planilha continuam planejadas para etapas posteriores.
+
+A Parte 7 adicionou entrada em lote por leitura/digitação de números de série. O fluxo cria todos os itens como estoque ADCETEI, sem responsável e sem data de envio, registrando movimento inicial `created` para cada equipamento. Importação por planilha continua para etapa posterior.
+
+A Parte 8 adicionou a tela `/inventario/cadastros` para gerenciar fornecedores, tipos de equipamento, fabricantes, modelos e setores. O acesso exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+
+O setor padrão `ADCETEI` é protegido no backend: não pode ser renomeado nem desativado via API.
+
 `GET /api/assets` exige a permissão `assets.view`.
 
 A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:

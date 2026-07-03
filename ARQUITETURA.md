@@ -107,6 +107,22 @@ O seed:
 
 ## Inventário
 
+O módulo de Inventário está sendo separado em arquivos próprios de backend. A tabela `assets` permanece como base dos equipamentos para preservar compatibilidade com chamados (`asset_id`) e as rotas legadas de assets continuam ativas durante a transição.
+
+A evolução prevista será incremental: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
+
+Os cadastros base ficam sob `/api/inventory/catalogs` e cobrem fornecedores, tipos de equipamento, fabricantes, modelos e setores. A criação/edição exige `inventory.manage_catalogs`; a listagem exige `inventory.view`.
+
+O contrato modular de equipamentos fica em `/api/inventory/assets`. Ele reaproveita a tabela `assets`, adiciona vínculos opcionais aos cadastros base, usa número de série como identificação principal e mantém fallback para `asset_type`, `manufacturer`, `model` e `name`. As rotas legadas de assets continuam disponíveis.
+
+Movimentações ficam em `asset_movements` e registram ator, data operacional, setor/responsável/status anterior e setor/responsável/status novo. Ações operacionais básicas já cobrem alocação, troca de responsável, devolução ao estoque e manutenção. Entrada em lote e importação seguem como etapas posteriores.
+
+A entrada em lote por leitura de número de série fica em `/inventario/lote` e usa `/api/inventory/assets/bulk-scan`. Ela pré-valida duplicidades, confirma tudo sem criação parcial e cria os equipamentos como estoque ADCETEI com movimento inicial `created`. Importação por planilha permanece fora deste fluxo.
+
+A Parte 8 adicionou `/inventario/cadastros` para gerenciar os cadastros base do inventário (fornecedores, tipos, fabricantes, modelos e setores). A tela exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+
+O setor padrão `ADCETEI` é protegido no backend contra renomeação e desativação pela API de cadastros.
+
 Existem duas superfícies:
 
 ### Inventário administrativo
@@ -117,7 +133,6 @@ Disponível para:
 
 - administrador;
 - técnico;
-- técnico.
 
 Retorna dados completos, como IP, serial, sistema operacional, localização e usuário.
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -56,9 +56,108 @@ class Asset(Base):
     operating_system: Mapped[str] = mapped_column(String(120), default="")
     assigned_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    supplier_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_suppliers.id"), nullable=True)
+    equipment_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_equipment_types.id"), nullable=True)
+    manufacturer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_manufacturers.id"), nullable=True)
+    equipment_model_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_equipment_models.id"), nullable=True)
+    sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
+    received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
 
     assigned_user: Mapped[Optional[User]] = relationship()
+    supplier: Mapped[Optional[InventorySupplier]] = relationship()
+    equipment_type: Mapped[Optional[InventoryEquipmentType]] = relationship()
+    manufacturer_ref: Mapped[Optional[InventoryManufacturer]] = relationship()
+    equipment_model: Mapped[Optional[InventoryEquipmentModel]] = relationship()
+    sector: Mapped[Optional[InventorySector]] = relationship()
     tickets: Mapped[list[Ticket]] = relationship(back_populates="asset")
+
+
+class InventorySupplier(Base):
+    __tablename__ = "inventory_suppliers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class InventoryEquipmentType(Base):
+    __tablename__ = "inventory_equipment_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class InventoryManufacturer(Base):
+    __tablename__ = "inventory_manufacturers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class InventoryEquipmentModel(Base):
+    __tablename__ = "inventory_equipment_models"
+    __table_args__ = (UniqueConstraint("normalized_name", name="uq_inventory_equipment_models_normalized_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(180), index=True)
+    manufacturer_id: Mapped[int] = mapped_column(ForeignKey("inventory_manufacturers.id"), index=True)
+    equipment_type_id: Mapped[int] = mapped_column(ForeignKey("inventory_equipment_types.id"), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    manufacturer: Mapped[InventoryManufacturer] = relationship()
+    equipment_type: Mapped[InventoryEquipmentType] = relationship()
+
+
+class InventorySector(Base):
+    __tablename__ = "inventory_sectors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class AssetMovement(Base):
+    __tablename__ = "asset_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    action: Mapped[str] = mapped_column(String(60), index=True)
+    from_sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
+    to_sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
+    from_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    to_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    from_status: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(40))
+    movement_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    actor_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+    asset: Mapped[Asset] = relationship()
+    from_sector: Mapped[Optional[InventorySector]] = relationship(foreign_keys=[from_sector_id])
+    to_sector: Mapped[Optional[InventorySector]] = relationship(foreign_keys=[to_sector_id])
+    from_user: Mapped[Optional[User]] = relationship(foreign_keys=[from_user_id])
+    to_user: Mapped[Optional[User]] = relationship(foreign_keys=[to_user_id])
+    actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])
 
 
 class ServiceCatalog(Base):
