@@ -513,9 +513,9 @@ class TicketDetailOut(TicketListOut):
 
 class TicketQueueSummaryOut(BaseModel):
     new: int
-    unassigned: int
-    urgent: int
-    waiting_user: int
+    assigned: int
+    closed: int
+    cancelled: int
 
 
 class TicketPageOut(BaseModel):
@@ -530,9 +530,9 @@ class DashboardOut(BaseModel):
     total: int
     new: int
     assigned: int
-    pending: int
+    closed: int
+    cancelled: int
     overdue: int
-    solved_today: int
     my_open: int
     by_category: list[dict[str, Any]]
     by_status: list[dict[str, Any]]
