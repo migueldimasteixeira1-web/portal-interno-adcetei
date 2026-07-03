@@ -5,7 +5,7 @@ import { Building2, Headphones, KeyRound, ShieldCheck, TicketCheck } from "lucid
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import AuthBrandHeader from "@/components/AuthBrandHeader";
-import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
+import { InstitutionalEmailInput, completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { SESSION_MESSAGE_KEY } from "@/lib/api";
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      await login(username, password);
+      await login(completeInstitutionalEmail(username), password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível entrar.");
     } finally {

@@ -5,7 +5,7 @@ import { MailCheck, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AuthCardShell from "@/components/AuthCardShell";
-import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
+import { InstitutionalEmailInput, completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import SearchParamsSuspense from "@/components/SearchParamsSuspense";
 import { Alert, Button, Field } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -23,7 +23,7 @@ function CheckEmailContent() {
     setError("");
     setMessage("");
     try {
-      const result = await api.resendVerification(email.trim().toLowerCase());
+      const result = await api.resendVerification(completeInstitutionalEmail(email));
       setMessage(result.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível reenviar a verificação.");

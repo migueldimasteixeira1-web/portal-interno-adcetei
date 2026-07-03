@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AuthBrandHeader from "@/components/AuthBrandHeader";
 import AuthCardShell from "@/components/AuthCardShell";
-import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
+import { InstitutionalEmailInput, completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { api } from "@/lib/api";
 
@@ -22,7 +22,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = completeInstitutionalEmail(email);
   const emailError = normalizedEmail && !institutionalEmailPattern.test(normalizedEmail)
     ? "E-mails @cabofrio.rj.gov.br ainda não estão no padrão exigido."
     : "";

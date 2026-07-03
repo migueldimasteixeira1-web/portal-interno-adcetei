@@ -6,7 +6,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
 import AccessDenied from "@/components/AccessDenied";
-import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
+import { InstitutionalEmailInput, completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Toolbar } from "@/components/ui";
@@ -111,7 +111,7 @@ export default function UsersPage() {
         const payload: Record<string, unknown> = {
           username: draft.username,
           full_name: draft.full_name,
-          email: draft.email,
+          email: completeInstitutionalEmail(draft.email),
           secretariat: draft.secretariat,
           department: draft.department,
           phone: draft.phone,
@@ -123,7 +123,7 @@ export default function UsersPage() {
         await api.updateUser(editing.id, payload);
         setMessage("Usuário atualizado com sucesso.");
       } else {
-        await api.createUser(draft);
+        await api.createUser({ ...draft, email: completeInstitutionalEmail(draft.email) });
         setMessage("Usuário local criado com sucesso.");
       }
       setDialogOpen(false);
