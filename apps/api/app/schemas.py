@@ -143,6 +143,7 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=120, pattern=r"^[A-Za-z0-9._-]+$")
     full_name: Optional[str] = Field(default=None, min_length=3, max_length=180)
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=10, max_length=128)

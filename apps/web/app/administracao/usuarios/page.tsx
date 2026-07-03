@@ -6,6 +6,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
 import AccessDenied from "@/components/AccessDenied";
+import { InstitutionalEmailInput, completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Toolbar } from "@/components/ui";
@@ -108,8 +109,9 @@ export default function UsersPage() {
     try {
       if (editing) {
         const payload: Record<string, unknown> = {
+          username: draft.username,
           full_name: draft.full_name,
-          email: draft.email,
+          email: completeInstitutionalEmail(draft.email),
           secretariat: draft.secretariat,
           department: draft.department,
           phone: draft.phone,
@@ -121,7 +123,7 @@ export default function UsersPage() {
         await api.updateUser(editing.id, payload);
         setMessage("Usuário atualizado com sucesso.");
       } else {
-        await api.createUser(draft);
+        await api.createUser({ ...draft, email: completeInstitutionalEmail(draft.email) });
         setMessage("Usuário local criado com sucesso.");
       }
       setDialogOpen(false);
@@ -210,9 +212,9 @@ export default function UsersPage() {
         confirmLabel="Salvar usuário"
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Usuário"><Input disabled={!!editing} value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} /></Field>
+          <Field label="Usuário"><Input value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} /></Field>
           <Field label="Nome completo"><Input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} /></Field>
-          <Field label="E-mail"><Input type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></Field>
+          <Field label="E-mail"><InstitutionalEmailInput value={draft.email} onChangeValue={(email) => setDraft({ ...draft, email })} /></Field>
           <Field label="Perfil">
             <Select value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}>
               {Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}

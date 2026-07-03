@@ -995,9 +995,10 @@ status, email_changed_user = call(
     "PATCH",
     f"/admin/users/{created_user['id']}",
     admin,
-    {"email": "teste.admin2@adcetei.cabofrio.rj.gov.br", "email_verified": True},
+    {"username": "teste.admin.renomeado", "email": "teste.admin2@adcetei.cabofrio.rj.gov.br", "email_verified": True},
 )
 expect(status, 200, "alteração administrativa de e-mail")
+expect(email_changed_user["username"], "teste.admin.renomeado", "nome de usuário administrativo atualizado")
 expect(email_changed_user["email"], "teste.admin2@adcetei.cabofrio.rj.gov.br", "e-mail administrativo atualizado")
 expect(email_changed_user["email_verified_at"], None, "alteração de e-mail reseta verificação")
 status, _ = call("GET", "/auth/me", created_user_token)
@@ -1016,7 +1017,7 @@ status, _ = call(
     "/admin/users",
     admin,
     {
-        "username": "teste.admin",
+        "username": "teste.admin.renomeado",
         "full_name": "Usuário Duplicado",
         "email": "duplicado@adcetei.cabofrio.rj.gov.br",
         "password": "SenhaTeste123",

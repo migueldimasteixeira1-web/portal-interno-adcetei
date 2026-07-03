@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AuthBrandHeader from "@/components/AuthBrandHeader";
 import AuthCardShell from "@/components/AuthCardShell";
+import { InstitutionalEmailInput, completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { api } from "@/lib/api";
 
 const institutionalEmailPattern = /^[^@\s]+@[a-z0-9-]+\.cabofrio\.rj\.gov\.br$/;
-const emailHelp = "Use seu e-mail institucional no formato nome@secretaria.cabofrio.rj.gov.br.";
+const emailHelp = "Digite apenas nome@secretaria; o final .cabofrio.rj.gov.br já fica preenchido.";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = completeInstitutionalEmail(email);
   const emailError = normalizedEmail && !institutionalEmailPattern.test(normalizedEmail)
     ? "E-mails @cabofrio.rj.gov.br ainda não estão no padrão exigido."
     : "";
@@ -64,7 +65,7 @@ export default function RegisterPage() {
             <Input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" required autoFocus />
           </Field>
           <Field label="E-mail institucional" help={!emailError ? emailHelp : undefined} error={emailError}>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+            <InstitutionalEmailInput value={email} onChangeValue={setEmail} autoComplete="email" required />
           </Field>
           <Field label="Senha" help="Use pelo menos 10 caracteres.">
             <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required minLength={10} />
