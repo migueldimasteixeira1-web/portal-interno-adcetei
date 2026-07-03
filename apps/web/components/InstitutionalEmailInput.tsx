@@ -18,7 +18,17 @@ export function institutionalEmailFromPrefix(prefix: string) {
 export function completeInstitutionalEmail(value: string) {
   const normalized = value.trim().toLowerCase();
   if (!normalized) return "";
+  if (normalized.endsWith(".")) return `${normalized}${institutionalEmailSuffix.slice(1)}`;
   return normalized.endsWith(institutionalEmailSuffix) ? normalized : institutionalEmailFromPrefix(normalized);
+}
+
+function shouldCompleteAfterSecretariaDot(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized.includes("@") &&
+    normalized.endsWith(".") &&
+    !normalized.endsWith(institutionalEmailSuffix)
+  );
 }
 
 export function InstitutionalEmailInput({
@@ -35,7 +45,14 @@ export function InstitutionalEmailInput({
       type="email"
       value={value}
       onBlur={(event) => onChangeValue(completeInstitutionalEmail(event.target.value))}
-      onChange={(event) => onChangeValue(event.target.value)}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        onChangeValue(
+          shouldCompleteAfterSecretariaDot(nextValue)
+            ? completeInstitutionalEmail(nextValue)
+            : nextValue
+        );
+      }}
     />
   );
 }
