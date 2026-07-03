@@ -10,7 +10,7 @@ import { PriorityChip, StatusChip } from "@/components/StatusChip";
 import { useAuth } from "@/components/AuthProvider";
 import { Alert, Badge, Button, Card, ConfirmDialog, DetailRow, Field, SectionHeader, Select, Textarea, cn } from "@/components/ui";
 import { api } from "@/lib/api";
-import { assetTypeLabels, catalogFieldLabels, formatDate, priorityLabels, priorityOptions, relativeTime, roleLabels, statusLabels, statusOptions, technicianStatusOptions } from "@/lib/format";
+import { assetTypeLabels, catalogFieldLabels, formatDate, priorityLabels, priorityOptions, relativeTime, roleLabels, statusLabels } from "@/lib/format";
 import type { Asset, Ticket, User } from "@/lib/types";
 
 export default function TicketDetailPage() {
@@ -24,6 +24,8 @@ export default function TicketDetailPage() {
   const [comment, setComment] = useState("");
   const [internal, setInternal] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [resolutionMessage, setResolutionMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [quickAction, setQuickAction] = useState("");
@@ -33,7 +35,6 @@ export default function TicketDetailPage() {
       const current = await api.ticket(params.id);
       setTicket(current);
       setDraft({
-        status: current.status,
         priority: current.priority,
         assignee_id: current.assignee?.id ? String(current.assignee.id) : "",
         asset_id: current.asset?.id ? String(current.asset.id) : "",
@@ -64,9 +65,6 @@ export default function TicketDetailPage() {
     const list: Array<{ label: string; from: string; to: string; field: string }> = [];
     const assigneeName = (id: string) => staff.find((item) => String(item.id) === id)?.full_name || "Sem responsável";
     const assetName = (id: string) => assets.find((item) => String(item.id) === id)?.name || "Nenhum";
-    if (canChangeStatus && draft.status && draft.status !== ticket.status) {
-      list.push({ label: "Status", from: statusLabels[ticket.status] || ticket.status, to: statusLabels[draft.status] || draft.status, field: "status" });
-    }
     if (canEditAdministrativeFields) {
       if (draft.priority && draft.priority !== ticket.priority) list.push({ label: "Prioridade", from: priorityLabels[ticket.priority] || ticket.priority, to: priorityLabels[draft.priority] || draft.priority, field: "priority" });
       const oldAssignee = ticket.assignee?.id ? String(ticket.assignee.id) : "";
@@ -77,12 +75,6 @@ export default function TicketDetailPage() {
     }
     return list;
   }, [assets, canChangeStatus, canEditAdministrativeFields, draft, staff, ticket]);
-
-  const availableStatusOptions = useMemo(() => {
-    if (!ticket || canEditAdministrativeFields) return statusOptions;
-    if (technicianStatusOptions.some(([value]) => value === ticket.status)) return technicianStatusOptions;
-    return [[ticket.status, statusLabels[ticket.status] || ticket.status], ...technicianStatusOptions] as const;
-  }, [canEditAdministrativeFields, ticket]);
 
   const saveChanges = async () => {
     if (!ticket) return;
@@ -134,6 +126,14 @@ export default function TicketDetailPage() {
     }
   };
 
+  const closeTicket = async () => {
+    const message = resolutionMessage.trim();
+    if (!message) return;
+    await runQuickAction({ status: "closed", resolution_message: message }, "close");
+    setCloseConfirmOpen(false);
+    setResolutionMessage("");
+  };
+
   if (!ticket || !user) {
     if (error) return (
       <div className="mx-auto max-w-2xl py-12">
@@ -150,6 +150,7 @@ export default function TicketDetailPage() {
   const hasPendingChanges = changes.length > 0;
   const canQuickAssign = canEditAdministrativeFields && !isFinalStatus && ticket.assignee?.id !== user.id;
   const canQuickClose = canChangeStatus && !isFinalStatus;
+  const canCloseNow = canQuickClose && Boolean(ticket.assignee);
   const formFieldLabels = Object.fromEntries(
     (ticket.form_schema_snapshot?.fields || []).map((field) => [field.key, field.label]),
   );
@@ -174,7 +175,7 @@ export default function TicketDetailPage() {
         {canChangeStatus && (
           <Button
             className={cn(changes.length && "border-[#b45309] bg-[#b45309] hover:border-[#92400e] hover:bg-[#92400e]")}
-            disabled={!changes.length}
+            disabled={!changes.length || isFinalStatus}
             onClick={() => setConfirmOpen(true)}
           >
             <Save size={16} />
@@ -279,27 +280,28 @@ export default function TicketDetailPage() {
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={saving || !!quickAction || hasPendingChanges}
-                      onClick={() => void runQuickAction({ status: "closed" }, "close")}
+                      disabled={saving || !!quickAction || hasPendingChanges || !canCloseNow}
+                      onClick={() => setCloseConfirmOpen(true)}
                     >
-                      {quickAction === "close" ? <LoaderCircle className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                      <CheckCircle2 size={16} />
                       Encerrar chamado
                     </Button>
                   )}
                   {hasPendingChanges && <p className="text-xs text-[#8b97a8]">Salve ou desfaça as alterações pendentes antes de usar ações rápidas.</p>}
+                  {canQuickClose && !ticket.assignee && <p className="text-xs text-[#8b97a8]">Atribua um responsável antes de encerrar.</p>}
                 </div>
               )}
               {canEditAdministrativeFields ? (
                 <>
-                  <Field label="Status"><Select value={draft.status || ""} onChange={(e) => setDraft((old) => ({ ...old, status: e.target.value }))}>{availableStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
-                  <Field label="Responsável"><Select value={draft.assignee_id || ""} onChange={(e) => setDraft((old) => ({ ...old, assignee_id: e.target.value }))}><option value="">Sem responsável</option>{staff.map((member) => <option key={member.id} value={String(member.id)}>{member.full_name} · {roleLabels[member.role]}</option>)}</Select></Field>
-                  <Field label="Prioridade"><Select value={draft.priority || "medium"} onChange={(e) => setDraft((old) => ({ ...old, priority: e.target.value }))}>{priorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
-                  <Field label="Equipamento"><Select value={draft.asset_id || ""} onChange={(e) => setDraft((old) => ({ ...old, asset_id: e.target.value }))}><option value="">Nenhum equipamento</option>{assets.map((asset) => <option key={asset.id} value={String(asset.id)}>{asset.name} · {asset.patrimony || "sem patrimônio"}</option>)}</Select></Field>
-                  <Field label="Localização"><Select value={draft.location || ""} onChange={(e) => setDraft((old) => ({ ...old, location: e.target.value }))}><option value="">Não informada</option><option value="SEDECON - SEGTEA">SEDECON - SEGTEA</option><option value="Administração - RH">Administração - RH</option><option value="Fazenda - Atendimento">Fazenda - Atendimento</option><option value="Oficina de TI">Oficina de TI</option><option value="Datacenter - Sede">Datacenter - Sede</option></Select></Field>
+                  <DetailRow label="Status" value={statusLabels[ticket.status] || ticket.status} />
+                  <Field label="Responsável"><Select disabled={isFinalStatus} value={draft.assignee_id || ""} onChange={(e) => setDraft((old) => ({ ...old, assignee_id: e.target.value }))}><option value="">Sem responsável</option>{staff.map((member) => <option key={member.id} value={String(member.id)}>{member.full_name} · {roleLabels[member.role]}</option>)}</Select></Field>
+                  <Field label="Prioridade"><Select disabled={isFinalStatus} value={draft.priority || "medium"} onChange={(e) => setDraft((old) => ({ ...old, priority: e.target.value }))}>{priorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
+                  <Field label="Equipamento"><Select disabled={isFinalStatus} value={draft.asset_id || ""} onChange={(e) => setDraft((old) => ({ ...old, asset_id: e.target.value }))}><option value="">Nenhum equipamento</option>{assets.map((asset) => <option key={asset.id} value={String(asset.id)}>{asset.name} · {asset.patrimony || "sem patrimônio"}</option>)}</Select></Field>
+                  <Field label="Localização"><Select disabled={isFinalStatus} value={draft.location || ""} onChange={(e) => setDraft((old) => ({ ...old, location: e.target.value }))}><option value="">Não informada</option><option value="SEDECON - SEGTEA">SEDECON - SEGTEA</option><option value="Administração - RH">Administração - RH</option><option value="Fazenda - Atendimento">Fazenda - Atendimento</option><option value="Oficina de TI">Oficina de TI</option><option value="Datacenter - Sede">Datacenter - Sede</option></Select></Field>
                 </>
               ) : canChangeStatus ? (
                 <>
-                  <Field label="Status"><Select value={draft.status || ""} onChange={(e) => setDraft((old) => ({ ...old, status: e.target.value }))}>{availableStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
+                  <DetailRow label="Status" value={statusLabels[ticket.status] || ticket.status} />
                   <DetailRow label="Responsável" value={ticket.assignee?.full_name || "Aguardando atribuição"} />
                   <DetailRow label="Prioridade" value={priorityLabels[ticket.priority] || ticket.priority} />
                 </>
@@ -363,6 +365,17 @@ export default function TicketDetailPage() {
             </div>
           ))}
         </div>
+      </ConfirmDialog>
+      <ConfirmDialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen} title="Encerrar chamado?" description="Informe uma mensagem de encerramento para registrar o fechamento e orientar o solicitante." confirmLabel="Encerrar chamado" loading={quickAction === "close"} confirmDisabled={!ticket.assignee || resolutionMessage.trim().length < 2} onConfirm={closeTicket}>
+        <Textarea
+          aria-label="Mensagem de encerramento"
+          value={resolutionMessage}
+          onChange={(event) => setResolutionMessage(event.target.value)}
+          placeholder="Ex.: Atendimento realizado, conexão normalizada e serviço validado com o setor."
+          className="bg-white"
+        />
+        {!ticket.assignee && <Alert tone="warning" className="mt-3">Atribua um responsável antes de encerrar o chamado.</Alert>}
+        {resolutionMessage.trim().length < 2 && <p className="mt-2 text-xs text-[#8b97a8]">A mensagem de encerramento é obrigatória.</p>}
       </ConfirmDialog>
     </>
   );

@@ -853,6 +853,8 @@ status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "valo
 expect(status, 422, "status inválido")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "in_progress"})
 expect(status, 422, "status antigo rejeitado")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "closed", "resolution_message": "Atendimento concluído."})
+expect(status, 409, "encerramento exige responsável")
 status, updated = call(
     "PATCH",
     f"/tickets/{ticket['id']}",
@@ -885,7 +887,18 @@ expect(status, 200, "técnico acessa chamado atribuído")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"priority": "critical"})
 expect(status, 200, "técnico altera prioridade")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "closed"})
+expect(status, 422, "encerramento exige mensagem")
+status, closed_ticket = call(
+    "PATCH",
+    f"/tickets/{ticket['id']}",
+    technician,
+    {"status": "closed", "resolution_message": "Atendimento validado e chamado encerrado."},
+)
 expect(status, 200, "técnico altera status permitido")
+expect(closed_ticket["status"], "closed", "chamado encerrado")
+expect(any("Mensagem de encerramento" in item["body"] for item in closed_ticket["comments"]), True, "mensagem de encerramento registrada")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "assigned"})
+expect(status, 409, "chamado fechado não altera status")
 
 _, page = call("GET", "/tickets", operator, params={"page_size": 100})
 foreign_ticket = next(

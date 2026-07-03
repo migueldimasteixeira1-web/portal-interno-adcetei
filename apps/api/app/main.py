@@ -80,7 +80,8 @@ FIELD_LABELS = {
     "asset_id": "o equipamento",
 }
 
-TECHNICIAN_UPDATE_FIELDS = {"status"}
+FINAL_TICKET_STATUSES = {"closed", "cancelled"}
+TECHNICIAN_UPDATE_FIELDS = {"status", "resolution_message"}
 NON_NULLABLE_UPDATE_FIELDS = {"status", "priority", "urgency", "impact", "category", "team", "location"}
 
 
@@ -633,6 +634,7 @@ def update_ticket(
     ensure_ticket_access(ticket, current_user, db)
 
     data = payload.model_dump(exclude_unset=True)
+    resolution_message = (data.pop("resolution_message", None) or "").strip()
     null_fields = NON_NULLABLE_UPDATE_FIELDS.intersection(
         field for field, value in data.items() if value is None
     )
@@ -647,9 +649,18 @@ def update_ticket(
         if data.get("status") not in TECHNICIAN_STATUSES:
             raise HTTPException(status_code=403, detail="Status não permitido para técnico")
 
+    if ticket.status in FINAL_TICKET_STATUSES and data:
+        raise HTTPException(status_code=409, detail="Chamado finalizado não pode ser alterado")
+
     validate_ticket_references(data, db)
-    if ticket.status in {"closed", "cancelled"} and data.get("status") in {"new", "assigned"}:
-        raise HTTPException(status_code=409, detail="Chamado finalizado não pode ser reaberto")
+    if resolution_message and data.get("status") != "closed":
+        raise HTTPException(status_code=422, detail="Mensagem de encerramento só é aceita ao encerrar chamado")
+
+    if data.get("status") == "closed":
+        if not (data.get("assignee_id") or ticket.assignee_id):
+            raise HTTPException(status_code=409, detail="Atribua um responsável antes de encerrar o chamado")
+        if not resolution_message:
+            raise HTTPException(status_code=422, detail="Informe a mensagem de encerramento")
 
     if data.get("assignee_id") and ticket.status == "new" and data.get("status", "new") == "new":
         data["status"] = "assigned"
@@ -672,18 +683,27 @@ def update_ticket(
 
     if changes:
         ticket.updated_at = now_utc()
-        db.add_all(
-            [
+        update_comments = [
+            TicketComment(
+                ticket_id=ticket.id,
+                author_id=current_user.id,
+                body=change_message(current_user, field, old, new, db),
+                internal=False,
+                event_type="update",
+            )
+            for field, old, new in changes
+        ]
+        if data.get("status") == "closed":
+            update_comments.append(
                 TicketComment(
                     ticket_id=ticket.id,
                     author_id=current_user.id,
-                    body=change_message(current_user, field, old, new, db),
+                    body=f"Mensagem de encerramento: {resolution_message}",
                     internal=False,
-                    event_type="update",
+                    event_type="event",
                 )
-                for field, old, new in changes
-            ]
-        )
+            )
+        db.add_all(update_comments)
     db.commit()
     return get_ticket(ticket_id, db, current_user)
 

@@ -463,6 +463,7 @@ class TicketCreate(BaseModel):
 class TicketUpdate(BaseModel):
     # Apenas equipe de TI/admin pode atualizar estes campos.
     status: Optional[TicketStatus] = None
+    resolution_message: Optional[str] = Field(default=None, min_length=2, max_length=5000)
     priority: Optional[TicketPriority] = None
     urgency: Optional[TicketPriority] = None
     impact: Optional[TicketPriority] = None
