@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from .audit import add_audit
 from .auth import hash_password, validate_institutional_email
-from .catalog_forms import catalog_payload, normalize_form_schema
+from .catalog_forms import catalog_options_payload, catalog_payload, normalize_form_schema
 from .database import get_db
 from .email_verification import send_user_verification
 from .models import Asset, AuditLog, RoleConfig, ServiceCatalog, User
@@ -18,6 +18,7 @@ from .schemas import (
     AuditLogOut,
     CatalogCreate,
     CatalogOut,
+    CatalogOptionsOut,
     CatalogUpdate,
     PermissionDefinitionOut,
     RoleConfigOut,
@@ -83,6 +84,11 @@ def validate_assigned_user(db: Session, user_id: int | None) -> None:
     user = db.get(User, user_id)
     if not user or not user.active:
         raise HTTPException(status_code=400, detail="Usuário responsável inválido")
+
+
+@router.get("/catalog/options", response_model=CatalogOptionsOut)
+def get_catalog_options(actor: User = Depends(require_permission("catalog.manage"))):
+    return catalog_options_payload()
 
 
 @router.post("/users", response_model=UserOut, status_code=201)

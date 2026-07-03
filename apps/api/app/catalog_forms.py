@@ -154,7 +154,56 @@ FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
 }
 
+CATALOG_CATEGORIES = (
+    "Acesso",
+    "E-mail",
+    "Hardware",
+    "Rede",
+    "Software",
+    "Impressoras",
+    "Sistemas",
+    "Outros",
+)
+
+CATALOG_ICONS = (
+    {"key": "Headphones", "label": "Suporte"},
+    {"key": "Computer", "label": "Computador"},
+    {"key": "Printer", "label": "Impressora"},
+    {"key": "Mail", "label": "E-mail"},
+    {"key": "User", "label": "Usuário"},
+    {"key": "Users", "label": "Usuários"},
+    {"key": "KeyRound", "label": "Acesso"},
+    {"key": "Wifi", "label": "Rede sem fio"},
+    {"key": "Server", "label": "Servidor"},
+    {"key": "Monitor", "label": "Monitor"},
+    {"key": "Package", "label": "Pacote"},
+    {"key": "Settings", "label": "Configurações"},
+    {"key": "FileText", "label": "Documento"},
+    {"key": "Shield", "label": "Segurança"},
+    {"key": "HelpCircle", "label": "Ajuda"},
+)
+
 ALLOWED_FIELD_TYPES = {"text", "email", "textarea", "select", "date"}
+
+
+def catalog_options_payload() -> dict[str, Any]:
+    return {
+        "categories": list(CATALOG_CATEGORIES),
+        "icons": list(CATALOG_ICONS),
+        "fields": [
+            {
+                "key": key,
+                "label": definition["label"],
+                "type": definition.get("type", "text"),
+                "required": bool(definition.get("required", False)),
+                "placeholder": definition.get("placeholder", ""),
+                "options": definition.get("options", []),
+                "max_length": definition.get("max_length", 500),
+                "help": definition.get("help", ""),
+            }
+            for key, definition in FIELD_DEFINITIONS.items()
+        ],
+    }
 
 
 def normalize_form_schema(schema: dict[str, Any] | None) -> dict[str, Any]:

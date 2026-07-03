@@ -102,6 +102,28 @@ class CatalogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CatalogIconOptionOut(BaseModel):
+    key: str
+    label: str
+
+
+class CatalogFieldOptionOut(BaseModel):
+    key: str
+    label: str
+    type: str
+    required: bool
+    placeholder: str
+    options: list[str]
+    max_length: int
+    help: str = ""
+
+
+class CatalogOptionsOut(BaseModel):
+    categories: list[str]
+    icons: list[CatalogIconOptionOut]
+    fields: list[CatalogFieldOptionOut]
+
+
 RoleName = Literal["admin", "technician", "user"]
 AssetStatus = Literal["active", "maintenance", "stock", "retired"]
 
