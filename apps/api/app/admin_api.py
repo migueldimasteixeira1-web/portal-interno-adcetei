@@ -142,21 +142,24 @@ def update_user(
     data = payload.model_dump(exclude_unset=True)
     reject_null_fields(
         data,
-        {"full_name", "email", "role", "secretariat", "department", "phone", "active", "email_verified"},
+        {"username", "full_name", "email", "role", "secretariat", "department", "phone", "active", "email_verified"},
     )
     ensure_last_admin(db, user, data)
     if actor.id == user.id and data.get("active") is False:
         raise HTTPException(status_code=409, detail="Você não pode desativar sua própria conta")
+    target_username = data["username"].strip().lower() if "username" in data else user.username
     target_email = validate_institutional_email(str(data["email"])) if "email" in data else user.email
-    ensure_unique_user(db, user.username, target_email, user.id)
+    ensure_unique_user(db, target_username, target_email, user.id)
 
     changes: dict[str, Any] = {}
     email_changed = False
-    for field in ("full_name", "email", "role", "secretariat", "department", "phone", "active"):
+    for field in ("username", "full_name", "email", "role", "secretariat", "department", "phone", "active"):
         if field in data:
             value = data[field]
             if isinstance(value, str):
                 value = value.strip()
+            if field == "username":
+                value = str(value).lower()
             if field == "email":
                 value = validate_institutional_email(str(value))
             old = getattr(user, field)
