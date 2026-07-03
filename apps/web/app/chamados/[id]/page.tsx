@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarClock, Clock3, Computer, LockKeyhole, MapPin, MessageSquareText, Save, Send, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, Computer, LoaderCircle, LockKeyhole, MapPin, MessageSquareText, Save, Send, UserPlus, UserRound } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import TicketTimeline from "@/components/TicketTimeline";
@@ -26,6 +26,7 @@ export default function TicketDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [quickAction, setQuickAction] = useState("");
 
   const load = async () => {
     try {
@@ -119,6 +120,20 @@ export default function TicketDetailPage() {
     }
   };
 
+  const runQuickAction = async (payload: Record<string, unknown>, key: string) => {
+    if (!ticket) return;
+    setQuickAction(key);
+    setError("");
+    try {
+      await api.updateTicket(ticket.id, payload);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível atualizar o chamado");
+    } finally {
+      setQuickAction("");
+    }
+  };
+
   if (!ticket || !user) {
     if (error) return (
       <div className="mx-auto max-w-2xl py-12">
@@ -131,6 +146,10 @@ export default function TicketDetailPage() {
 
   const overdue = ticket.due_at && new Date(ticket.due_at) < new Date() && !["closed", "cancelled"].includes(ticket.status);
   const isUserProfile = user.role === "user";
+  const isFinalStatus = ticket.status === "closed" || ticket.status === "cancelled";
+  const hasPendingChanges = changes.length > 0;
+  const canQuickAssign = canEditAdministrativeFields && !isFinalStatus && ticket.assignee?.id !== user.id;
+  const canQuickClose = canChangeStatus && !isFinalStatus;
   const formFieldLabels = Object.fromEntries(
     (ticket.form_schema_snapshot?.fields || []).map((field) => [field.key, field.label]),
   );
@@ -243,6 +262,33 @@ export default function TicketDetailPage() {
           <Card className="overflow-hidden xl:sticky xl:top-16">
             <SectionHeader title={canChangeStatus ? "Painel de atendimento" : "Dados do chamado"} description={canChangeStatus ? "Revise e confirme antes de salvar." : undefined} />
             <div className="space-y-3 p-4">
+              {(canQuickAssign || canQuickClose) && (
+                <div className="grid gap-2 border-b border-[#e8edf2] pb-3">
+                  {canQuickAssign && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={saving || !!quickAction || hasPendingChanges}
+                      onClick={() => void runQuickAction({ assignee_id: user.id }, "assign")}
+                    >
+                      {quickAction === "assign" ? <LoaderCircle className="animate-spin" size={16} /> : <UserPlus size={16} />}
+                      Atribuir a mim
+                    </Button>
+                  )}
+                  {canQuickClose && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={saving || !!quickAction || hasPendingChanges}
+                      onClick={() => void runQuickAction({ status: "closed" }, "close")}
+                    >
+                      {quickAction === "close" ? <LoaderCircle className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                      Encerrar chamado
+                    </Button>
+                  )}
+                  {hasPendingChanges && <p className="text-xs text-[#8b97a8]">Salve ou desfaça as alterações pendentes antes de usar ações rápidas.</p>}
+                </div>
+              )}
               {canEditAdministrativeFields ? (
                 <>
                   <Field label="Status"><Select value={draft.status || ""} onChange={(e) => setDraft((old) => ({ ...old, status: e.target.value }))}>{availableStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>

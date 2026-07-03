@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleOff, Eye, Filter, LoaderCircle, Plus, Search, TicketCheck, Tickets, UserCheck, UserPlus, UserRoundX, X } from "lucide-react";
+import { Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleOff, Eye, Filter, LoaderCircle, Plus, Search, TicketCheck, Tickets, UserCheck, UserRoundX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
@@ -25,7 +25,6 @@ export default function TicketsPage() {
   const [summary, setSummary] = useState({ new: 0, assigned: 0, closed: 0, cancelled: 0 });
   const [initialLoading, setInitialLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [actionKey, setActionKey] = useState("");
   const [error, setError] = useState("");
   const requestSequence = useRef(0);
   const hasLoaded = useRef(false);
@@ -60,8 +59,6 @@ export default function TicketsPage() {
   const canViewAll = !!user?.permissions.includes("tickets.view_all");
   const isUserProfile = user?.role === "user" && !canViewAll;
   const assignedOnly = user?.role === "technician" && !canViewAll;
-  const canManageTickets = !!user?.permissions.includes("tickets.triage");
-  const canCloseTickets = canManageTickets || user?.role === "technician";
   const hasFilters = !!(appliedFilters.search || appliedFilters.status || appliedFilters.priority);
   const totalPages = Math.max(1, Math.ceil(total / 20));
   const clearFilters = () => {
@@ -78,20 +75,6 @@ export default function TicketsPage() {
     if (ticket.status === "cancelled") return "border-l-[#991b1b]";
     return "border-l-[#1a5f9e]";
   };
-  const isFinalStatus = (ticket: Ticket) => ticket.status === "closed" || ticket.status === "cancelled";
-  const runTicketAction = async (ticket: Ticket, payload: Record<string, unknown>, key: string) => {
-    setActionKey(key);
-    setError("");
-    try {
-      await api.updateTicket(ticket.id, payload);
-      await load(appliedFilters, page);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível atualizar o chamado");
-    } finally {
-      setActionKey("");
-    }
-  };
-
   return (
     <>
       <PageHeader
@@ -205,35 +188,9 @@ export default function TicketsPage() {
                     <td className="text-[#5c6b7e]">{relativeTime(ticket.created_at)}</td>
                     <td className="text-[#5c6b7e]">{formatDate(ticket.due_at, false)}</td>
                     <td>
-                      <div className="flex flex-wrap gap-1.5">
-                        {canManageTickets && user && !isFinalStatus(ticket) && ticket.assignee?.id !== user.id && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={!!actionKey}
-                            onClick={() => void runTicketAction(ticket, { assignee_id: user.id }, `assign-${ticket.id}`)}
-                          >
-                            {actionKey === `assign-${ticket.id}` ? <LoaderCircle className="animate-spin" size={15} /> : <UserPlus size={15} />}
-                            Atribuir a mim
-                          </Button>
-                        )}
-                        {canCloseTickets && !isFinalStatus(ticket) && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={!!actionKey}
-                            onClick={() => void runTicketAction(ticket, { status: "closed" }, `close-${ticket.id}`)}
-                          >
-                            {actionKey === `close-${ticket.id}` ? <LoaderCircle className="animate-spin" size={15} /> : <CheckCircle2 size={15} />}
-                            Encerrar
-                          </Button>
-                        )}
-                        <Link href={`/chamados/${ticket.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })}>
-                          <Eye size={15} />Ver
-                        </Link>
-                      </div>
+                      <Link href={`/chamados/${ticket.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })}>
+                        <Eye size={15} />Ver detalhes
+                      </Link>
                     </td>
                   </tr>
                 ))}
