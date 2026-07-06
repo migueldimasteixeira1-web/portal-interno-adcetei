@@ -1,0 +1,160 @@
+# Arquitetura do Portal Interno ADCETEI
+
+## Visão geral
+
+O sistema é um **hub operacional modular** da ADCETEI — monólito em execução, separado por domínio no código. Chamados e inventário são módulos maduros; impressoras, memorandos e catálogo de VMs permanecem planejados.
+
+```text
+Portal Interno ADCETEI
+├── Núcleo
+│   ├── autenticação (e-mail institucional + JWT)
+│   ├── usuários e perfis
+│   ├── sessão
+│   └── auditoria
+├── Chamados
+│   ├── catálogo de serviços
+│   ├── abertura com campos dinâmicos
+│   ├── triagem e histórico
+│   └── notas internas
+├── Inventário
+│   ├── cadastros base (fornecedor, tipo, fabricante, modelo, setor)
+│   ├── equipamentos e movimentações
+│   ├── entrada em lote por série
+│   └── opções resumidas para chamados
+└── Administração
+    ├── usuários
+    ├── catálogo de serviços
+    ├── equipamentos legados
+    ├── perfis e permissões
+    └── auditoria
+```
+
+## Organização do código
+
+### Backend (`apps/api/app/`)
+
+| Caminho | Papel |
+|---------|--------|
+| `main.py` | Factory FastAPI, CORS, `include_router`, startup (schema, seed) |
+| `routers/auth.py` | Login, cadastro, verificação de e-mail |
+| `routers/tickets.py` | Chamados e dashboard |
+| `routers/users_assets.py` | Usuários, assets legados, opções para chamados |
+| `routers/admin/` | Usuários admin, assets, catálogo, perfis, auditoria |
+| `routers/inventory/` | Meta, equipamentos modulares, cadastros base |
+| `serializers/` | Serialização de users, assets e tickets |
+| `services/tickets_service.py` | Regras de negócio de chamados |
+| `admin_api.py` | Reexport: `from .routers.admin import router` |
+| `inventory_api.py` | Reexport: `from .routers.inventory import router` |
+| `inventory_service.py` | Regras de inventário e movimentações |
+| `inventory_helpers.py`, `admin_helpers.py` | Helpers compartilhados dos routers |
+| `schemas.py` | Schemas Pydantic (monolítico de propósito — evita imports circulares) |
+| `models.py`, `database.py`, `permissions.py` | Persistência, migração compatível e RBAC |
+
+Rotas públicas principais:
+
+- `/api/auth/*`, `/api/tickets/*`, `/api/users`, `/api/assets/*`
+- `/api/admin/*`
+- `/api/inventory/*`
+
+### Frontend (`apps/web/`)
+
+| Caminho | Papel |
+|---------|--------|
+| `app/` | Rotas Next.js — páginas **orquestradoras** (estado, fetch, permissões) |
+| `features/<domínio>/` | Composição de UI por módulo (`admin`, `dashboard`, `inventory`, `tickets`) |
+| `components/` | UI compartilhada (`ui.tsx`, layout, chips, paginação, etc.) |
+| `lib/api/` | Cliente HTTP por domínio; `lib/api.ts` reexporta objeto `api` unificado |
+| `lib/types/` | Tipos TypeScript por domínio; `lib/types.ts` reexporta tudo |
+| `lib/format.ts`, `lib/modules.ts`, `lib/permissions.ts` | Formatação, navegação modular e checagem de perfil no cliente |
+
+Imports existentes `@/lib/api` e `@/lib/types` continuam válidos após a modularização.
+
+### Páginas e features
+
+| Rota | Feature principal |
+|------|-------------------|
+| `/dashboard` | `features/dashboard/DashboardSections` |
+| `/chamados`, `/chamados/novo`, `/chamados/[id]` | `features/tickets/*` |
+| `/inventario`, `/inventario/[id]`, `/inventario/lote`, `/inventario/novo`, `/inventario/cadastros` | `features/inventory/*` |
+| `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
+| `/administracao/perfis`, `/administracao/auditoria` | Inline (telas menores) |
+
+## Frontend — detalhes
+
+- Next.js App Router, React, TypeScript, Tailwind CSS, Radix Dialog;
+- tokens visuais em `app/globals.css`;
+- estado de autenticação em `components/AuthProvider.tsx`.
+
+### Sessão
+
+O cliente HTTP detecta `401` apenas em requisições que possuíam token. Ele limpa o armazenamento e emite um evento global. O `AuthProvider` recebe esse evento, remove o usuário do estado e redireciona para o login.
+
+Um bloqueio impede múltiplos redirecionamentos simultâneos quando várias chamadas retornam `401`.
+
+## Backend — detalhes
+
+- FastAPI, SQLAlchemy, Pydantic, JWT;
+- SQLite no ambiente local; PostgreSQL no Docker;
+- SMTP para verificação de e-mail institucional.
+
+## Autorização
+
+Ações protegidas por permissões em `role_configs`, não só pelo nome do perfil. Dependências automáticas:
+
+- triagem inclui visão de chamados, usuários e inventário;
+- gestão de usuários inclui consulta de usuários;
+- gestão de equipamentos inclui consulta do inventário.
+
+Mudanças em usuários, equipamentos, catálogo e perfis geram `audit_logs`. Exclusões destrutivas são limitadas: contas bloqueadas, serviços arquivados, equipamentos com histórico preservado.
+
+## Autenticação
+
+Fluxo `AUTH_MODE=email`:
+
+```text
+cadastro público -> e-mail institucional -> token de verificação -> senha local -> JWT
+```
+
+Padrão aceito: `usuario@secretaria.cabofrio.rj.gov.br`. Contas públicas nascem como solicitante, sem e-mail verificado. Técnico e Administrador são atribuídos manualmente.
+
+## Inventário
+
+A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Rotas legadas de `/api/assets` coexistem com o contrato modular em `/api/inventory/assets`.
+
+- Cadastros base: `/api/inventory/catalogs` — `inventory.view` / `inventory.manage_catalogs`
+- Equipamentos: número de série como ID principal, vínculos opcionais aos cadastros
+- Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
+- Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI
+- Tela `/inventario/cadastros` para CRUD dos cadastros base
+- Setor `ADCETEI` protegido contra renomeação/desativação via API
+
+Duas superfícies para equipamentos:
+
+| Endpoint | Uso |
+|----------|-----|
+| `GET /api/assets` | Inventário administrativo completo (`assets.view`) |
+| `GET /api/assets/ticket-options` | Seleção resumida na abertura de chamado; usuário comum só vê vínculos próprios |
+
+## Chamados
+
+- Paginação e resumo agregado calculados no banco (`GET /api/tickets`);
+- datas em UTC na API, exibição em `America/Sao_Paulo` no frontend;
+- `form_schema` legado (lista de strings) e configurável (objetos com `key`, `type`, `required`);
+- respostas em `tickets.form_data`, snapshot em `form_schema_snapshot`.
+
+## Compatibilidade de banco
+
+`database.ensure_schema_compatibility()` adiciona colunas ausentes (`form_data`, `form_schema_snapshot`, `service_id`, etc.) sem reset. Ponte temporária — novas evoluções devem usar Alembic.
+
+## Implantação em VM
+
+```text
+navegador -> gateway:80 -> web:3000
+                       -> api:8000 -> database:5432
+```
+
+O gateway Nginx entrega o frontend e encaminha `/api` internamente. Variáveis sensíveis vêm do `.env` da VM (`POSTGRES_PASSWORD`, `SECRET_KEY`, SMTP, `PUBLIC_APP_URL`).
+
+- `SEED_DEMO_DATA` controla criação de dados demo;
+- `SHOW_DEMO_USERS` controla atalhos no login;
+- sem seed, administrador inicial via `python -m app.create_admin`.
