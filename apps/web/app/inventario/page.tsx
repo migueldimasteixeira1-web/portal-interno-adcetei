@@ -1,39 +1,19 @@
 "use client";
 
-import { Boxes, ChevronLeft, ChevronRight, CircleOff, Eye, LoaderCircle, PackageCheck, Plus, Search, Settings2, UserCheck, Wrench, X } from "lucide-react";
+import { Boxes, PackageCheck, Plus, Settings2, UserCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import AccessDenied from "@/components/AccessDenied";
+import { useAuth } from "@/components/AuthProvider";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
-import AccessDenied from "@/components/AccessDenied";
-import { useAuth } from "@/components/AuthProvider";
-import { Alert, Badge, Button, Card, EmptyState, Input, SectionHeader, Select, Toolbar, buttonStyles } from "@/components/ui";
+import { Alert, buttonStyles } from "@/components/ui";
+import InventoryAssetsTable from "@/features/inventory/InventoryAssetsTable";
+import { emptyInventoryCatalogs } from "@/features/inventory/inventory-utils";
 import { api } from "@/lib/api";
-import { assetStatusTone, formatDate, inventoryAssetStatusLabels } from "@/lib/format";
 import { hasPermission } from "@/lib/permissions";
-import type { InventoryAsset, InventoryAssetCatalogRef, InventoryCatalogs } from "@/lib/types";
-
-const emptyCatalogs: InventoryCatalogs = {
-  suppliers: [],
-  equipment_types: [],
-  manufacturers: [],
-  models: [],
-  sectors: [],
-};
-
-function catalogName(ref?: InventoryAssetCatalogRef | null) {
-  return ref?.name || "Não informado";
-}
-
-function manufacturerModel(asset: InventoryAsset) {
-  const value = [asset.manufacturer?.name, asset.equipment_model?.name].filter(Boolean).join(" / ");
-  return value || "Não informado";
-}
-
-function activeCatalogOptions(items: Array<{ id: number; name: string; is_active?: boolean }>) {
-  return items.filter((item) => item.is_active !== false).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-}
+import type { InventoryAsset, InventoryCatalogs } from "@/lib/types";
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -50,7 +30,7 @@ export default function InventoryPage() {
   const [appliedFilters, setAppliedFilters] = useState({ search: "", typeFilter: "", statusFilter: "", sectorFilter: "" });
   const [page, setPage] = useState(1);
   const [summary, setSummary] = useState({ stock: 0, allocated: 0, maintenance: 0, retired: 0 });
-  const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyCatalogs);
+  const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
   const [initialLoading, setInitialLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
@@ -97,7 +77,7 @@ export default function InventoryPage() {
       if (user) setInitialLoading(false);
       return;
     }
-    void api.inventoryCatalogs().then(setCatalogs).catch(() => setCatalogs(emptyCatalogs));
+    void api.inventoryCatalogs().then(setCatalogs).catch(() => setCatalogs(emptyInventoryCatalogs));
     void load({ search: "", typeFilter: "", statusFilter: "", sectorFilter: "" }, 1);
   }, [canView, user]);
 
@@ -117,8 +97,6 @@ export default function InventoryPage() {
 
   const hasFilters = !!(appliedFilters.search || appliedFilters.typeFilter || appliedFilters.statusFilter || appliedFilters.sectorFilter);
   const totalPages = Math.max(1, Math.ceil(total / 20));
-  const typeOptions = activeCatalogOptions(catalogs.equipment_types);
-  const sectorOptions = activeCatalogOptions(catalogs.sectors);
   const clearFilters = () => {
     setSearch("");
     setTypeFilter("");
@@ -154,86 +132,24 @@ export default function InventoryPage() {
         <MetricCard label="Baixados" value={summary.retired} icon={<Boxes size={17} />} hint="Arquivados" tone="slate" />
       </div>
 
-      <Toolbar className="mb-4">
-        <div className="grid w-full gap-2 xl:grid-cols-[minmax(240px,1fr)_180px_180px_180px_auto]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
-            <Input aria-label="Buscar equipamentos" className="pl-8" placeholder="Buscar série, tipo, modelo, setor ou responsável" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <Select aria-label="Filtrar por tipo" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="">Todos os tipos</option>
-            {typeOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </Select>
-          <Select aria-label="Filtrar por status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">Todos os status</option>
-            {Object.entries(inventoryAssetStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </Select>
-          <Select aria-label="Filtrar por setor" value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)}>
-            <option value="">Todos os setores</option>
-            {sectorOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </Select>
-          {hasFilters && (
-            <Button type="button" variant="ghost" onClick={clearFilters} aria-label="Limpar filtros"><X size={16} /></Button>
-          )}
-        </div>
-      </Toolbar>
-
-      <Card className="relative overflow-hidden" aria-busy={updating}>
-        {updating && (
-          <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-md border border-[#c5daf0] bg-white px-2.5 py-1 text-xs font-medium text-[#164f84] shadow-sm">
-            <LoaderCircle className="animate-spin" size={13} /> Atualizando
-          </div>
-        )}
-        <SectionHeader
-          title={`${total} ${total === 1 ? "equipamento encontrado" : "equipamentos encontrados"}`}
-          description={hasFilters ? "Resultado dos filtros aplicados." : "Equipamentos ordenados pelo cadastro mais recente."}
-        />
-        <div className="overflow-x-auto soft-scrollbar">
-          <table className="data-table min-w-[1180px]">
-            <thead><tr><th>Número de série</th><th>Tipo</th><th>Fabricante / modelo</th><th>Fornecedor</th><th>Setor</th><th>Responsável</th><th>Status</th><th>Recebimento</th><th>Envio</th><th>Ações</th></tr></thead>
-            <tbody>
-              {assets.map((asset) => (
-                <tr key={asset.id}>
-                  <td><p className="font-semibold text-[#1a2332]">{asset.serial_number || "Não informado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{asset.display_name || "Equipamento sem descrição"}</p></td>
-                  <td className="text-[#5c6b7e]">{catalogName(asset.equipment_type)}</td>
-                  <td className="text-[#5c6b7e]">{manufacturerModel(asset)}</td>
-                  <td className="text-[#5c6b7e]">{catalogName(asset.supplier)}</td>
-                  <td className="text-[#5c6b7e]">{catalogName(asset.sector)}</td>
-                  <td><p className="font-medium text-[#1a2332]">{asset.assigned_user?.full_name || "Não vinculado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{asset.assigned_user?.department || "—"}</p></td>
-                  <td><Badge className={assetStatusTone(asset.status)}>{inventoryAssetStatusLabels[asset.status] || asset.status}</Badge></td>
-                  <td className="text-[#5c6b7e]">{formatDate(asset.received_at, false)}</td>
-                  <td className="text-[#5c6b7e]">{formatDate(asset.delivered_at, false)}</td>
-                  <td><Link href={`/inventario/${asset.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })}><Eye size={15} />Ver detalhes</Link></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!assets.length && (
-          <EmptyState
-            icon={<CircleOff size={18} />}
-            title={hasFilters ? "Nenhum equipamento corresponde aos filtros" : "Nenhum equipamento encontrado"}
-            description={hasFilters ? "Revise os termos ou limpe os filtros para ampliar a busca." : "Cadastre um novo equipamento para iniciar o inventário."}
-            action={hasFilters ? <Button variant="secondary" onClick={clearFilters}>Limpar filtros</Button> : undefined}
-          />
-        )}
-        {(total > 0 || hasFilters) && (
-          <div className="flex flex-col gap-3 border-t border-[#e8edf2] bg-[#f7f9fb] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#5c6b7e]">
-              Página <strong className="text-[#1a2332]">{page}</strong> de <strong className="text-[#1a2332]">{totalPages}</strong>
-              <span className="ml-1">· {total} registro(s) no total</span>
-            </p>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" size="sm" disabled={updating || page <= 1} onClick={() => void load(appliedFilters, page - 1)}>
-                <ChevronLeft size={15} /> Anterior
-              </Button>
-              <Button type="button" variant="secondary" size="sm" disabled={updating || page >= totalPages} onClick={() => void load(appliedFilters, page + 1)}>
-                Próxima <ChevronRight size={15} />
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+      <InventoryAssetsTable
+        assets={assets}
+        total={total}
+        page={page}
+        totalPages={totalPages}
+        updating={updating}
+        hasFilters={hasFilters}
+        catalogs={catalogs}
+        filters={{ search, typeFilter, statusFilter, sectorFilter }}
+        onFiltersChange={(changes) => {
+          if ("search" in changes) setSearch(changes.search ?? "");
+          if ("typeFilter" in changes) setTypeFilter(changes.typeFilter ?? "");
+          if ("statusFilter" in changes) setStatusFilter(changes.statusFilter ?? "");
+          if ("sectorFilter" in changes) setSectorFilter(changes.sectorFilter ?? "");
+        }}
+        onClearFilters={clearFilters}
+        onPageChange={(nextPage) => void load(appliedFilters, nextPage)}
+      />
     </>
   );
 }

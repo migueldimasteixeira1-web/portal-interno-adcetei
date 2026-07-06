@@ -1,0 +1,65 @@
+import { Pencil, Trash2 } from "lucide-react";
+import { Badge, Button } from "@/components/ui";
+import type { InventoryCatalogItem } from "@/lib/types";
+import { activeBadgeClass, isDefaultSector, type CatalogTab } from "./catalog-utils";
+
+type Props = {
+  tab: CatalogTab;
+  items: InventoryCatalogItem[];
+  onEdit: (item: InventoryCatalogItem) => void;
+  onDelete: (item: InventoryCatalogItem) => void;
+};
+
+export default function CatalogSimpleTable({ tab, items, onEdit, onDelete }: Props) {
+  return (
+    <div className="overflow-x-auto soft-scrollbar">
+      <table className="data-table min-w-[720px]">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Status</th>
+            {tab === "sectors" && <th>Observação</th>}
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id}>
+              <td className="font-semibold text-[#1a2332]">{item.name}</td>
+              <td>
+                <Badge className={activeBadgeClass(item.is_active)}>{item.is_active ? "Ativo" : "Inativo"}</Badge>
+              </td>
+              {tab === "sectors" && (
+                <td className="text-[#5c6b7e]">
+                  {isDefaultSector(item.name) ? (
+                    <Badge className="border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]">Padrão do sistema</Badge>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              )}
+              <td>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(item)} aria-label={`Editar ${item.name}`}>
+                    <Pencil size={15} />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={tab === "sectors" && isDefaultSector(item.name)}
+                    onClick={() => onDelete(item)}
+                    aria-label={`Excluir ${item.name}`}
+                  >
+                    <Trash2 size={15} />
+                    Excluir
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

@@ -1,6 +1,15 @@
 # Portal Interno ADCETEI
 
-Portal interno da Prefeitura de Cabo Frio para abertura, triagem e acompanhamento de chamados técnicos, com inventário básico, catálogo de serviços, usuários e cadastro por e-mail institucional verificado.
+Hub operacional modular da ADCETEI (Prefeitura de Cabo Frio): chamados técnicos, inventário de equipamentos, catálogo de serviços, usuários e cadastro por e-mail institucional verificado. Novos módulos (impressoras, memorandos, etc.) entram sem alterar a estrutura central.
+
+## Documentação
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Organização do monólito modular, pastas do backend e frontend |
+| [docs/VALIDACAO.md](docs/VALIDACAO.md) | Comandos de verificação e última rodada de testes |
+| [docs/CORRECAO-NPM.md](docs/CORRECAO-NPM.md) | Recuperação de instalação npm |
+| [docs/README.md](docs/README.md) | Índice da documentação |
 
 ## Administração
 
@@ -27,10 +36,21 @@ As permissões são verificadas novamente pela API. Permissões de gerenciamento
 
 O projeto usa um monólito modular. Não há dependência de MUI.
 
+```text
+apps/
+├── api/app/          # FastAPI — routers/, serializers/, services/
+└── web/
+    ├── app/          # rotas Next.js (orquestradoras)
+    ├── features/     # UI por domínio (tickets, inventory, admin, dashboard)
+    ├── components/   # UI compartilhada
+    └── lib/          # api/, types/, format, permissions
+```
+
+Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+
 ## Executar localmente
 
 ```bash
-cd "/home/dimas/Projetos/Portal Interno ADCETEI"
 chmod +x iniciar-local.sh scripts/*.sh
 ./iniciar-local.sh
 ```
@@ -238,7 +258,7 @@ docker compose build
 
 Os testes de regressão e smoke usam bancos SQLite temporários e são removidos ao final. Nenhum chamado de teste é inserido no banco local.
 
-Resultados desta rodada estão registrados em `VALIDACAO.md`.
+Resultados e cobertura detalhada estão em [docs/VALIDACAO.md](docs/VALIDACAO.md).
 
 ## Testar em uma VM
 
