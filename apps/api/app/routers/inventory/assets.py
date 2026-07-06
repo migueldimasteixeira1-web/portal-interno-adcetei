@@ -36,6 +36,7 @@ from ...inventory_service import (
     asset_movement_state,
     build_asset_display_name,
     display_serial_number,
+    legacy_asset_status,
     movement_datetime,
 )
 from ...models import Asset, AssetMovement, InventorySector, Ticket, User
