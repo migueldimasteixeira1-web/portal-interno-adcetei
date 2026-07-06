@@ -130,6 +130,14 @@ export interface InventoryAsset {
   updated_at?: string | null;
 }
 
+export interface InventoryAssetPage {
+  items: InventoryAsset[];
+  total: number;
+  page: number;
+  page_size: number;
+  summary: Record<InventoryAssetStatus, number>;
+}
+
 export interface InventoryAssetCreatePayload {
   serial_number: string;
   supplier_id: number;

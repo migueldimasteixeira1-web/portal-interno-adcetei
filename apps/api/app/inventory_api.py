@@ -1,7 +1,7 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from .database import get_db
@@ -49,6 +49,7 @@ from .schemas import (
     InventoryCatalogsOut,
     InventoryAssetCreate,
     InventoryAssetOut,
+    InventoryAssetPageOut,
     InventoryAssetUpdate,
     InventoryAllocateRequest,
     InventoryBulkScanConfirmOut,
@@ -426,17 +427,125 @@ def ensure_shipping_date(status: str, delivered_at: Any | None) -> None:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get("/assets", response_model=list[InventoryAssetOut])
+def inventory_status_db_filter(status_filter: str):
+    if status_filter == "allocated":
+        return Asset.status.in_(["active", "allocated"])
+    return Asset.status == status_filter
+
+
+def inventory_asset_filter_conditions(
+    *,
+    status_filter: str | None,
+    equipment_type_id: int | None,
+    sector_id: int | None,
+    search: str | None,
+) -> tuple[list[Any], bool]:
+    conditions: list[Any] = []
+    needs_join = False
+    if status_filter:
+        conditions.append(inventory_status_db_filter(status_filter))
+    if equipment_type_id:
+        conditions.append(Asset.equipment_type_id == equipment_type_id)
+    if sector_id:
+        conditions.append(Asset.sector_id == sector_id)
+    if search and search.strip():
+        needs_join = True
+        like = f"%{search.strip()}%"
+        conditions.append(
+            or_(
+                Asset.serial_number.ilike(like),
+                Asset.name.ilike(like),
+                Asset.manufacturer.ilike(like),
+                Asset.model.ilike(like),
+                Asset.notes.ilike(like),
+                Asset.asset_type.ilike(like),
+                Asset.patrimony.ilike(like),
+                InventorySupplier.name.ilike(like),
+                InventoryEquipmentType.name.ilike(like),
+                InventoryManufacturer.name.ilike(like),
+                InventoryEquipmentModel.name.ilike(like),
+                InventorySector.name.ilike(like),
+                User.full_name.ilike(like),
+                User.department.ilike(like),
+            )
+        )
+    return conditions, needs_join
+
+
+def inventory_assets_base_query(*, conditions: list[Any], needs_join: bool):
+    query = select(Asset)
+    if needs_join:
+        query = (
+            query.outerjoin(Asset.supplier)
+            .outerjoin(Asset.equipment_type)
+            .outerjoin(Asset.manufacturer_ref)
+            .outerjoin(Asset.equipment_model)
+            .outerjoin(Asset.sector)
+            .outerjoin(Asset.assigned_user)
+        )
+    return query.where(*conditions) if conditions else query
+
+
+@router.get("/assets", response_model=InventoryAssetPageOut)
 def list_inventory_assets(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     status_filter: str | None = None,
+    equipment_type_id: int | None = None,
+    sector_id: int | None = None,
+    search: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.view")),
 ):
-    query = inventory_asset_query().order_by(Asset.id)
-    assets = list(db.scalars(query).unique())
-    if status_filter:
-        assets = [asset for asset in assets if asset_inventory_status(asset) == status_filter]
-    return [inventory_asset_payload(asset) for asset in assets]
+    conditions, needs_join = inventory_asset_filter_conditions(
+        status_filter=status_filter,
+        equipment_type_id=equipment_type_id,
+        sector_id=sector_id,
+        search=search,
+    )
+
+    def aggregate_count(*extra_conditions: Any) -> int:
+        merged = [*conditions, *extra_conditions]
+        if needs_join:
+            return db.scalar(
+                select(func.count()).select_from(
+                    inventory_assets_base_query(conditions=merged, needs_join=True)
+                    .with_only_columns(Asset.id)
+                    .distinct()
+                    .subquery()
+                )
+            ) or 0
+        count_stmt = select(func.count(Asset.id))
+        if merged:
+            count_stmt = count_stmt.where(*merged)
+        return db.scalar(count_stmt) or 0
+
+    total = aggregate_count()
+    asset_ids = list(
+        db.scalars(
+            inventory_assets_base_query(conditions=conditions, needs_join=needs_join)
+            .with_only_columns(Asset.id)
+            .distinct()
+            .order_by(Asset.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    items = list(
+        db.scalars(inventory_asset_query().where(Asset.id.in_(asset_ids)).order_by(Asset.id.desc())).unique()
+    ) if asset_ids else []
+    return InventoryAssetPageOut(
+        items=[inventory_asset_payload(asset) for asset in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+        summary={
+            "stock": aggregate_count(Asset.status == "stock"),
+            "allocated": aggregate_count(Asset.status.in_(["active", "allocated"])),
+            "maintenance": aggregate_count(Asset.status == "maintenance"),
+            "retired": aggregate_count(Asset.status == "retired"),
+        },
+    )
 
 
 @router.post("/assets/bulk-scan/preview", response_model=InventoryBulkScanPreviewOut)

@@ -326,6 +326,21 @@ class InventoryAssetOut(BaseModel):
         return iso_utc(value)
 
 
+class InventoryAssetSummaryOut(BaseModel):
+    stock: int
+    allocated: int
+    maintenance: int
+    retired: int
+
+
+class InventoryAssetPageOut(BaseModel):
+    items: list[InventoryAssetOut]
+    total: int
+    page: int
+    page_size: int
+    summary: InventoryAssetSummaryOut
+
+
 class InventoryAssetCreate(BaseModel):
     serial_number: str = Field(min_length=1, max_length=120)
     supplier_id: Optional[int] = None

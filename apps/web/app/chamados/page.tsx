@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleOff, Eye, Filter, LoaderCircle, Plus, Search, TicketCheck, Tickets, UserCheck, UserRoundX, X } from "lucide-react";
+import { Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleOff, Eye, LoaderCircle, Plus, Search, TicketCheck, Tickets, UserCheck, UserRoundX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
@@ -54,12 +54,23 @@ export default function TicketsPage() {
     }
   };
 
-  useEffect(() => { void load({ search: "", status: "", priority: "" }, 1); }, []);
-
   const canViewAll = !!user?.permissions.includes("tickets.view_all");
   const isUserProfile = user?.role === "user" && !canViewAll;
+
+  useEffect(() => { void load({ search: "", status: "", priority: "" }, 1); }, []);
+
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    const effectivePriority = isUserProfile ? "" : priority;
+    if (search === appliedFilters.search && status === appliedFilters.status && effectivePriority === appliedFilters.priority) return;
+    const timer = setTimeout(() => {
+      void load({ search, status, priority: effectivePriority }, 1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search, status, priority, isUserProfile, appliedFilters]);
+
   const assignedOnly = user?.role === "technician" && !canViewAll;
-  const hasFilters = !!(appliedFilters.search || appliedFilters.status || appliedFilters.priority);
+  const hasFilters = !!(search || status || (!isUserProfile && priority));
   const totalPages = Math.max(1, Math.ceil(total / 20));
   const clearFilters = () => {
     setSearch("");
@@ -93,7 +104,7 @@ export default function TicketsPage() {
       </div>
 
       <Toolbar className="mb-4">
-        <form onSubmit={(event) => { event.preventDefault(); void load({ search, status, priority: isUserProfile ? "" : priority }, 1); }} className={cn("grid w-full gap-2", isUserProfile ? "xl:grid-cols-[minmax(240px,1fr)_180px_auto]" : "xl:grid-cols-[minmax(240px,1fr)_180px_180px_auto]")}>
+        <div className={cn("grid w-full gap-2", isUserProfile ? "xl:grid-cols-[minmax(240px,1fr)_180px_auto]" : "xl:grid-cols-[minmax(240px,1fr)_180px_180px_auto]")}>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
             <Input aria-label="Buscar chamados" className="pl-8" placeholder="Buscar por título, descrição ou categoria" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -108,11 +119,8 @@ export default function TicketsPage() {
               {priorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </Select>
           )}
-          <div className="flex gap-2">
-            <Button type="submit" variant="secondary" className="flex-1" disabled={updating}><Filter size={15} /> Aplicar</Button>
-            {hasFilters && <Button type="button" variant="ghost" onClick={clearFilters} aria-label="Limpar filtros"><X size={16} /></Button>}
-          </div>
-        </form>
+          {hasFilters && <Button type="button" variant="ghost" onClick={clearFilters} aria-label="Limpar filtros"><X size={16} /></Button>}
+        </div>
       </Toolbar>
 
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}

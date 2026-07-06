@@ -1,4 +1,4 @@
-import type { Asset, AssetTicketOption, AuditLog, CatalogOptions, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogCreatePayload, InventoryCatalogItem, InventoryCatalogs, InventoryCatalogUpdatePayload, InventoryChangeResponsiblePayload, InventoryEquipmentModel, InventoryEquipmentModelCreatePayload, InventoryEquipmentModelUpdatePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
+import type { Asset, AssetTicketOption, AuditLog, CatalogOptions, CatalogService, DashboardData, InventoryAllocatePayload, InventoryAsset, InventoryAssetCreatePayload, InventoryAssetPage, InventoryBulkScanConfirm, InventoryBulkScanPayload, InventoryBulkScanPreview, InventoryCatalogCreatePayload, InventoryCatalogItem, InventoryCatalogs, InventoryCatalogUpdatePayload, InventoryChangeResponsiblePayload, InventoryEquipmentModel, InventoryEquipmentModelCreatePayload, InventoryEquipmentModelUpdatePayload, InventoryMovement, InventoryMovementPayload, PermissionDefinition, RoleConfig, Ticket, TicketPage, User } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const SESSION_EXPIRED_EVENT = "pti:session-expired";
@@ -132,7 +132,11 @@ export const api = {
     request<InventoryCatalogItem>(`/inventory/catalogs/sectors/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteInventorySector: (id: number) =>
     request<{ message: string }>(`/inventory/catalogs/sectors/${id}`, { method: "DELETE" }),
-  inventoryAssets: () => request<InventoryAsset[]>("/inventory/assets"),
+  inventoryAssets: (params: Record<string, string | number | undefined> = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => value !== undefined && value !== "" && query.set(key, String(value)));
+    return request<InventoryAssetPage>(`/inventory/assets?${query.toString()}`);
+  },
   inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
   inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),
   createInventoryAsset: (payload: InventoryAssetCreatePayload) =>

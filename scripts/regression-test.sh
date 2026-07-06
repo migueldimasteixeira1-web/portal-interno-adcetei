@@ -579,8 +579,9 @@ status, _ = call(
 )
 expect(status, 400, "preview bloqueia modelo incompatível com fabricante")
 
-status, before_bulk_assets = call("GET", "/inventory/assets", admin)
+status, before_bulk_assets = call("GET", "/inventory/assets", admin, params={"page_size": 100})
 expect(status, 200, "lista antes do lote inválido")
+expect("items" in before_bulk_assets and "total" in before_bulk_assets, True, "lista paginada do inventário")
 status, _ = call(
     "POST",
     "/inventory/assets/bulk-scan/confirm",
@@ -588,10 +589,10 @@ status, _ = call(
     {**bulk_payload, "serial_numbers": ["SN-BULK-ROLLBACK", "SN MOD-001"]},
 )
 expect(status, 409, "confirm revalida e bloqueia lote com erro")
-status, after_failed_bulk_assets = call("GET", "/inventory/assets", admin)
+status, after_failed_bulk_assets = call("GET", "/inventory/assets", admin, params={"page_size": 100})
 expect(status, 200, "lista após lote inválido")
-expect(len(after_failed_bulk_assets), len(before_bulk_assets), "confirm inválido não cria parcialmente")
-if any(item["serial_number"] == "SN-BULK-ROLLBACK" for item in after_failed_bulk_assets):
+expect(after_failed_bulk_assets["total"], before_bulk_assets["total"], "confirm inválido não cria parcialmente")
+if any(item["serial_number"] == "SN-BULK-ROLLBACK" for item in after_failed_bulk_assets["items"]):
     raise AssertionError("confirm inválido criou item parcial")
 
 status, bulk_confirm = call("POST", "/inventory/assets/bulk-scan/confirm", admin, bulk_payload)
@@ -656,9 +657,9 @@ expect(status, 201, "administrador cria equipamento alocado")
 expect(allocated_asset["status"], "allocated", "responsável coloca equipamento como alocado")
 expect(allocated_asset["assigned_user"]["id"], requester_user["id"], "responsável no contrato novo")
 
-status, listed_assets = call("GET", "/inventory/assets", admin, params={"status_filter": "stock"})
+status, listed_assets = call("GET", "/inventory/assets", admin, params={"status_filter": "stock", "page_size": 100})
 expect(status, 200, "administrador lista equipamentos no contrato novo")
-if not any(item["id"] == modular_asset["id"] for item in listed_assets):
+if not any(item["id"] == modular_asset["id"] for item in listed_assets["items"]):
     raise AssertionError("equipamento em estoque não retornou no filtro do contrato novo")
 status, detailed_asset = call("GET", f"/inventory/assets/{allocated_asset['id']}", admin)
 expect(status, 200, "administrador detalha equipamento modular")
