@@ -1,4 +1,4 @@
-import { CircleOff, Eye, LoaderCircle, Search, X } from "lucide-react";
+import { CircleOff, Eye, FileSpreadsheet, LoaderCircle, Search, X } from "lucide-react";
 import Link from "next/link";
 import ListPagination from "@/components/ListPagination";
 import { Badge, Button, Card, EmptyState, Input, SectionHeader, Select, Toolbar, buttonStyles } from "@/components/ui";
@@ -25,6 +25,9 @@ type Props = {
   onFiltersChange: (changes: Partial<FilterState>) => void;
   onClearFilters: () => void;
   onPageChange: (page: number) => void;
+  canExport: boolean;
+  exporting: boolean;
+  onExport: () => void;
 };
 
 export default function InventoryAssetsTable({
@@ -39,6 +42,9 @@ export default function InventoryAssetsTable({
   onFiltersChange,
   onClearFilters,
   onPageChange,
+  canExport,
+  exporting,
+  onExport,
 }: Props) {
   const typeOptions = activeCatalogItems(catalogs.equipment_types);
   const sectorOptions = activeCatalogItems(catalogs.sectors);
@@ -46,7 +52,7 @@ export default function InventoryAssetsTable({
   return (
     <>
       <Toolbar className="mb-4">
-        <div className="grid w-full gap-2 xl:grid-cols-[minmax(240px,1fr)_180px_180px_180px_auto]">
+        <div className="grid w-full gap-2 xl:grid-cols-[minmax(240px,1fr)_180px_180px_180px_auto_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
             <Input
@@ -71,6 +77,12 @@ export default function InventoryAssetsTable({
           </Select>
           {hasFilters && (
             <Button type="button" variant="ghost" onClick={onClearFilters} aria-label="Limpar filtros"><X size={16} /></Button>
+          )}
+          {canExport && (
+            <Button type="button" variant="secondary" disabled={exporting} onClick={onExport}>
+              {exporting ? <LoaderCircle className="animate-spin" size={16} /> : <FileSpreadsheet size={16} />}
+              {exporting ? "Exportando..." : "Exportar planilha"}
+            </Button>
           )}
         </div>
       </Toolbar>

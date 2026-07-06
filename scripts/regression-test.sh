@@ -661,6 +661,32 @@ status, listed_assets = call("GET", "/inventory/assets", admin, params={"status_
 expect(status, 200, "administrador lista equipamentos no contrato novo")
 if not any(item["id"] == modular_asset["id"] for item in listed_assets["items"]):
     raise AssertionError("equipamento em estoque não retornou no filtro do contrato novo")
+
+def call_binary(method, path, token=None, params=None):
+    if params:
+        path = f"{path}?{urlencode(params)}"
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = Request(BASE + path, headers=headers, method=method)
+    try:
+        with urlopen(request) as response:
+            return response.status, {key.lower(): value for key, value in response.headers.items()}, response.read()
+    except HTTPError as exc:
+        return exc.code, {key.lower(): value for key, value in exc.headers.items()}, exc.read()
+
+
+status, _, _ = call_binary("GET", "/inventory/assets/export", requester)
+expect(status, 403, "usuário comum não exporta inventário")
+status, export_headers, export_body = call_binary("GET", "/inventory/assets/export", admin, params={"status_filter": "stock"})
+expect(status, 200, "administrador exporta inventário filtrado")
+if "spreadsheetml" not in export_headers.get("content-type", ""):
+    raise AssertionError("exportação não retornou xlsx")
+if export_body[:2] != b"PK":
+    raise AssertionError("arquivo xlsx inválido")
+if "inventario_adcetei" not in export_headers.get("content-disposition", ""):
+    raise AssertionError("nome de arquivo de exportação ausente")
+
 status, detailed_asset = call("GET", f"/inventory/assets/{allocated_asset['id']}", admin)
 expect(status, 200, "administrador detalha equipamento modular")
 expect(detailed_asset["status"], "allocated", "detalhe converte active legado para allocated")

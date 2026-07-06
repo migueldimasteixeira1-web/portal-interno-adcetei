@@ -1,10 +1,13 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from ...audit import add_audit
 from ...database import get_db
+from ...inventory_export import export_inventory_assets
 from ...inventory_helpers import (
     add_asset_movement,
     asset_display_name,
@@ -118,6 +121,49 @@ def list_inventory_assets(
             "maintenance": aggregate_count(Asset.status == "maintenance"),
             "retired": aggregate_count(Asset.status == "retired"),
         },
+    )
+
+
+@router.get("/assets/export")
+def export_inventory_assets_spreadsheet(
+    status_filter: str | None = None,
+    equipment_type_id: int | None = None,
+    sector_id: int | None = None,
+    search: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.view")),
+):
+    content, filename, exported_count = export_inventory_assets(
+        db,
+        actor=current_user,
+        status_filter=status_filter,
+        equipment_type_id=equipment_type_id,
+        sector_id=sector_id,
+        search=search,
+    )
+    add_audit(
+        db,
+        actor=current_user,
+        action="export_inventory",
+        entity_type="inventory",
+        entity_id="export",
+        summary=f"Exportação de inventário ({exported_count} registro(s))",
+        changes={
+            "count": exported_count,
+            "filters": {
+                "search": search or "",
+                "status_filter": status_filter or "",
+                "equipment_type_id": equipment_type_id,
+                "sector_id": sector_id,
+            },
+        },
+    )
+    db.commit()
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
     )
 
 

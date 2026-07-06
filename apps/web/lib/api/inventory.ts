@@ -18,7 +18,7 @@ import type {
   InventoryMovement,
   InventoryMovementPayload,
 } from "../types";
-import { request } from "./client";
+import { downloadRequest, request } from "./client";
 
 export const inventoryApi = {
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
@@ -56,6 +56,12 @@ export const inventoryApi = {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => value !== undefined && value !== "" && query.set(key, String(value)));
     return request<InventoryAssetPage>(`/inventory/assets?${query.toString()}`);
+  },
+  exportInventorySpreadsheet: (params: Record<string, string | number | undefined> = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => value !== undefined && value !== "" && query.set(key, String(value)));
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return downloadRequest(`/inventory/assets/export${suffix}`, "inventario_adcetei.xlsx");
   },
   inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
   inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),

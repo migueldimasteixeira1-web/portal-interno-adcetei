@@ -25,6 +25,17 @@ export function resetSessionExpiryGuard() {
   sessionExpiryInProgress = false;
 }
 
+async function handleUnauthorized(response: Response, token: string | null) {
+  if (response.status === 401 && typeof window !== "undefined" && token) {
+    clearStoredSession();
+    if (!sessionExpiryInProgress) {
+      sessionExpiryInProgress = true;
+      sessionStorage.setItem(SESSION_MESSAGE_KEY, "Sua sessão expirou. Entre novamente.");
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
+  }
+}
+
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -38,15 +49,36 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       const body = await response.json();
       message = body.detail || message;
     } catch {}
-    if (response.status === 401 && typeof window !== "undefined" && token) {
-      clearStoredSession();
-      if (!sessionExpiryInProgress) {
-        sessionExpiryInProgress = true;
-        sessionStorage.setItem(SESSION_MESSAGE_KEY, "Sua sessão expirou. Entre novamente.");
-        window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
-      }
-    }
+    await handleUnauthorized(response, token);
     throw new ApiError(message, response.status);
   }
   return response.json() as Promise<T>;
+}
+
+export async function downloadRequest(path: string, fallbackFilename: string): Promise<void> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(`${API_URL}${path}`, { headers, cache: "no-store" });
+  if (!response.ok) {
+    let message = "Não foi possível concluir a operação.";
+    try {
+      const body = await response.json();
+      message = body.detail || message;
+    } catch {}
+    await handleUnauthorized(response, token);
+    throw new ApiError(message, response.status);
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename=\"([^\"]+)\"/);
+  const filename = match?.[1] || fallbackFilename;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
