@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..admin_helpers import reject_null_fields
-from ..audit import add_audit
-from ..database import get_db
-from ..models import RoleConfig, User
-from ..permissions import ALL_PERMISSIONS, DEFAULT_ROLE_CONFIGS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
-from ..schemas import PermissionDefinitionOut, RoleConfigOut, RoleConfigUpdate
-from ..time_utils import utc_now
+from ...admin_helpers import reject_null_fields
+from ...audit import add_audit
+from ...database import get_db
+from ...models import RoleConfig, User
+from ...permissions import ALL_PERMISSIONS, DEFAULT_ROLE_CONFIGS, PERMISSION_DEFINITIONS, normalize_permissions, require_permission
+from ...schemas import PermissionDefinitionOut, RoleConfigOut, RoleConfigUpdate
+from ...time_utils import utc_now
 
 router = APIRouter()
 

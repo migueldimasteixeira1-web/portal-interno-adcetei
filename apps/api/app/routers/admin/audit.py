@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from ..database import get_db
-from ..models import AuditLog, User
-from ..permissions import require_permission
-from ..schemas import AuditLogOut
+from ...database import get_db
+from ...models import AuditLog, User
+from ...permissions import require_permission
+from ...schemas import AuditLogOut
 
 router = APIRouter()
 

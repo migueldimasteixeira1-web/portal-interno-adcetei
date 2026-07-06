@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..inventory_constants import DEFAULT_INVENTORY_SECTOR
-from ..inventory_helpers import (
+from ...database import get_db
+from ...inventory_constants import DEFAULT_INVENTORY_SECTOR
+from ...inventory_helpers import (
     catalog_name,
     create_item,
     delete_item,
@@ -14,8 +14,8 @@ from ..inventory_helpers import (
     list_items,
     update_item,
 )
-from ..inventory_service import default_sector_update_error, normalize_catalog_name
-from ..models import (
+from ...inventory_service import default_sector_update_error, normalize_catalog_name
+from ...models import (
     Asset,
     AssetMovement,
     InventoryEquipmentModel,
@@ -25,8 +25,8 @@ from ..models import (
     InventorySupplier,
     User,
 )
-from ..permissions import require_permission
-from ..schemas import (
+from ...permissions import require_permission
+from ...schemas import (
     InventoryCatalogItemCreate,
     InventoryCatalogItemOut,
     InventoryCatalogItemUpdate,

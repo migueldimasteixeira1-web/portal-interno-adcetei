@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..inventory_helpers import (
+from ...database import get_db
+from ...inventory_helpers import (
     add_asset_movement,
     asset_display_name,
     bulk_scan_preview_payload,
@@ -28,7 +28,7 @@ from ..inventory_helpers import (
     validate_user,
     has_rows,
 )
-from ..inventory_service import (
+from ...inventory_service import (
     apply_asset_allocation,
     apply_responsible_change,
     apply_return_to_stock,
@@ -38,9 +38,9 @@ from ..inventory_service import (
     display_serial_number,
     movement_datetime,
 )
-from ..models import Asset, AssetMovement, InventorySector, Ticket, User
-from ..permissions import require_permission
-from ..schemas import (
+from ...models import Asset, AssetMovement, InventorySector, Ticket, User
+from ...permissions import require_permission
+from ...schemas import (
     InventoryAllocateRequest,
     InventoryAssetCreate,
     InventoryAssetOut,
@@ -54,7 +54,7 @@ from ..schemas import (
     InventoryMovementOut,
     InventoryReturnToStockRequest,
 )
-from ..time_utils import utc_now
+from ...time_utils import utc_now
 
 router = APIRouter()
 

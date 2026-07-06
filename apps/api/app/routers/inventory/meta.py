@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends
 
-from ..inventory_constants import (
+from ...inventory_constants import (
     DEFAULT_INVENTORY_SECTOR,
     INVENTORY_MOVEMENT_ACTIONS,
     INVENTORY_PERMISSIONS,
     INVENTORY_STATUSES,
 )
-from ..models import User
-from ..permissions import require_permission
+from ...models import User
+from ...permissions import require_permission
 
 router = APIRouter()
 

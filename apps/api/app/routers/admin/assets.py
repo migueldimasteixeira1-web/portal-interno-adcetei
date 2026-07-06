@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from ..admin_helpers import ensure_unique_asset, has_rows, reject_null_fields, validate_assigned_user
-from ..audit import add_audit
-from ..database import get_db
-from ..models import Asset, AssetMovement, Ticket, User
-from ..permissions import require_permission
-from ..schemas import AssetCreate, AssetOut, AssetUpdate
+from ...admin_helpers import ensure_unique_asset, has_rows, reject_null_fields, validate_assigned_user
+from ...audit import add_audit
+from ...database import get_db
+from ...models import Asset, AssetMovement, Ticket, User
+from ...permissions import require_permission
+from ...schemas import AssetCreate, AssetOut, AssetUpdate
 
 router = APIRouter()
 
