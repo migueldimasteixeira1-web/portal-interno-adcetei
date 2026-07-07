@@ -100,12 +100,25 @@ def _format_datetime(value: datetime | None) -> str:
 def latest_movements(db: Session, asset_ids: list[int]) -> dict[int, AssetMovement]:
     if not asset_ids:
         return {}
-    latest_ids = db.scalars(
-        select(func.max(AssetMovement.id))
-        .where(AssetMovement.asset_id.in_(asset_ids))
-        .group_by(AssetMovement.asset_id)
+    # ponytail: movement_date + id (not max(id)) — backdated entries must win over newer IDs
+    row_number = (
+        func.row_number()
+        .over(
+            partition_by=AssetMovement.asset_id,
+            order_by=(AssetMovement.movement_date.desc(), AssetMovement.id.desc()),
+        )
+        .label("rn")
     )
-    movement_ids = [movement_id for movement_id in latest_ids if movement_id]
+    ranked = (
+        select(AssetMovement.id.label("movement_id"), row_number)
+        .where(AssetMovement.asset_id.in_(asset_ids))
+        .subquery()
+    )
+    movement_ids = [
+        movement_id
+        for movement_id in db.scalars(select(ranked.c.movement_id).where(ranked.c.rn == 1))
+        if movement_id
+    ]
     if not movement_ids:
         return {}
     movements = db.scalars(select(AssetMovement).where(AssetMovement.id.in_(movement_ids)))

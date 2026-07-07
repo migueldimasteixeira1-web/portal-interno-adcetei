@@ -125,6 +125,7 @@ A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados).
 - Equipamentos: número de série como ID principal, vínculos opcionais aos cadastros
 - Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
 - Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI
+- Exportação: `GET /api/inventory/assets/export` — planilha `.xlsx` com os mesmos filtros da listagem (`inventory.view`); coluna “Última movimentação” usa a entrada mais recente por `movement_date` (desempate por `id`)
 - Tela `/inventario/cadastros` para CRUD dos cadastros base
 - Setor `ADCETEI` protegido contra renomeação/desativação via API
 

@@ -62,7 +62,7 @@ O `scripts/regression-test.sh` valida, entre outros:
 7. CRUD administrativo de usuários, equipamentos, catálogo e perfis;
 8. proteção do último administrador e dependências de permissões;
 9. auditoria administrativa;
-10. inventário modular (cadastros, equipamentos, movimentações, lote);
+10. inventário modular (cadastros, equipamentos, movimentações, lote, exportação `.xlsx` filtrada);
 11. datas serializadas com `Z` ou offset explícito;
 12. migração não destrutiva de schema legado.
 
