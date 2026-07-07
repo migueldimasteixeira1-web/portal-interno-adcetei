@@ -777,6 +777,102 @@ status, detailed_asset = call("GET", f"/inventory/assets/{modular_asset['id']}",
 expect(status, 200, "detalhe segue retornando contrato novo após movimentações")
 expect(detailed_asset["status"], "maintenance", "detalhe reflete última movimentação")
 
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/retire",
+    requester,
+    {
+        "reason": "DEFEITO_IRRECUPERAVEL",
+        "justification": "Equipamento com placa-mãe queimada, sem viabilidade de reparo.",
+        "movement_date": "2026-07-06",
+    },
+)
+expect(status, 403, "usuário comum não dá baixa no inventário")
+
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/retire",
+    admin,
+    {"reason": "DEFEITO_IRRECUPERAVEL", "justification": "Curta", "movement_date": "2026-07-06"},
+)
+expect(status, 422, "baixa exige justificativa mínima")
+
+status, retired_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/retire",
+    admin,
+    {
+        "reason": "DEFEITO_IRRECUPERAVEL",
+        "justification": "Equipamento com placa-mãe queimada, sem viabilidade de reparo.",
+        "movement_date": "2026-07-06",
+        "notes": "Separado pela regressão.",
+    },
+)
+expect(status, 200, "administrador baixa equipamento")
+expect(retired_asset["status"], "retired", "baixa muda status para baixado")
+expect(retired_asset["retirement_reason"], "DEFEITO_IRRECUPERAVEL", "baixa persiste motivo")
+expect(retired_asset["retirement_justification"], "Equipamento com placa-mãe queimada, sem viabilidade de reparo.", "baixa persiste justificativa")
+assert_explicit_zone(retired_asset["retired_at"], "inventário.retired_at")
+
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/retire",
+    admin,
+    {
+        "reason": "DESCARTE",
+        "justification": "Tentativa de baixa duplicada na regressão.",
+        "movement_date": "2026-07-07",
+    },
+)
+expect(status, 409, "baixa duplicada é rejeitada")
+
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/allocate",
+    admin,
+    {
+        "sector_id": external_sector["id"],
+        "assigned_user_id": requester_user["id"],
+        "movement_date": "2026-07-07",
+    },
+)
+expect(status, 409, "equipamento baixado não pode ser movimentado")
+
+status, retired_detail = call("GET", f"/inventory/assets/{modular_asset['id']}", admin)
+expect(status, 200, "consulta de equipamento baixado")
+expect(retired_detail["status"], "retired", "detalhe reflete baixa")
+
+status, retired_list = call("GET", "/inventory/assets", admin, params={"status_filter": "retired", "search": modular_asset["serial_number"]})
+expect(status, 200, "listagem filtra equipamentos baixados")
+if not any(item["id"] == modular_asset["id"] for item in retired_list["items"]):
+    raise AssertionError("equipamento baixado não apareceu no filtro retired")
+
+status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
+retired_movement = next((item for item in movements if item["action"] == "retired"), None)
+if not retired_movement or retired_movement["to_status"] != "retired":
+    raise AssertionError("histórico não registrou baixa")
+
+status, roles_for_retire = call("GET", "/admin/roles", admin)
+technician_role_for_retire = next(item for item in roles_for_retire if item["role"] == "technician")
+status, _ = call(
+    "PATCH",
+    "/admin/roles/technician",
+    admin,
+    {"permissions": sorted(set(technician_role_for_retire["permissions"] + ["inventory.move"]))},
+)
+expect(status, 200, "técnico recebe inventory.move para teste de correção administrativa")
+status, _ = call(
+    "POST",
+    f"/inventory/assets/{allocated_asset['id']}/retire",
+    technician,
+    {
+        "reason": "CORRECAO_ADMINISTRATIVA",
+        "justification": "Tentativa de correção administrativa sem perfil admin.",
+        "movement_date": "2026-07-07",
+    },
+)
+expect(status, 403, "correção administrativa restrita ao administrador")
+
 status, legacy_inventory = call("GET", "/assets", operator)
 expect(status, 200, "rota antiga de assets segue funcionando")
 if not any(item["id"] == allocated_asset["id"] and item["status"] == "active" for item in legacy_inventory):

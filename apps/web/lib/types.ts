@@ -2,6 +2,7 @@ export type { Role, User, Asset, AssetTicketOption } from "./types/auth";
 export type {
   InventoryAssetStatus,
   InventoryMovementAction,
+  InventoryRetirementReason,
   InventoryCatalogItem,
   InventoryEquipmentModel,
   InventoryCatalogs,
@@ -18,6 +19,7 @@ export type {
   InventoryMovementPayload,
   InventoryAllocatePayload,
   InventoryChangeResponsiblePayload,
+  InventoryRetirePayload,
   InventoryBulkScanPayload,
   InventoryBulkScanItemPreview,
   InventoryBulkScanError,

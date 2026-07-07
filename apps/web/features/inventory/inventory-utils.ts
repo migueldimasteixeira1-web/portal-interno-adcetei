@@ -1,4 +1,4 @@
-import type { InventoryAssetCatalogRef, InventoryCatalogs } from "@/lib/types";
+import type { InventoryAssetCatalogRef, InventoryCatalogs, InventoryRetirementReason } from "@/lib/types";
 
 export const emptyInventoryCatalogs: InventoryCatalogs = {
   suppliers: [],
@@ -78,4 +78,31 @@ export const movementActionTitle: Record<MovementAction, string> = {
 
 export function emptyMovementDraft(): MovementDraft {
   return { sector_id: "", assigned_user_id: "", movement_date: todayInputValue(), notes: "" };
+}
+
+export const inventoryRetirementReasonOptions: Array<{ key: InventoryRetirementReason; label: string }> = [
+  { key: "CONTRATO_ENCERRADO", label: "Contrato encerrado" },
+  { key: "DEVOLVIDO_AO_FORNECEDOR", label: "Devolvido ao fornecedor" },
+  { key: "DEFEITO_IRRECUPERAVEL", label: "Defeito sem recuperação" },
+  { key: "DESCARTE", label: "Descarte" },
+  { key: "SUBSTITUICAO", label: "Substituição" },
+  { key: "PERDA", label: "Perda" },
+  { key: "FURTO_ROUBO", label: "Furto/Roubo" },
+  { key: "CORRECAO_ADMINISTRATIVA", label: "Correção administrativa" },
+  { key: "OUTRO", label: "Outro" },
+];
+
+export type RetireDraft = {
+  reason: InventoryRetirementReason | "";
+  justification: string;
+  movement_date: string;
+  notes: string;
+};
+
+export function emptyRetireDraft(): RetireDraft {
+  return { reason: "", justification: "", movement_date: todayInputValue(), notes: "" };
+}
+
+export function retirementReasonLabel(reason?: InventoryRetirementReason | null) {
+  return inventoryRetirementReasonOptions.find((item) => item.key === reason)?.label || "Não informado";
 }

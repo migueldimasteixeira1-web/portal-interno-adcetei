@@ -1,4 +1,4 @@
-import { ArrowLeft, PackageCheck, Send, Trash2, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, Archive, PackageCheck, Send, Trash2, UserRound, Wrench } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonStyles } from "@/components/ui";
 
@@ -6,10 +6,12 @@ type Props = {
   canMove: boolean;
   canEdit: boolean;
   canViewUsers: boolean;
+  isRetired: boolean;
   onAllocate: () => void;
   onChangeResponsible: () => void;
   onReturnToStock: () => void;
   onMaintenance: () => void;
+  onRetire: () => void;
   onDelete: () => void;
 };
 
@@ -17,10 +19,12 @@ export default function InventoryAssetActionBar({
   canMove,
   canEdit,
   canViewUsers,
+  isRetired,
   onAllocate,
   onChangeResponsible,
   onReturnToStock,
   onMaintenance,
+  onRetire,
   onDelete,
 }: Props) {
   if (!canMove && !canEdit) {
@@ -34,7 +38,7 @@ export default function InventoryAssetActionBar({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {canMove && (
+      {canMove && !isRetired && (
         <>
           <Button variant="secondary" onClick={onAllocate}>
             <Send size={16} />
@@ -57,9 +61,13 @@ export default function InventoryAssetActionBar({
             <Wrench size={16} />
             Manutenção
           </Button>
+          <Button variant="danger" onClick={onRetire}>
+            <Archive size={16} />
+            Dar baixa
+          </Button>
         </>
       )}
-      {canEdit && (
+      {canEdit && !isRetired && (
         <Button variant="danger" onClick={onDelete}>
           <Trash2 size={16} />
           Excluir

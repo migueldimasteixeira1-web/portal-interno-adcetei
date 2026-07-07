@@ -60,6 +60,7 @@ export const inventoryMovementActionLabels: Record<string, string> = {
   responsible_changed: "Troca de responsável",
   returned_to_stock: "Devolução ao estoque",
   maintenance: "Manutenção",
+  retired: "Baixa",
 };
 
 export const assetTypeLabels: Record<string, string> = {

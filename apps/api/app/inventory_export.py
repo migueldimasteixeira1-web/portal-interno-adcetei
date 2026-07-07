@@ -15,6 +15,7 @@ from .inventory_helpers import (
     catalog_ref,
     list_inventory_assets_filtered,
 )
+from .inventory_service import retirement_reason_label
 from .models import Asset, AssetMovement, User
 from .time_utils import SAO_PAULO, ensure_utc, utc_now
 
@@ -40,6 +41,7 @@ MOVEMENT_ACTION_LABELS = {
     "responsible_changed": "Troca de responsável",
     "returned_to_stock": "Devolução ao estoque",
     "maintenance": "Manutenção",
+    "retired": "Baixa",
 }
 
 EMPTY_VALUE = "Não informado"
@@ -53,6 +55,9 @@ EXPORT_HEADERS = (
     "Setor",
     "Responsável",
     "Situação",
+    "Motivo da baixa",
+    "Data da baixa",
+    "Justificativa da baixa",
     "Data de recebimento",
     "Data de entrega",
     "Última movimentação",
@@ -144,6 +149,9 @@ def asset_export_row(asset: Asset, last_movement: AssetMovement | None) -> tuple
         _text(_catalog_name(asset.sector) or asset.location),
         _text(asset.assigned_user.full_name if asset.assigned_user else None),
         INVENTORY_STATUS_LABELS.get(status, status),
+        _text(retirement_reason_label(asset.retirement_reason) if asset.retirement_reason else None),
+        _format_date(asset.retired_at) or EMPTY_VALUE,
+        _text(asset.retirement_justification),
         _format_date(asset.received_at) or EMPTY_VALUE,
         _format_date(asset.delivered_at) or EMPTY_VALUE,
         _movement_summary(last_movement),
@@ -193,7 +201,7 @@ def build_inventory_export_workbook(
     sheet.auto_filter.ref = f"A{header_row}:{last_column}{last_row}"
     sheet.freeze_panes = f"A{data_start}"
 
-    column_widths = (22, 18, 18, 24, 22, 22, 28, 16, 20, 18, 28, 36)
+    column_widths = (22, 18, 18, 24, 22, 22, 28, 16, 24, 18, 36, 20, 18, 28, 36)
     for index, width in enumerate(column_widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
 

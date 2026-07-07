@@ -138,7 +138,52 @@ def apply_send_to_maintenance(asset) -> None:
     asset.status = legacy_asset_status("maintenance")
 
 
-def build_bulk_scan_preview(serial_numbers: list[str], existing_normalized_serials: set[str]) -> dict:
+def asset_is_retired(asset) -> bool:
+    return inventory_status_from_asset(asset) == "retired"
+
+
+def ensure_asset_movable(asset) -> None:
+    if asset_is_retired(asset):
+        raise ValueError("Equipamento baixado não pode ser movimentado")
+
+
+def retirement_reason_label(reason: str) -> str:
+    from .inventory_constants import INVENTORY_RETIREMENT_REASON_LABELS
+
+    return INVENTORY_RETIREMENT_REASON_LABELS.get(reason, reason)
+
+
+def build_retirement_movement_notes(*, reason: str, justification: str, notes: str = "") -> str:
+    parts = [
+        f"Motivo: {retirement_reason_label(reason)} ({reason})",
+        f"Justificativa: {justification.strip()}",
+    ]
+    cleaned_notes = (notes or "").strip()
+    if cleaned_notes:
+        parts.append(f"Observações: {cleaned_notes}")
+    return "\n".join(parts)
+
+
+def apply_retire_asset(
+    asset,
+    *,
+    retired_at,
+    retired_by_user_id: int,
+    reason: str,
+    justification: str,
+    notes: str = "",
+) -> None:
+    if asset_is_retired(asset):
+        raise ValueError("Equipamento já está baixado")
+    asset.status = legacy_asset_status("retired")
+    asset.retired_at = retired_at
+    asset.retired_by_user_id = retired_by_user_id
+    asset.retirement_reason = reason
+    asset.retirement_justification = justification.strip()
+    asset.retirement_notes = (notes or "").strip()
+
+
+def build_bulk_scan_preview(serial_numbers: list[str], existing_serial_statuses: dict[str, str]) -> dict:
     valid_items: list[dict] = []
     errors: list[dict] = []
     seen: set[str] = set()
@@ -163,12 +208,17 @@ def build_bulk_scan_preview(serial_numbers: list[str], existing_normalized_seria
             })
             continue
         seen.add(normalized)
-        if normalized in existing_normalized_serials:
+        if normalized in existing_serial_statuses:
+            status = existing_serial_statuses[normalized]
+            if status == "retired":
+                message = "Equipamento baixado — consulte o histórico no inventário; não pode ser reentrado em lote"
+            else:
+                message = "Número de série já cadastrado"
             errors.append({
                 "index": index,
                 "serial_number": serial,
                 "normalized_serial": normalized,
-                "message": "Número de série já cadastrado",
+                "message": message,
             })
             continue
         valid_items.append({

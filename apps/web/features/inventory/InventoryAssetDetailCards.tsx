@@ -2,7 +2,7 @@ import { Boxes } from "lucide-react";
 import { Badge, Card, DetailRow, EmptyState, SectionHeader } from "@/components/ui";
 import { assetStatusTone, formatDate, inventoryAssetStatusLabels, inventoryMovementActionLabels } from "@/lib/format";
 import type { InventoryAsset, InventoryMovement } from "@/lib/types";
-import { catalogRefName, notesText, transitionLabel, userDisplayName } from "./inventory-utils";
+import { catalogRefName, notesText, retirementReasonLabel, transitionLabel, userDisplayName } from "./inventory-utils";
 
 type SummaryProps = { asset: InventoryAsset };
 
@@ -36,6 +36,17 @@ export function InventoryAssetDetailsCard({ asset }: SummaryProps) {
         <DetailRow label="Responsável atual" value={asset.assigned_user?.full_name || "Não vinculado"} />
         <DetailRow label="Data de recebimento" value={formatDate(asset.received_at, false)} />
         <DetailRow label="Data de envio/entrega" value={formatDate(asset.delivered_at, false)} />
+        {asset.status === "retired" && (
+          <>
+            <DetailRow label="Motivo da baixa" value={retirementReasonLabel(asset.retirement_reason)} />
+            <DetailRow label="Data da baixa" value={formatDate(asset.retired_at, false)} />
+            <DetailRow label="Baixado por" value={userDisplayName(asset.retired_by, "Não informado")} />
+            <DetailRow label="Justificativa da baixa" value={notesText(asset.retirement_justification || "")} className="sm:col-span-2 xl:col-span-3" />
+            {asset.retirement_notes?.trim() && (
+              <DetailRow label="Observações da baixa" value={notesText(asset.retirement_notes)} className="sm:col-span-2 xl:col-span-3" />
+            )}
+          </>
+        )}
         <DetailRow label="Observações" value={notesText(asset.notes)} className="sm:col-span-2 xl:col-span-3" />
       </div>
     </Card>
