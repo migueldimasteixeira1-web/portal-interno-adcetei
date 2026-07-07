@@ -33,6 +33,7 @@ export default function InventoryPage() {
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
   const [initialLoading, setInitialLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const requestSequence = useRef(0);
   const hasLoaded = useRef(false);
@@ -105,6 +106,23 @@ export default function InventoryPage() {
     void load({ search: "", typeFilter: "", statusFilter: "", sectorFilter: "" }, 1);
   };
 
+  const exportSpreadsheet = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      await api.exportInventorySpreadsheet({
+        search: appliedFilters.search || undefined,
+        status_filter: appliedFilters.statusFilter || undefined,
+        equipment_type_id: appliedFilters.typeFilter || undefined,
+        sector_id: appliedFilters.sectorFilter || undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível exportar o inventário.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (initialLoading) return <LoadingScreen label="Carregando inventário..." />;
   if (!canView) return <AccessDenied />;
 
@@ -149,6 +167,9 @@ export default function InventoryPage() {
         }}
         onClearFilters={clearFilters}
         onPageChange={(nextPage) => void load(appliedFilters, nextPage)}
+        canExport={canView}
+        exporting={exporting}
+        onExport={() => void exportSpreadsheet()}
       />
     </>
   );

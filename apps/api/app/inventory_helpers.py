@@ -445,3 +445,32 @@ def inventory_assets_base_query(*, conditions: list[Any], needs_join: bool):
     return query.where(*conditions) if conditions else query
 
 
+def list_inventory_assets_filtered(
+    db: Session,
+    *,
+    status_filter: str | None,
+    equipment_type_id: int | None,
+    sector_id: int | None,
+    search: str | None,
+) -> list[Asset]:
+    conditions, needs_join = inventory_asset_filter_conditions(
+        status_filter=status_filter,
+        equipment_type_id=equipment_type_id,
+        sector_id=sector_id,
+        search=search,
+    )
+    asset_ids = list(
+        db.scalars(
+            inventory_assets_base_query(conditions=conditions, needs_join=needs_join)
+            .with_only_columns(Asset.id)
+            .distinct()
+            .order_by(Asset.id.desc())
+        )
+    )
+    if not asset_ids:
+        return []
+    return list(
+        db.scalars(inventory_asset_query().where(Asset.id.in_(asset_ids)).order_by(Asset.id.desc())).unique()
+    )
+
+
