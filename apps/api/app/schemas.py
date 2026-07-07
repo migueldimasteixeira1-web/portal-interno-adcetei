@@ -282,7 +282,18 @@ class InventoryCatalogsOut(BaseModel):
 
 
 InventoryAssetStatus = Literal["stock", "allocated", "maintenance", "retired"]
-InventoryMovementAction = Literal["created", "updated", "allocated", "responsible_changed", "returned_to_stock", "maintenance"]
+InventoryMovementAction = Literal["created", "updated", "allocated", "responsible_changed", "returned_to_stock", "maintenance", "retired"]
+InventoryRetirementReason = Literal[
+    "CONTRATO_ENCERRADO",
+    "DEVOLVIDO_AO_FORNECEDOR",
+    "DEFEITO_IRRECUPERAVEL",
+    "DESCARTE",
+    "SUBSTITUICAO",
+    "PERDA",
+    "FURTO_ROUBO",
+    "CORRECAO_ADMINISTRATIVA",
+    "OUTRO",
+]
 
 
 class InventoryAssetCatalogRefOut(BaseModel):
@@ -318,10 +329,16 @@ class InventoryAssetOut(BaseModel):
     received_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     notes: str = ""
+    retired_at: Optional[datetime] = None
+    retired_by_user_id: Optional[int] = None
+    retirement_reason: Optional[InventoryRetirementReason] = None
+    retirement_justification: str = ""
+    retirement_notes: str = ""
+    retired_by: Optional[InventoryAssetUserRefOut] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    @field_serializer("received_at", "delivered_at", "created_at", "updated_at")
+    @field_serializer("received_at", "delivered_at", "retired_at", "created_at", "updated_at")
     def serialize_inventory_asset_datetimes(self, value: datetime | None) -> str | None:
         return iso_utc(value)
 
@@ -429,6 +446,14 @@ class InventoryReturnToStockRequest(InventoryMovementCreate):
 
 class InventoryMaintenanceRequest(InventoryMovementCreate):
     pass
+
+
+class InventoryRetireRequest(BaseModel):
+    reason: InventoryRetirementReason
+    justification: str = Field(min_length=10, max_length=2000)
+    movement_date: date
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
 
 
 class InventoryMovementOut(BaseModel):

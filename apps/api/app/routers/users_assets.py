@@ -56,7 +56,7 @@ def list_asset_ticket_options(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Asset).order_by(Asset.name)
+    query = select(Asset).order_by(Asset.name).where(Asset.status != "retired")
     if current_user.role == "user":
         query = query.where(Asset.assigned_user_id == current_user.id)
     return list(db.scalars(query))

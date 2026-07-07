@@ -10,12 +10,15 @@ import { Alert, ConfirmDialog } from "@/components/ui";
 import InventoryAssetActionBar from "@/features/inventory/InventoryAssetActionBar";
 import { InventoryAssetDetailsCard, InventoryAssetSummaryCard, InventoryMovementTable } from "@/features/inventory/InventoryAssetDetailCards";
 import InventoryMovementDialog from "@/features/inventory/InventoryMovementDialog";
+import InventoryRetireDialog from "@/features/inventory/InventoryRetireDialog";
 import {
   activeByName,
   emptyInventoryCatalogs,
   emptyMovementDraft,
+  emptyRetireDraft,
   type MovementAction,
   type MovementDraft,
+  type RetireDraft,
 } from "@/features/inventory/inventory-utils";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
@@ -34,8 +37,10 @@ export default function InventoryAssetDetailPage() {
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
   const [users, setUsers] = useState<User[]>([]);
   const [activeAction, setActiveAction] = useState<MovementAction | null>(null);
+  const [retireOpen, setRetireOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [draft, setDraft] = useState<MovementDraft>(emptyMovementDraft());
+  const [retireDraft, setRetireDraft] = useState<RetireDraft>(emptyRetireDraft());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -83,6 +88,10 @@ export default function InventoryAssetDetailPage() {
     (activeAction === "allocate" && !draft.sector_id) ||
     (activeAction === "responsible" && !draft.assigned_user_id);
 
+  const retireRequiredMissing = !retireDraft.reason || !retireDraft.movement_date || !retireDraft.justification.trim();
+  const retireJustificationTooShort = retireDraft.justification.trim().length > 0 && retireDraft.justification.trim().length < 10;
+  const isRetired = asset?.status === "retired";
+
   const submitAction = async () => {
     if (!activeAction || requiredMissing) return;
     setSaving(true);
@@ -123,6 +132,29 @@ export default function InventoryAssetDetailPage() {
     }
   };
 
+  const submitRetire = async () => {
+    if (retireRequiredMissing || retireJustificationTooShort || !retireDraft.reason) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await api.retireInventoryAsset(params.id, {
+        reason: retireDraft.reason,
+        justification: retireDraft.justification.trim(),
+        movement_date: retireDraft.movement_date,
+        notes: retireDraft.notes.trim(),
+      });
+      setRetireOpen(false);
+      setRetireDraft(emptyRetireDraft());
+      setMessage("Equipamento baixado com sucesso.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível dar baixa neste equipamento.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteAsset = async () => {
     if (!asset) return;
     setSaving(true);
@@ -154,10 +186,17 @@ export default function InventoryAssetDetailPage() {
               canMove={canMove}
               canEdit={canEdit}
               canViewUsers={canViewUsers}
+              isRetired={isRetired}
               onAllocate={() => openAction("allocate")}
               onChangeResponsible={() => openAction("responsible")}
               onReturnToStock={() => openAction("stock")}
               onMaintenance={() => openAction("maintenance")}
+              onRetire={() => {
+                setError("");
+                setMessage("");
+                setRetireDraft(emptyRetireDraft());
+                setRetireOpen(true);
+              }}
               onDelete={() => setDeleteOpen(true)}
             />
           ) : undefined
@@ -166,6 +205,11 @@ export default function InventoryAssetDetailPage() {
 
       {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
+      {asset?.status === "retired" && (
+        <Alert tone="warning" className="mb-4">
+          Este equipamento está baixado e não pode ser movimentado. O registro permanece disponível para consulta, histórico e auditoria.
+        </Alert>
+      )}
 
       {asset && (
         <div className="space-y-4">
@@ -187,6 +231,18 @@ export default function InventoryAssetDetailPage() {
         onOpenChange={(open) => !open && setActiveAction(null)}
         onConfirm={submitAction}
         onDraftChange={setDraft}
+      />
+
+      <InventoryRetireDialog
+        open={retireOpen}
+        draft={retireDraft}
+        saving={saving}
+        isAdmin={user?.role === "admin"}
+        requiredMissing={retireRequiredMissing}
+        justificationTooShort={retireJustificationTooShort}
+        onOpenChange={setRetireOpen}
+        onConfirm={submitRetire}
+        onDraftChange={setRetireDraft}
       />
 
       <ConfirmDialog

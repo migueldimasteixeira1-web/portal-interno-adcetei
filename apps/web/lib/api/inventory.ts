@@ -17,6 +17,7 @@ import type {
   InventoryEquipmentModelUpdatePayload,
   InventoryMovement,
   InventoryMovementPayload,
+  InventoryRetirePayload,
 } from "../types";
 import { downloadRequest, request } from "./client";
 
@@ -81,4 +82,6 @@ export const inventoryApi = {
     request<InventoryAsset>(`/inventory/assets/${id}/return-to-stock`, { method: "POST", body: JSON.stringify(payload) }),
   sendInventoryAssetToMaintenance: (id: number | string, payload: InventoryMovementPayload) =>
     request<InventoryAsset>(`/inventory/assets/${id}/maintenance`, { method: "POST", body: JSON.stringify(payload) }),
+  retireInventoryAsset: (id: number | string, payload: InventoryRetirePayload) =>
+    request<InventoryAsset>(`/inventory/assets/${id}/retire`, { method: "POST", body: JSON.stringify(payload) }),
 };

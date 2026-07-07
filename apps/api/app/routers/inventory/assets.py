@@ -34,11 +34,15 @@ from ...inventory_helpers import (
 from ...inventory_service import (
     apply_asset_allocation,
     apply_responsible_change,
+    apply_retire_asset,
     apply_return_to_stock,
     apply_send_to_maintenance,
+    asset_is_retired,
     asset_movement_state,
     build_asset_display_name,
+    build_retirement_movement_notes,
     display_serial_number,
+    ensure_asset_movable,
     legacy_asset_status,
     movement_datetime,
 )
@@ -56,11 +60,20 @@ from ...schemas import (
     InventoryChangeResponsibleRequest,
     InventoryMaintenanceRequest,
     InventoryMovementOut,
+    InventoryRetireRequest,
     InventoryReturnToStockRequest,
 )
 from ...time_utils import utc_now
 
 router = APIRouter()
+
+
+def _guard_movable(asset: Asset) -> None:
+    try:
+        ensure_asset_movable(asset)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
 
 @router.get("/assets", response_model=InventoryAssetPageOut)
 def list_inventory_assets(
@@ -339,8 +352,13 @@ def update_inventory_asset(
     if "notes" in data:
         asset.notes = (data["notes"] or "").strip()
 
+    if data.get("status") == "retired":
+        raise HTTPException(status_code=400, detail="Use POST /inventory/assets/{id}/retire para baixar equipamento")
+    if asset_is_retired(asset) and "status" in data:
+        raise HTTPException(status_code=409, detail="Equipamento baixado não pode ter status alterado por edição direta")
+
     sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
-    status = data.get("status") if data.get("status") in {"maintenance", "retired"} else calculated_asset_status(sector, asset.assigned_user_id)
+    status = data.get("status") if data.get("status") == "maintenance" else calculated_asset_status(sector, asset.assigned_user_id)
     ensure_shipping_date(status, asset.delivered_at)
     asset.status = legacy_asset_status(status)
     asset.name = asset_display_name(asset)[:160]
@@ -388,6 +406,7 @@ def allocate_inventory_asset(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    _guard_movable(asset)
     sector = db.get(InventorySector, payload.sector_id)
     if not sector:
         raise HTTPException(status_code=400, detail="Setor inválido")
@@ -416,6 +435,7 @@ def change_inventory_asset_responsible(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    _guard_movable(asset)
     validate_user(db, payload.assigned_user_id)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
@@ -444,6 +464,7 @@ def return_inventory_asset_to_stock(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    _guard_movable(asset)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     apply_return_to_stock(asset, get_default_sector(db))
@@ -468,6 +489,7 @@ def send_inventory_asset_to_maintenance(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    _guard_movable(asset)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     apply_send_to_maintenance(asset)
@@ -483,4 +505,60 @@ def send_inventory_asset_to_maintenance(
     db.commit()
     return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
 
+
+@router.post("/assets/{asset_id}/retire", response_model=InventoryAssetOut)
+def retire_inventory_asset(
+    asset_id: int,
+    payload: InventoryRetireRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.move")),
+):
+    if payload.reason == "CORRECAO_ADMINISTRATIVA" and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Correção administrativa disponível apenas para administrador")
+    asset = get_inventory_asset_or_404(db, asset_id)
+    movement_at = movement_datetime(payload.movement_date)
+    before = asset_movement_state(asset)
+    previous_status = before.get("status")
+    try:
+        apply_retire_asset(
+            asset,
+            retired_at=movement_at,
+            retired_by_user_id=current_user.id,
+            reason=payload.reason,
+            justification=payload.justification,
+            notes=payload.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    add_asset_movement(
+        db,
+        asset=asset,
+        action="retired",
+        before=before,
+        movement_at=movement_at,
+        notes=build_retirement_movement_notes(
+            reason=payload.reason,
+            justification=payload.justification,
+            notes=payload.notes,
+        ),
+        actor_id=current_user.id,
+    )
+    add_audit(
+        db,
+        actor=current_user,
+        action="inventory_asset_retired",
+        entity_type="inventory_asset",
+        entity_id=asset.id,
+        summary=f"Baixa de inventário: {asset.serial_number}",
+        changes={
+            "asset_id": asset.id,
+            "serial_number": asset.serial_number,
+            "reason": payload.reason,
+            "previous_status": previous_status,
+            "new_status": "retired",
+            "retired_at": movement_at.isoformat(),
+        },
+    )
+    db.commit()
+    return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
 

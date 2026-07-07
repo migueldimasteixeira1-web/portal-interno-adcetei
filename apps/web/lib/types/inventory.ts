@@ -1,5 +1,15 @@
 export type InventoryAssetStatus = "stock" | "allocated" | "maintenance" | "retired";
-export type InventoryMovementAction = "created" | "updated" | "allocated" | "responsible_changed" | "returned_to_stock" | "maintenance";
+export type InventoryMovementAction = "created" | "updated" | "allocated" | "responsible_changed" | "returned_to_stock" | "maintenance" | "retired";
+export type InventoryRetirementReason =
+  | "CONTRATO_ENCERRADO"
+  | "DEVOLVIDO_AO_FORNECEDOR"
+  | "DEFEITO_IRRECUPERAVEL"
+  | "DESCARTE"
+  | "SUBSTITUICAO"
+  | "PERDA"
+  | "FURTO_ROUBO"
+  | "CORRECAO_ADMINISTRATIVA"
+  | "OUTRO";
 
 export interface InventoryCatalogItem {
   id: number;
@@ -74,6 +84,12 @@ export interface InventoryAsset {
   received_at?: string | null;
   delivered_at?: string | null;
   notes: string;
+  retired_at?: string | null;
+  retired_by_user_id?: number | null;
+  retirement_reason?: InventoryRetirementReason | null;
+  retirement_justification?: string;
+  retirement_notes?: string;
+  retired_by?: InventoryAssetUserRef | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -126,6 +142,13 @@ export interface InventoryAllocatePayload extends InventoryMovementPayload {
 
 export interface InventoryChangeResponsiblePayload extends InventoryMovementPayload {
   assigned_user_id: number;
+}
+
+export interface InventoryRetirePayload {
+  reason: InventoryRetirementReason;
+  justification: string;
+  movement_date: string;
+  notes?: string;
 }
 
 export interface InventoryBulkScanPayload {

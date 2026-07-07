@@ -8,13 +8,17 @@ from .inventory_constants import DEFAULT_INVENTORY_SECTOR
 from .inventory_service import (
     apply_asset_allocation,
     apply_responsible_change,
+    apply_retire_asset,
     apply_return_to_stock,
     apply_send_to_maintenance,
+    asset_is_retired,
     asset_movement_state,
     build_asset_display_name,
     build_bulk_scan_preview,
+    build_retirement_movement_notes,
     default_sector_update_error,
     display_serial_number,
+    ensure_asset_movable,
     initial_inventory_status,
     inventory_status_from_asset,
     legacy_asset_status,
@@ -22,6 +26,7 @@ from .inventory_service import (
     movement_values,
     normalize_catalog_name,
     normalize_serial_number,
+    retirement_reason_label,
     validate_shipping_date_for_status,
 )
 from .models import (
@@ -200,6 +205,7 @@ def inventory_asset_query():
         joinedload(Asset.equipment_model),
         joinedload(Asset.sector),
         joinedload(Asset.assigned_user),
+        joinedload(Asset.retired_by),
     )
 
 
@@ -237,6 +243,12 @@ def inventory_asset_payload(asset: Asset) -> dict[str, Any]:
         "received_at": asset.received_at,
         "delivered_at": asset.delivered_at,
         "notes": asset.notes or "",
+        "retired_at": asset.retired_at,
+        "retired_by_user_id": asset.retired_by_user_id,
+        "retirement_reason": asset.retirement_reason or None,
+        "retirement_justification": asset.retirement_justification or "",
+        "retirement_notes": asset.retirement_notes or "",
+        "retired_by": asset.retired_by,
         "created_at": None,
         "updated_at": None,
     }
@@ -305,12 +317,16 @@ def add_asset_movement(
     return movement
 
 
-def existing_normalized_serials(db: Session) -> set[str]:
+def existing_serial_statuses(db: Session) -> dict[str, str]:
     return {
-        normalize_serial_number(serial)
-        for serial, in db.execute(select(Asset.serial_number))
+        normalize_serial_number(serial): status
+        for serial, status in db.execute(select(Asset.serial_number, Asset.status))
         if serial and normalize_serial_number(serial)
     }
+
+
+def existing_normalized_serials(db: Session) -> set[str]:
+    return set(existing_serial_statuses(db))
 
 
 def bulk_scan_preview_payload(db: Session, payload: InventoryBulkScanRequest) -> dict[str, Any]:
@@ -321,7 +337,7 @@ def bulk_scan_preview_payload(db: Session, payload: InventoryBulkScanRequest) ->
         payload.manufacturer_id,
         payload.equipment_model_id,
     )
-    return build_bulk_scan_preview(payload.serial_numbers, existing_normalized_serials(db))
+    return build_bulk_scan_preview(payload.serial_numbers, existing_serial_statuses(db))
 
 
 def create_bulk_scan_asset(
