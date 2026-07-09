@@ -225,6 +225,10 @@ export default function InventoryDeliveryTermsPage() {
   };
 
   const saveUser = async () => {
+    if (!userDraft.department_sector_id) {
+      setError("Selecione um setor cadastrado no inventário para o recebedor.");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");

@@ -101,6 +101,10 @@ export default function UsersPage() {
   };
 
   const save = async () => {
+    if (!draft.department_sector_id) {
+      setError("Selecione um setor cadastrado no inventário.");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");
