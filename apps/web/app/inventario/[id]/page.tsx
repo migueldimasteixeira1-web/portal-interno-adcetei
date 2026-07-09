@@ -76,7 +76,7 @@ export default function InventoryAssetDetailPage() {
     setMessage("");
     setActiveAction(action);
     setDraft({
-      sector_id: action === "allocate" && asset?.sector_id ? String(asset.sector_id) : "",
+      sector_id: (action === "allocate" || action === "responsible") && asset?.sector_id ? String(asset.sector_id) : "",
       assigned_user_id: (action === "allocate" || action === "responsible") && asset?.assigned_user_id ? String(asset.assigned_user_id) : "",
       movement_date: emptyMovementDraft().movement_date,
       notes: "",

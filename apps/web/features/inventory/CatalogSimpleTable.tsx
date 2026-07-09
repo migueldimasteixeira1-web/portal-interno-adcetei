@@ -18,10 +18,10 @@ export default function CatalogSimpleTable({ tab, items, supplierNameById, secre
       <table className="data-table min-w-[720px]">
         <thead>
           <tr>
-            <th>Nome</th>
+            {tab === "sectors" ? <th>Secretaria</th> : <th>Nome</th>}
+            {tab === "sectors" && <th>Setor</th>}
             <th>Status</th>
             {tab === "contracts" && <th>Fornecedor</th>}
-            {tab === "sectors" && <th>Secretaria</th>}
             {tab === "sectors" && <th>Observação</th>}
             <th>Ações</th>
           </tr>
@@ -29,15 +29,19 @@ export default function CatalogSimpleTable({ tab, items, supplierNameById, secre
         <tbody>
           {items.map((item) => (
             <tr key={item.id}>
-              <td className="font-semibold text-[#1a2332]">{item.name}</td>
+              {tab === "sectors" ? (
+                <>
+                  <td className="font-semibold text-[#1a2332]">{secretariatNameById?.get((item as InventorySector).secretariat_id || 0) || "Secretaria não vinculada"}</td>
+                  <td className="text-[#5c6b7e]">{item.name}</td>
+                </>
+              ) : (
+                <td className="font-semibold text-[#1a2332]">{item.name}</td>
+              )}
               <td>
                 <Badge className={activeBadgeClass(item.is_active)}>{item.is_active ? "Ativo" : "Inativo"}</Badge>
               </td>
               {tab === "contracts" && (
                 <td className="text-[#5c6b7e]">{supplierNameById?.get((item as InventoryContract).supplier_id) || "Fornecedor não informado"}</td>
-              )}
-              {tab === "sectors" && (
-                <td className="text-[#5c6b7e]">{secretariatNameById?.get((item as InventorySector).secretariat_id || 0) || "Secretaria não vinculada"}</td>
               )}
               {tab === "sectors" && (
                 <td className="text-[#5c6b7e]">

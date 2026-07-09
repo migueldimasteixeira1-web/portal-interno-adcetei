@@ -28,7 +28,7 @@ from ...inventory_helpers import (
     normalize_inventory_serial,
     validate_asset_catalogs,
     validate_optional_catalogs,
-    validate_user,
+    validate_user_for_sector,
     has_rows,
 )
 from ...inventory_service import (
@@ -251,10 +251,10 @@ def create_inventory_asset(
 ):
     serial_number = normalize_inventory_serial(payload.serial_number)
     ensure_unique_serial(db, serial_number)
-    validate_user(db, payload.assigned_user_id)
     supplier, sector = validate_optional_catalogs(db, payload.supplier_id, payload.sector_id)
     if sector is None:
         sector = get_default_sector(db)
+    validate_user_for_sector(db, payload.assigned_user_id, sector)
     equipment_type, manufacturer, equipment_model = validate_asset_catalogs(
         db,
         payload.equipment_type_id,
@@ -320,9 +320,7 @@ def update_inventory_asset(
         ensure_unique_serial(db, asset.serial_number, asset.id)
     if "specifications" in data:
         asset.specifications = (data["specifications"] or "").strip()
-    if "assigned_user_id" in data:
-        validate_user(db, data["assigned_user_id"])
-        asset.assigned_user_id = data["assigned_user_id"]
+    next_assigned_user_id = data.get("assigned_user_id", asset.assigned_user_id)
     if "supplier_id" in data:
         supplier, _ = validate_optional_catalogs(db, data["supplier_id"], None)
         asset.supplier_id = supplier.id if supplier else None
@@ -348,6 +346,10 @@ def update_inventory_asset(
         _, sector = validate_optional_catalogs(db, None, data["sector_id"])
         asset.sector_id = sector.id if sector else None
         asset.location = sector.name if sector else ""
+    sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
+    validate_user_for_sector(db, next_assigned_user_id, sector)
+    if "assigned_user_id" in data:
+        asset.assigned_user_id = data["assigned_user_id"]
     if "received_at" in data:
         asset.received_at = data["received_at"]
     if "delivered_at" in data:
@@ -360,7 +362,6 @@ def update_inventory_asset(
     if asset_is_retired(asset) and "status" in data:
         raise HTTPException(status_code=409, detail="Equipamento baixado não pode ter status alterado por edição direta")
 
-    sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
     status = data.get("status") if data.get("status") == "maintenance" else calculated_asset_status(sector, asset.assigned_user_id)
     ensure_shipping_date(status, asset.delivered_at)
     asset.status = legacy_asset_status(status)
@@ -413,7 +414,7 @@ def allocate_inventory_asset(
     sector = db.get(InventorySector, payload.sector_id)
     if not sector:
         raise HTTPException(status_code=400, detail="Setor inválido")
-    validate_user(db, payload.assigned_user_id)
+    validate_user_for_sector(db, payload.assigned_user_id, sector)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     apply_asset_allocation(asset, sector, payload.assigned_user_id, movement_at)
@@ -439,7 +440,8 @@ def change_inventory_asset_responsible(
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
     _guard_movable(asset)
-    validate_user(db, payload.assigned_user_id)
+    sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
+    validate_user_for_sector(db, payload.assigned_user_id, sector)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     try:

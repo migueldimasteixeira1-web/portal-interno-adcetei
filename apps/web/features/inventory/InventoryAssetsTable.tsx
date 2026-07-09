@@ -4,7 +4,7 @@ import ListPagination from "@/components/ListPagination";
 import { Badge, Button, Card, EmptyState, Input, SectionHeader, Select, Toolbar, buttonStyles } from "@/components/ui";
 import { assetStatusTone, formatDate, inventoryAssetStatusLabels } from "@/lib/format";
 import type { InventoryAsset, InventoryCatalogs } from "@/lib/types";
-import { activeCatalogItems, catalogRefName, manufacturerModel } from "./inventory-utils";
+import { activeCatalogItems, catalogRefName, manufacturerModel, sectorWithSecretariat } from "./inventory-utils";
 
 type FilterState = {
   search: string;
@@ -73,7 +73,7 @@ export default function InventoryAssetsTable({
           </Select>
           <Select aria-label="Filtrar por setor" value={filters.sectorFilter} onChange={(e) => onFiltersChange({ sectorFilter: e.target.value })}>
             <option value="">Todos os setores</option>
-            {sectorOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            {sectorOptions.map((item) => <option key={item.id} value={item.id}>{sectorWithSecretariat(item)}</option>)}
           </Select>
           {hasFilters && (
             <Button type="button" variant="ghost" onClick={onClearFilters} aria-label="Limpar filtros"><X size={16} /></Button>
@@ -99,7 +99,7 @@ export default function InventoryAssetsTable({
         />
         <div className="overflow-x-auto soft-scrollbar">
           <table className="data-table min-w-[1180px]">
-            <thead><tr><th>Número de série</th><th>Tipo</th><th>Fabricante / modelo</th><th>Fornecedor</th><th>Setor</th><th>Responsável</th><th>Status</th><th>Recebimento</th><th>Envio</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Número de série</th><th>Tipo</th><th>Fabricante / modelo</th><th>Fornecedor</th><th>Secretaria / setor</th><th>Responsável</th><th>Status</th><th>Recebimento</th><th>Envio</th><th>Ações</th></tr></thead>
             <tbody>
               {assets.map((asset) => (
                 <tr key={asset.id}>
@@ -107,8 +107,8 @@ export default function InventoryAssetsTable({
                   <td className="text-[#5c6b7e]">{catalogRefName(asset.equipment_type)}</td>
                   <td className="text-[#5c6b7e]">{manufacturerModel(asset)}</td>
                   <td className="text-[#5c6b7e]">{catalogRefName(asset.supplier)}</td>
-                  <td className="text-[#5c6b7e]">{catalogRefName(asset.sector)}</td>
-                  <td><p className="font-medium text-[#1a2332]">{asset.assigned_user?.full_name || "Não vinculado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{asset.assigned_user?.department || "—"}</p></td>
+                  <td><p className="font-medium text-[#1a2332]">{asset.sector?.secretariat?.name || "Não informado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{catalogRefName(asset.sector)}</p></td>
+                  <td><p className="font-medium text-[#1a2332]">{asset.assigned_user?.full_name || "Não vinculado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{asset.assigned_user ? `${asset.assigned_user.secretariat} - ${asset.assigned_user.department}` : "—"}</p></td>
                   <td><Badge className={assetStatusTone(asset.status)}>{inventoryAssetStatusLabels[asset.status] || asset.status}</Badge></td>
                   <td className="text-[#5c6b7e]">{formatDate(asset.received_at, false)}</td>
                   <td className="text-[#5c6b7e]">{formatDate(asset.delivered_at, false)}</td>

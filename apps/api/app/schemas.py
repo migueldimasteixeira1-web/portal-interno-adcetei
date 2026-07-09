@@ -301,6 +301,7 @@ class InventoryContractOut(InventoryCatalogItemOut):
 
 class InventorySectorOut(InventoryCatalogItemOut):
     secretariat_id: Optional[int] = None
+    secretariat: Optional[InventoryCatalogItemOut] = None
 
 
 class InventoryCatalogsOut(BaseModel):
@@ -331,12 +332,16 @@ InventoryRetirementReason = Literal[
 class InventoryAssetCatalogRefOut(BaseModel):
     id: int
     name: str
+    secretariat_id: Optional[int] = None
+    secretariat: Optional["InventoryAssetCatalogRefOut"] = None
 
 
 class InventoryAssetUserRefOut(BaseModel):
     id: int
     full_name: str
     email: EmailStr
+    secretariat: str
+    department_sector_id: Optional[int] = None
     department: str
     model_config = ConfigDict(from_attributes=True)
 

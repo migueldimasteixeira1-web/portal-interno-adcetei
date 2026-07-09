@@ -36,6 +36,7 @@ from .models import (
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
+    InventorySecretariat,
     InventorySector,
     InventorySupplier,
     Ticket,
@@ -118,7 +119,11 @@ def ensure_model_references(db: Session, manufacturer_id: int, equipment_type_id
 def catalog_ref(item: Any | None) -> dict[str, Any] | None:
     if not item:
         return None
-    return {"id": item.id, "name": item.name}
+    payload = {"id": item.id, "name": item.name}
+    if isinstance(item, InventorySector):
+        payload["secretariat_id"] = item.secretariat_id
+        payload["secretariat"] = catalog_ref(item.secretariat)
+    return payload
 
 
 def normalize_inventory_serial(value: str) -> str:
@@ -159,6 +164,13 @@ def validate_user(db: Session, user_id: int | None) -> User | None:
     user = db.get(User, user_id)
     if not user or not user.active:
         raise HTTPException(status_code=400, detail="Usuário responsável inválido")
+    return user
+
+
+def validate_user_for_sector(db: Session, user_id: int | None, sector: InventorySector | None) -> User | None:
+    user = validate_user(db, user_id)
+    if user and sector and user.department_sector_id != sector.id:
+        raise HTTPException(status_code=400, detail="Responsável não pertence ao setor selecionado")
     return user
 
 
@@ -213,7 +225,7 @@ def inventory_asset_query():
         joinedload(Asset.equipment_type),
         joinedload(Asset.manufacturer_ref),
         joinedload(Asset.equipment_model),
-        joinedload(Asset.sector),
+        joinedload(Asset.sector).joinedload(InventorySector.secretariat),
         joinedload(Asset.assigned_user),
         joinedload(Asset.retired_by),
     )
@@ -451,6 +463,7 @@ def inventory_asset_filter_conditions(
                 InventoryEquipmentType.name.ilike(like),
                 InventoryManufacturer.name.ilike(like),
                 InventoryEquipmentModel.name.ilike(like),
+                InventorySecretariat.name.ilike(like),
                 InventorySector.name.ilike(like),
                 User.full_name.ilike(like),
                 User.department.ilike(like),
@@ -468,6 +481,7 @@ def inventory_assets_base_query(*, conditions: list[Any], needs_join: bool):
             .outerjoin(Asset.manufacturer_ref)
             .outerjoin(Asset.equipment_model)
             .outerjoin(Asset.sector)
+            .outerjoin(InventorySector.secretariat)
             .outerjoin(Asset.assigned_user)
         )
     return query.where(*conditions) if conditions else query

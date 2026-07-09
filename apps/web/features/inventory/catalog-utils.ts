@@ -41,12 +41,12 @@ export const emptySectorDraft: SectorDraft = { name: "", is_active: true, secret
 
 export const catalogTabs: Array<{ id: CatalogTab; label: string; icon: typeof Truck }> = [
   { id: "secretariats", label: "Secretarias", icon: Landmark },
+  { id: "sectors", label: "Setores", icon: Building2 },
   { id: "suppliers", label: "Fornecedores", icon: Truck },
   { id: "contracts", label: "Contratos", icon: FileText },
   { id: "equipment_types", label: "Tipos de equipamento", icon: Layers3 },
   { id: "manufacturers", label: "Fabricantes", icon: Factory },
   { id: "models", label: "Modelos", icon: Package },
-  { id: "sectors", label: "Setores", icon: Building2 },
 ];
 
 export function isDefaultSector(name: string) {

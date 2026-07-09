@@ -37,6 +37,11 @@ export function catalogRefName(ref?: InventoryAssetCatalogRef | null, empty = "N
   return ref?.name || empty;
 }
 
+export function sectorWithSecretariat(ref?: InventoryAssetCatalogRef | null, empty = "Não informado") {
+  if (!ref) return empty;
+  return ref.secretariat?.name ? `${ref.secretariat.name} - ${ref.name}` : ref.name;
+}
+
 export function notesText(value: string) {
   return value.trim() || "Não informado";
 }

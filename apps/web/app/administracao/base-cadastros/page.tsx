@@ -37,7 +37,7 @@ export default function InventoryCatalogsPage() {
   const { user } = useAuth();
   const canManage = hasPermission(user, "inventory.manage_catalogs");
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyCatalogs);
-  const [tab, setTab] = useState<CatalogTab>("suppliers");
+  const [tab, setTab] = useState<CatalogTab>("secretariats");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -126,10 +126,6 @@ export default function InventoryCatalogsPage() {
     const name = simpleDraft.name.trim();
     if (!name) {
       setError("Informe o nome do cadastro.");
-      return;
-    }
-    if (tab === "sectors" && editingSimple && isDefaultSector(editingSimple.name) && !sectorDraft.is_active) {
-      setError("O setor ADCETEI é o padrão do sistema e deve permanecer ativo.");
       return;
     }
 

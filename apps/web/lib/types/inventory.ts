@@ -30,6 +30,7 @@ export interface InventoryEquipmentModel extends InventoryCatalogItem {
 
 export interface InventorySector extends InventoryCatalogItem {
   secretariat_id?: number | null;
+  secretariat?: InventoryCatalogItem | null;
 }
 
 export interface InventoryCatalogs {
@@ -81,12 +82,16 @@ export interface InventoryContractUpdatePayload extends InventoryCatalogUpdatePa
 export interface InventoryAssetCatalogRef {
   id: number;
   name: string;
+  secretariat_id?: number | null;
+  secretariat?: InventoryAssetCatalogRef | null;
 }
 
 export interface InventoryAssetUserRef {
   id: number;
   full_name: string;
   email: string;
+  secretariat: string;
+  department_sector_id?: number | null;
   department: string;
 }
 

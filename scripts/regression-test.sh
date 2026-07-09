@@ -265,9 +265,12 @@ import json
 import os
 import re
 import sqlite3
+from io import BytesIO
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from openpyxl import load_workbook
 
 BASE = os.environ["API_URL"]
 DB_PATH = os.environ["TEST_DB"]
@@ -365,6 +368,7 @@ default_secretariat = catalogs["secretariats"][0]
 if not any(item["name"] == "ADCETEI" and item["is_active"] for item in catalogs["sectors"]):
     raise AssertionError("setor padrão ADCETEI ausente")
 default_sector = next(item for item in catalogs["sectors"] if item["name"] == "ADCETEI")
+requester_sector = next(item for item in catalogs["sectors"] if item["id"] == requester_user["department_sector_id"])
 status, body = call("PATCH", f"/inventory/catalogs/sectors/{default_sector['id']}", admin, {"is_active": False})
 expect(status, 400, "setor padrão ADCETEI não pode ser desativado")
 if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou desativado.":
@@ -638,6 +642,7 @@ status, _ = call(
         "equipment_type_id": equipment_type["id"],
         "manufacturer_id": manufacturer["id"],
         "equipment_model_id": equipment_model["id"],
+        "sector_id": requester_sector["id"],
         "assigned_user_id": requester_user["id"],
     },
 )
@@ -652,6 +657,7 @@ status, allocated_asset = call(
         "equipment_type_id": equipment_type["id"],
         "manufacturer_id": manufacturer["id"],
         "equipment_model_id": equipment_model["id"],
+        "sector_id": requester_sector["id"],
         "assigned_user_id": requester_user["id"],
         "delivered_at": "2026-07-02T12:00:00-03:00",
     },
@@ -689,6 +695,10 @@ if export_body[:2] != b"PK":
     raise AssertionError("arquivo xlsx inválido")
 if "inventario_adcetei" not in export_headers.get("content-disposition", ""):
     raise AssertionError("nome de arquivo de exportação ausente")
+workbook = load_workbook(BytesIO(export_body), read_only=True)
+headers = [cell.value for cell in next(workbook["Inventário"].iter_rows(min_row=6, max_row=6))]
+expect(headers[5], "Secretaria", "exportação coloca secretaria antes do setor")
+expect(headers[6], "Setor", "exportação mantém setor após secretaria")
 
 status, detailed_asset = call("GET", f"/inventory/assets/{allocated_asset['id']}", admin)
 expect(status, 200, "administrador detalha equipamento modular")
@@ -707,7 +717,7 @@ status, _ = call(
 )
 expect(status, 403, "usuário comum sem inventory.move não movimenta equipamento")
 
-status, moved_asset = call(
+status, _ = call(
     "POST",
     f"/inventory/assets/{modular_asset['id']}/allocate",
     admin,
@@ -718,18 +728,50 @@ status, moved_asset = call(
         "notes": "Entregue ao setor pela regressão.",
     },
 )
+expect(status, 400, "responsável fora do setor não pode receber equipamento")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/allocate",
+    admin,
+    {
+        "sector_id": requester_sector["id"],
+        "assigned_user_id": requester_user["id"],
+        "movement_date": "2026-07-02",
+        "notes": "Entregue ao setor pela regressão.",
+    },
+)
 expect(status, 200, "administrador aloca equipamento")
 expect(moved_asset["status"], "allocated", "alocação muda status para alocado")
-expect(moved_asset["sector"]["id"], external_sector["id"], "alocação muda setor")
+expect(moved_asset["sector"]["id"], requester_sector["id"], "alocação muda setor")
 expect(moved_asset["assigned_user"]["id"], requester_user["id"], "alocação vincula responsável")
 assert_explicit_zone(moved_asset["delivered_at"], "inventário.delivered_at")
 status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
 expect(status, 200, "histórico após alocação")
 allocated_movement = next((item for item in movements if item["action"] == "allocated"), None)
-if not allocated_movement or allocated_movement["to_sector"]["id"] != external_sector["id"] or allocated_movement["to_user"]["id"] != requester_user["id"]:
+if not allocated_movement or allocated_movement["to_sector"]["id"] != requester_sector["id"] or allocated_movement["to_user"]["id"] != requester_user["id"]:
     raise AssertionError("histórico não registrou alocação com setor/responsável")
 
-status, moved_asset = call(
+status, same_sector_user = call(
+    "POST",
+    "/admin/users",
+    admin,
+    {
+        "username": "mesmo.setor",
+        "full_name": "Usuário Mesmo Setor",
+        "email": "mesmo.setor@adcetei.cabofrio.rj.gov.br",
+        "password": "SenhaTeste123",
+        "role": "user",
+        "secretariat": requester_user["secretariat"],
+        "department_sector_id": requester_sector["id"],
+        "department": requester_sector["name"],
+        "phone": "",
+        "active": True,
+    },
+)
+expect(status, 201, "administrador cria usuário no mesmo setor para movimentação")
+
+status, _ = call(
     "POST",
     f"/inventory/assets/{modular_asset['id']}/change-responsible",
     admin,
@@ -739,12 +781,24 @@ status, moved_asset = call(
         "notes": "Troca de responsável pela regressão.",
     },
 )
+expect(status, 400, "troca para responsável de outro setor é bloqueada")
+
+status, moved_asset = call(
+    "POST",
+    f"/inventory/assets/{modular_asset['id']}/change-responsible",
+    admin,
+    {
+        "assigned_user_id": same_sector_user["id"],
+        "movement_date": "2026-07-03",
+        "notes": "Troca de responsável pela regressão.",
+    },
+)
 expect(status, 200, "administrador troca responsável")
-expect(moved_asset["assigned_user"]["id"], admin_user["id"], "responsável atualizado")
+expect(moved_asset["assigned_user"]["id"], same_sector_user["id"], "responsável atualizado")
 expect(moved_asset["status"], "allocated", "troca mantém equipamento alocado")
 status, movements = call("GET", f"/inventory/assets/{modular_asset['id']}/movements", admin)
 responsible_movement = next((item for item in movements if item["action"] == "responsible_changed"), None)
-if not responsible_movement or responsible_movement["from_user"]["id"] != requester_user["id"] or responsible_movement["to_user"]["id"] != admin_user["id"]:
+if not responsible_movement or responsible_movement["from_user"]["id"] != requester_user["id"] or responsible_movement["to_user"]["id"] != same_sector_user["id"]:
     raise AssertionError("histórico não registrou troca de responsável")
 
 status, moved_asset = call(

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge, Button, Card, Field, Input, SectionHeader, Select, Textarea, buttonStyles } from "@/components/ui";
 import { assetStatusTone } from "@/lib/format";
 import type { InventoryCatalogs, InventoryEquipmentModel, User } from "@/lib/types";
-import { activeCatalogItems } from "./inventory-utils";
+import { activeCatalogItems, sectorWithSecretariat } from "./inventory-utils";
 
 export type NewAssetDraft = {
   supplier_id: string;
@@ -46,6 +46,9 @@ export default function NewInventoryAssetForm({
   onDraftChange,
   onSubmit,
 }: Props) {
+  const selectedSectorId = Number(draft.sector_id || 0);
+  const responsibleOptions = users.filter((item) => item.active && (!selectedSectorId || item.department_sector_id === selectedSectorId));
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <Card className="overflow-hidden">
@@ -94,16 +97,16 @@ export default function NewInventoryAssetForm({
         />
         <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
           <Field label="Setor">
-            <Select value={draft.sector_id} onChange={(event) => onDraftChange({ sector_id: event.target.value })}>
+            <Select value={draft.sector_id} onChange={(event) => onDraftChange({ sector_id: event.target.value, assigned_user_id: "" })}>
               <option value="">ADCETEI</option>
-              {activeCatalogItems(catalogs.sectors).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              {activeCatalogItems(catalogs.sectors).map((item) => <option key={item.id} value={item.id}>{sectorWithSecretariat(item)}</option>)}
             </Select>
           </Field>
           {canViewUsers && (
-            <Field label="Responsável" help="Opcional. Use apenas usuário cadastrado no portal.">
-              <Select value={draft.assigned_user_id} onChange={(event) => onDraftChange({ assigned_user_id: event.target.value })}>
+            <Field label="Responsável" help={draft.sector_id ? "Opcional. Lista limitada ao setor selecionado." : "Selecione um setor para vincular responsável."}>
+              <Select disabled={!draft.sector_id} value={draft.assigned_user_id} onChange={(event) => onDraftChange({ assigned_user_id: event.target.value })}>
                 <option value="">Não vinculado</option>
-                {users.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.full_name} · {item.department}</option>)}
+                {responsibleOptions.map((item) => <option key={item.id} value={item.id}>{item.full_name} · {item.department}</option>)}
               </Select>
             </Field>
           )}
