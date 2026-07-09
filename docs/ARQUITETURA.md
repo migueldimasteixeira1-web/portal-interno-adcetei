@@ -20,6 +20,7 @@ Portal Interno ADCETEI
 │   ├── cadastros base (fornecedor, tipo, fabricante, modelo, setor)
 │   ├── equipamentos e movimentações
 │   ├── entrada em lote por série
+│   ├── termos de recebimento e confirmação de entrega
 │   └── opções resumidas para chamados
 └── Administração
     ├── usuários
@@ -76,6 +77,7 @@ Imports existentes `@/lib/api` e `@/lib/types` continuam válidos após a modula
 | `/dashboard` | `features/dashboard/DashboardSections` |
 | `/chamados`, `/chamados/novo`, `/chamados/[id]` | `features/tickets/*` |
 | `/inventario`, `/inventario/[id]`, `/inventario/lote`, `/inventario/novo`, `/inventario/cadastros` | `features/inventory/*` |
+| `/inventario/termos` | Termos de recebimento e confirmação de entrega |
 | `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
 | `/administracao/perfis`, `/administracao/auditoria` | Inline (telas menores) |
 
@@ -121,14 +123,17 @@ Padrão aceito: `usuario@secretaria.cabofrio.rj.gov.br`. Contas públicas nascem
 
 A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Rotas legadas de `/api/assets` coexistem com o contrato modular em `/api/inventory/assets`.
 
-- Cadastros base: `/api/inventory/catalogs` — `inventory.view` / `inventory.manage_catalogs`
-- Equipamentos: número de série como ID principal, vínculos opcionais aos cadastros
+- Cadastros base: `/api/inventory/catalogs` — fornecedores, contratos vinculados a fornecedor, tipos, fabricantes, modelos e setores (`inventory.view` / `inventory.manage_catalogs`)
+- Equipamentos: número de série como ID principal, especificações e vínculos opcionais aos cadastros
 - Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
 - Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI
+- Termos: `/api/inventory/delivery-terms` — número sugerido, contrato cadastrado, prévia por número de série, emissão/cancelamento do DOCX oficial a partir do template e confirmação de entrega sem alterar o inventário antes da assinatura
 - Exportação: `GET /api/inventory/assets/export` — planilha `.xlsx` com os mesmos filtros da listagem (`inventory.view`); coluna “Última movimentação” usa a entrada mais recente por `movement_date` (desempate por `id`)
 - Baixa: `POST /api/inventory/assets/{id}/retire` — status `retired` com motivo, justificativa, movimentação `retired` e auditoria `inventory_asset_retired` (`inventory.move`; correção administrativa só admin)
 - Tela `/inventario/cadastros` para CRUD dos cadastros base
 - Setor `ADCETEI` protegido contra renomeação/desativação via API
+
+Termos de recebimento usam o cadastro existente de `users` como cadastro único de pessoas. Uma conta pode ficar bloqueada para login (`active=false`) e ainda ser usada como responsável recebedor do termo. A confirmação de entrega aplica a alocação em lote nos ativos e registra uma movimentação individual para cada equipamento.
 
 Duas superfícies para equipamentos:
 

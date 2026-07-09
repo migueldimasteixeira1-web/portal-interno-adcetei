@@ -106,6 +106,8 @@ SEED_DEMO_DATA=true
 - ambientes não locais ficam sem seed por padrão;
 - dados existentes nunca são apagados automaticamente.
 
+O seed local cobre o fluxo operacional: usuários/chamados, catálogos do inventário, fornecedor IART, contratos, setores, equipamentos em estoque, alocados, em manutenção e baixados. A massa usa uma amostra curta baseada na exportação real `inventario_adcetei_2026-07-08.xlsx`, suficiente para testar emissão de termo, validação por número de série, alocação e item usado devolvido ao estoque.
+
 O `iniciar-local.sh` usa a configuração de `apps/api/.env` quando esse arquivo existir. Sem arquivo, os padrões locais mantêm os dados de demonstração habilitados.
 
 ## Contas de demonstração
@@ -133,7 +135,9 @@ A Parte 6 adicionou histórico e movimentações em `asset_movements`. Alocaçã
 
 A Parte 7 adicionou entrada em lote por leitura/digitação de números de série. O fluxo cria todos os itens como estoque ADCETEI, sem responsável e sem data de envio, registrando movimento inicial `created` para cada equipamento. Importação por planilha continua para etapa posterior.
 
-A Parte 8 adicionou a tela `/inventario/cadastros` para gerenciar fornecedores, tipos de equipamento, fabricantes, modelos e setores. O acesso exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+A Parte 8 adicionou a tela `/inventario/cadastros` para gerenciar fornecedores, contratos, tipos de equipamento, fabricantes, modelos e setores. O acesso exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+
+O fluxo de termos de recebimento fica separado em `/inventario/termos`. Ele sugere o próximo número, usa contrato cadastrado vinculado a fornecedor, preenche o destino como `Secretaria - Setor`, valida os números de série antes da emissão, emite o DOCX oficial a partir do template cadastrado na API, permite cancelar termo aberto e só altera o inventário quando a entrega assinada é confirmada. A confirmação aloca todos os itens do termo para o setor/usuário e registra uma movimentação por equipamento. Equipamentos também têm campo de especificações, usado na relação do termo.
 
 O setor padrão `ADCETEI` é protegido no backend: não pode ser renomeado nem desativado via API.
 

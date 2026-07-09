@@ -407,7 +407,7 @@ expect(status, 200, "administrador consulta catálogos após exclusão")
 if any(item["id"] == temporary_supplier["id"] for item in catalogs_after_delete["suppliers"]):
     raise AssertionError("fornecedor temporário não foi excluído")
 
-status, equipment_type = call("POST", "/inventory/catalogs/equipment-types", admin, {"name": "Notebook"})
+status, equipment_type = call("POST", "/inventory/catalogs/equipment-types", admin, {"name": "Projetor"})
 expect(status, 201, "administrador cria tipo de equipamento")
 status, manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Dell"})
 expect(status, 201, "administrador cria fabricante")
@@ -512,7 +512,7 @@ status, _ = call(
 )
 expect(status, 409, "serial duplicado bloqueado por comparação normalizada")
 
-status, other_manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Lenovo"})
+status, other_manufacturer = call("POST", "/inventory/catalogs/manufacturers", admin, {"name": "Fabricante Regressao"})
 expect(status, 201, "administrador cria fabricante alternativo")
 status, _ = call(
     "POST",
