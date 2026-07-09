@@ -20,6 +20,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), default="")
     role: Mapped[str] = mapped_column(String(40), default="user", index=True)
     secretariat: Mapped[str] = mapped_column(String(150), default="Prefeitura de Cabo Frio")
+    department_sector_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_sectors.id"), nullable=True)
     department: Mapped[str] = mapped_column(String(150), default="Não informado")
     registration: Mapped[str] = mapped_column(String(80), default="")
     phone: Mapped[str] = mapped_column(String(40), default="")
@@ -39,6 +40,7 @@ class User(Base):
     assigned_tickets: Mapped[list[Ticket]] = relationship(
         back_populates="assignee", foreign_keys="Ticket.assignee_id"
     )
+    department_sector: Mapped[Optional["InventorySector"]] = relationship(foreign_keys=[department_sector_id])
 
 
 class Asset(Base):

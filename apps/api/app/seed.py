@@ -152,6 +152,10 @@ def seed_database(db: Session) -> None:
     sector = {item.name: item for item in sectors}
     eq_type = {item.name: item for item in equipment_types}
     maker = {item.name: item for item in manufacturers}
+    for seeded_user in users:
+        linked_sector = sector.get(seeded_user.department)
+        if linked_sector:
+            seeded_user.department_sector_id = linked_sector.id
 
     models = [
         _catalog(InventoryEquipmentModel, "S24D400GAL", manufacturer_id=maker["SAMSUNG"].id, equipment_type_id=eq_type["Monitor"].id),

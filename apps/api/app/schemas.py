@@ -14,6 +14,7 @@ class UserOut(BaseModel):
     email: EmailStr
     role: str
     secretariat: str
+    department_sector_id: Optional[int] = None
     department: str
     registration: str = ""
     phone: str
@@ -136,6 +137,7 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=10, max_length=128)
     role: RoleName = "user"
     secretariat: str = Field(default="Prefeitura de Cabo Frio", max_length=150)
+    department_sector_id: Optional[int] = None
     department: str = Field(default="Não informado", max_length=150)
     registration: str = Field(default="", max_length=80)
     phone: str = Field(default="", max_length=40)
@@ -151,6 +153,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(default=None, min_length=10, max_length=128)
     role: Optional[RoleName] = None
     secretariat: Optional[str] = Field(default=None, max_length=150)
+    department_sector_id: Optional[int] = None
     department: Optional[str] = Field(default=None, max_length=150)
     registration: Optional[str] = Field(default=None, max_length=80)
     phone: Optional[str] = Field(default=None, max_length=40)

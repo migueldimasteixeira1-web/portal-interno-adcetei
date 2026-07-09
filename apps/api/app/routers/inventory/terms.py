@@ -165,14 +165,19 @@ def next_term_number(db: Session) -> str:
 
 
 def destination_sector_for_recipient(db: Session, recipient: User) -> InventorySector:
+    if recipient.department_sector_id:
+        sector = db.get(InventorySector, recipient.department_sector_id)
+        if sector:
+            return sector
     name = " ".join((recipient.department or "").strip().split()) or "Não informado"
     normalized = normalize_catalog_name(name)
     sector = db.scalar(select(InventorySector).where(InventorySector.normalized_name == normalized))
-    if sector:
-        return sector
-    sector = InventorySector(name=name, normalized_name=normalized, is_active=True)
-    db.add(sector)
-    db.flush()
+    if not sector:
+        sector = InventorySector(name=name, normalized_name=normalized, is_active=True)
+        db.add(sector)
+        db.flush()
+    recipient.department_sector_id = sector.id
+    recipient.department = sector.name
     return sector
 
 

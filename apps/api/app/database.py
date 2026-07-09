@@ -44,6 +44,8 @@ def ensure_schema_compatibility() -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP"))
         if "registration" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN registration VARCHAR(80) DEFAULT ''"))
+        if "department_sector_id" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN department_sector_id INTEGER"))
         if "role" in user_columns:
             connection.execute(text("UPDATE users SET role = 'technician' WHERE role = 'helpdesk'"))
             connection.execute(text("UPDATE users SET role = 'user' WHERE role = 'requester'"))

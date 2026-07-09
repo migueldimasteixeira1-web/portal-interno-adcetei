@@ -20,6 +20,7 @@ def serialize_user(
         "email": user.email,
         "role": user.role,
         "secretariat": user.secretariat,
+        "department_sector_id": user.department_sector_id,
         "department": user.department,
         "registration": user.registration,
         "phone": user.phone,

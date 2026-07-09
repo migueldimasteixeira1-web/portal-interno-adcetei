@@ -53,6 +53,7 @@ const emptyUserDraft: UserDraft = {
   password: "TermoTemporario123",
   role: "user",
   secretariat: "Prefeitura de Cabo Frio",
+  department_sector_id: "",
   department: "Não informado",
   registration: "",
   phone: "",
@@ -231,6 +232,7 @@ export default function InventoryDeliveryTermsPage() {
       const email = completeInstitutionalEmail(userDraft.email);
       const created = await api.createUser({
         ...userDraft,
+        department_sector_id: userDraft.department_sector_id ? Number(userDraft.department_sector_id) : null,
         username: userDraft.username || usernameFromEmail(email),
         email,
         active: false,
@@ -516,6 +518,7 @@ export default function InventoryDeliveryTermsPage() {
         draft={userDraft}
         saving={saving}
         error={error}
+        sectorOptions={activeCatalogItems(catalogs.sectors)}
         onOpenChange={setUserDialogOpen}
         onConfirm={saveUser}
         onDraftChange={(next) => {

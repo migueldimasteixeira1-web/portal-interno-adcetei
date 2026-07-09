@@ -3,7 +3,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { Alert, Badge, Button, ConfirmDialog, Field, Input, Select, Toolbar } from "@/components/ui";
 import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
 import { roleLabels } from "@/lib/format";
-import type { Role, User } from "@/lib/types";
+import type { InventoryCatalogItem, Role, User } from "@/lib/types";
 
 export type UserDraft = {
   username: string;
@@ -12,6 +12,7 @@ export type UserDraft = {
   password: string;
   role: Role;
   secretariat: string;
+  department_sector_id: string;
   department: string;
   registration: string;
   phone: string;
@@ -82,12 +83,18 @@ type FormDialogProps = {
   draft: UserDraft;
   saving: boolean;
   error: string;
+  sectorOptions?: InventoryCatalogItem[];
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   onDraftChange: (draft: UserDraft) => void;
 };
 
-export function UserFormDialog({ open, editing, draft, saving, error, onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+export function UserFormDialog({ open, editing, draft, saving, error, sectorOptions = [], onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+  const selectSector = (sectorId: string) => {
+    const sector = sectorOptions.find((item) => String(item.id) === sectorId);
+    onDraftChange({ ...draft, department_sector_id: sectorId, department: sector?.name || draft.department });
+  };
+
   return (
     <ConfirmDialog
       open={open}
@@ -108,7 +115,13 @@ export function UserFormDialog({ open, editing, draft, saving, error, onOpenChan
           </Select>
         </Field>
         <Field label="Secretaria"><Input value={draft.secretariat} onChange={(e) => onDraftChange({ ...draft, secretariat: e.target.value })} /></Field>
-        <Field label="Setor"><Input value={draft.department} onChange={(e) => onDraftChange({ ...draft, department: e.target.value })} /></Field>
+        <Field label="Setor">
+          <Select value={draft.department_sector_id} onChange={(e) => selectSector(e.target.value)}>
+            <option value="">Setor textual/manual</option>
+            {sectorOptions.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
+          </Select>
+        </Field>
+        {!draft.department_sector_id && <Field label="Setor textual"><Input value={draft.department} onChange={(e) => onDraftChange({ ...draft, department: e.target.value })} /></Field>}
         <Field label="Matrícula"><Input value={draft.registration} onChange={(e) => onDraftChange({ ...draft, registration: e.target.value })} /></Field>
         <Field label="Telefone"><Input value={draft.phone} onChange={(e) => onDraftChange({ ...draft, phone: e.target.value })} /></Field>
         <Field label={editing ? "Nova senha (opcional)" : "Senha"} help="Mínimo de 10 caracteres."><Input type="password" value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} /></Field>

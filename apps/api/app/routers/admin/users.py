@@ -9,12 +9,21 @@ from ...audit import add_audit
 from ...auth import hash_password, validate_institutional_email
 from ...database import get_db
 from ...email_verification import send_user_verification
-from ...models import Asset, AssetMovement, AuditLog, Ticket, TicketComment, User
+from ...models import Asset, AssetMovement, AuditLog, InventorySector, Ticket, TicketComment, User
 from ...permissions import require_permission
 from ...schemas import UserCreate, UserOut, UserUpdate
 from ...time_utils import utc_now
 
 router = APIRouter()
+
+
+def user_department_from_sector(db: Session, sector_id: int | None, fallback: str) -> tuple[int | None, str]:
+    if sector_id is None:
+        return None, fallback.strip()
+    sector = db.get(InventorySector, sector_id)
+    if not sector:
+        raise HTTPException(status_code=400, detail="Setor do usuário inválido")
+    return sector.id, sector.name
 
 @router.post("/users", response_model=UserOut, status_code=201)
 def create_user(
@@ -25,6 +34,7 @@ def create_user(
     username = payload.username.strip().lower()
     email = validate_institutional_email(str(payload.email))
     ensure_unique_user(db, username, email)
+    department_sector_id, department = user_department_from_sector(db, payload.department_sector_id, payload.department)
     user = User(
         username=username,
         full_name=payload.full_name.strip(),
@@ -32,7 +42,8 @@ def create_user(
         password_hash=hash_password(payload.password),
         role=payload.role,
         secretariat=payload.secretariat.strip(),
-        department=payload.department.strip(),
+        department_sector_id=department_sector_id,
+        department=department,
         registration=payload.registration.strip(),
         phone=payload.phone.strip(),
         source="local",
@@ -79,6 +90,12 @@ def update_user(
 
     changes: dict[str, Any] = {}
     email_changed = False
+    if "department_sector_id" in data:
+        sector_id, department = user_department_from_sector(db, data["department_sector_id"], data.get("department", user.department))
+        if user.department_sector_id != sector_id:
+            changes["department_sector_id"] = {"from": user.department_sector_id, "to": sector_id}
+            user.department_sector_id = sector_id
+        data["department"] = department
     for field in ("username", "full_name", "email", "role", "secretariat", "department", "registration", "phone", "active"):
         if field in data:
             value = data[field]
@@ -209,4 +226,3 @@ def delete_user(
     )
     db.commit()
     return {"message": "Usuário excluído com sucesso"}
-

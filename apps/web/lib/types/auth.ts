@@ -7,6 +7,7 @@ export interface User {
   email: string;
   role: Role;
   secretariat: string;
+  department_sector_id?: number | null;
   department: string;
   registration: string;
   phone: string;
