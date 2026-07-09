@@ -33,6 +33,7 @@ def create_user(
         role=payload.role,
         secretariat=payload.secretariat.strip(),
         department=payload.department.strip(),
+        registration=payload.registration.strip(),
         phone=payload.phone.strip(),
         source="local",
         active=payload.active,
@@ -67,7 +68,7 @@ def update_user(
     data = payload.model_dump(exclude_unset=True)
     reject_null_fields(
         data,
-        {"username", "full_name", "email", "role", "secretariat", "department", "phone", "active", "email_verified"},
+        {"username", "full_name", "email", "role", "secretariat", "department", "registration", "phone", "active", "email_verified"},
     )
     ensure_last_admin(db, user, data)
     if actor.id == user.id and data.get("active") is False:
@@ -78,7 +79,7 @@ def update_user(
 
     changes: dict[str, Any] = {}
     email_changed = False
-    for field in ("username", "full_name", "email", "role", "secretariat", "department", "phone", "active"):
+    for field in ("username", "full_name", "email", "role", "secretariat", "department", "registration", "phone", "active"):
         if field in data:
             value = data[field]
             if isinstance(value, str):
@@ -208,5 +209,4 @@ def delete_user(
     )
     db.commit()
     return {"message": "Usuário excluído com sucesso"}
-
 

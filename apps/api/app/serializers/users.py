@@ -21,6 +21,7 @@ def serialize_user(
         "role": user.role,
         "secretariat": user.secretariat,
         "department": user.department,
+        "registration": user.registration,
         "phone": user.phone,
         "source": user.source,
         "active": user.active,

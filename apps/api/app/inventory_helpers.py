@@ -32,6 +32,7 @@ from .inventory_service import (
 from .models import (
     Asset,
     AssetMovement,
+    InventoryContract,
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
@@ -175,6 +176,15 @@ def validate_optional_catalogs(
     return supplier, sector
 
 
+def validate_contract(db: Session, contract_id: int | None) -> InventoryContract | None:
+    if contract_id is None:
+        return None
+    contract = db.get(InventoryContract, contract_id)
+    if not contract or not contract.is_active:
+        raise HTTPException(status_code=400, detail="Contrato inválido")
+    return contract
+
+
 def validate_asset_catalogs(
     db: Session,
     equipment_type_id: int,
@@ -226,6 +236,7 @@ def inventory_asset_payload(asset: Asset) -> dict[str, Any]:
     return {
         "id": asset.id,
         "serial_number": asset.serial_number,
+        "specifications": asset.specifications or "",
         "status": asset_inventory_status(asset),
         "display_name": asset_display_name(asset),
         "supplier_id": asset.supplier_id,
@@ -365,6 +376,7 @@ def create_bulk_scan_asset(
         manufacturer=manufacturer.name[:100],
         model=equipment_model.name[:140],
         serial_number=serial_number,
+        specifications=payload.specifications.strip(),
         status=legacy_asset_status("stock"),
         location=sector.name,
         assigned_user_id=None,
@@ -488,5 +500,3 @@ def list_inventory_assets_filtered(
     return list(
         db.scalars(inventory_asset_query().where(Asset.id.in_(asset_ids)).order_by(Asset.id.desc())).unique()
     )
-
-

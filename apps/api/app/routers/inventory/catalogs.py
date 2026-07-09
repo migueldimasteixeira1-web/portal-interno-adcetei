@@ -18,6 +18,8 @@ from ...inventory_service import default_sector_update_error, normalize_catalog_
 from ...models import (
     Asset,
     AssetMovement,
+    InventoryContract,
+    InventoryDeliveryTerm,
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
@@ -31,6 +33,9 @@ from ...schemas import (
     InventoryCatalogItemOut,
     InventoryCatalogItemUpdate,
     InventoryCatalogsOut,
+    InventoryContractCreate,
+    InventoryContractOut,
+    InventoryContractUpdate,
     InventoryEquipmentModelCreate,
     InventoryEquipmentModelOut,
     InventoryEquipmentModelUpdate,
@@ -45,6 +50,7 @@ def list_catalogs(
 ):
     return {
         "suppliers": list_items(db, InventorySupplier),
+        "contracts": list_items(db, InventoryContract),
         "equipment_types": list_items(db, InventoryEquipmentType),
         "manufacturers": list_items(db, InventoryManufacturer),
         "models": list_items(db, InventoryEquipmentModel),
@@ -77,7 +83,68 @@ def delete_supplier(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
-    return delete_item(db, InventorySupplier, item_id, (select(Asset.id).where(Asset.supplier_id == item_id),))
+    return delete_item(
+        db,
+        InventorySupplier,
+        item_id,
+        (
+            select(Asset.id).where(Asset.supplier_id == item_id),
+            select(InventoryContract.id).where(InventoryContract.supplier_id == item_id),
+        ),
+    )
+
+
+@router.post("/catalogs/contracts", response_model=InventoryContractOut, status_code=201)
+def create_contract(
+    payload: InventoryContractCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    if not db.get(InventorySupplier, payload.supplier_id):
+        raise HTTPException(status_code=400, detail="Fornecedor inválido")
+    name = catalog_name(payload.name)
+    contract = InventoryContract(
+        name=name,
+        normalized_name=ensure_unique_name(db, InventoryContract, name),
+        supplier_id=payload.supplier_id,
+        is_active=payload.is_active,
+    )
+    db.add(contract)
+    db.commit()
+    db.refresh(contract)
+    return contract
+
+
+@router.patch("/catalogs/contracts/{item_id}", response_model=InventoryContractOut)
+def update_contract(
+    item_id: int,
+    payload: InventoryContractUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    contract = get_item(db, InventoryContract, item_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "supplier_id" in data:
+        if not db.get(InventorySupplier, data["supplier_id"]):
+            raise HTTPException(status_code=400, detail="Fornecedor inválido")
+        contract.supplier_id = data["supplier_id"]
+    if "name" in data:
+        contract.name = catalog_name(data["name"])
+        contract.normalized_name = ensure_unique_name(db, InventoryContract, contract.name, item_id)
+    if "is_active" in data:
+        contract.is_active = data["is_active"]
+    db.commit()
+    db.refresh(contract)
+    return contract
+
+
+@router.delete("/catalogs/contracts/{item_id}")
+def delete_contract(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(db, InventoryContract, item_id, (select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.contract_id == item_id),))
 
 
 @router.post("/catalogs/equipment-types", response_model=InventoryCatalogItemOut, status_code=201)

@@ -21,6 +21,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(40), default="user", index=True)
     secretariat: Mapped[str] = mapped_column(String(150), default="Prefeitura de Cabo Frio")
     department: Mapped[str] = mapped_column(String(150), default="Não informado")
+    registration: Mapped[str] = mapped_column(String(80), default="")
     phone: Mapped[str] = mapped_column(String(40), default="")
     source: Mapped[str] = mapped_column(String(20), default="local")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -49,6 +50,7 @@ class Asset(Base):
     manufacturer: Mapped[str] = mapped_column(String(100), default="")
     model: Mapped[str] = mapped_column(String(140), default="")
     serial_number: Mapped[str] = mapped_column(String(120), default="")
+    specifications: Mapped[str] = mapped_column(Text, default="")
     patrimony: Mapped[str] = mapped_column(String(80), default="")
     status: Mapped[str] = mapped_column(String(40), default="active", index=True)
     location: Mapped[str] = mapped_column(String(160), default="")
@@ -89,6 +91,20 @@ class InventorySupplier(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class InventoryContract(Base):
+    __tablename__ = "inventory_contracts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(180), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(220), unique=True, index=True)
+    supplier_id: Mapped[int] = mapped_column(ForeignKey("inventory_suppliers.id"), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    supplier: Mapped[InventorySupplier] = relationship()
 
 
 class InventoryEquipmentType(Base):
@@ -164,6 +180,61 @@ class AssetMovement(Base):
     from_user: Mapped[Optional[User]] = relationship(foreign_keys=[from_user_id])
     to_user: Mapped[Optional[User]] = relationship(foreign_keys=[to_user_id])
     actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])
+
+
+class InventoryDeliveryTerm(Base):
+    __tablename__ = "inventory_delivery_terms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    term_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    contract_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_contracts.id"), nullable=True, index=True)
+    contract_number: Mapped[str] = mapped_column(String(120), default="")
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    destination_sector_id: Mapped[int] = mapped_column(ForeignKey("inventory_sectors.id"), index=True)
+    destination_unit: Mapped[str] = mapped_column(String(180))
+    recipient_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    recipient_name: Mapped[str] = mapped_column(String(180))
+    recipient_email: Mapped[str] = mapped_column(String(180))
+    recipient_registration: Mapped[str] = mapped_column(String(80), default="")
+    recipient_phone: Mapped[str] = mapped_column(String(40), default="")
+    adcetei_signer_name: Mapped[str] = mapped_column(String(180), default="William Barreto Corrêa")
+    adcetei_signer_title: Mapped[str] = mapped_column(String(180), default="Coordenador Geral de Tecnologia da Informação")
+    item_observation: Mapped[str] = mapped_column(String(180), default="Equipamento locado")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    delivered_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    recipient: Mapped[User] = relationship(foreign_keys=[recipient_user_id])
+    contract: Mapped[Optional[InventoryContract]] = relationship()
+    destination_sector: Mapped[InventorySector] = relationship()
+    created_by: Mapped[Optional[User]] = relationship(foreign_keys=[created_by_user_id])
+    delivered_by: Mapped[Optional[User]] = relationship(foreign_keys=[delivered_by_user_id])
+    items: Mapped[list[InventoryDeliveryTermItem]] = relationship(
+        back_populates="term",
+        cascade="all, delete-orphan",
+        order_by="InventoryDeliveryTermItem.id",
+    )
+
+
+class InventoryDeliveryTermItem(Base):
+    __tablename__ = "inventory_delivery_term_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    term_id: Mapped[int] = mapped_column(ForeignKey("inventory_delivery_terms.id"), index=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    asset_type: Mapped[str] = mapped_column(String(80), default="")
+    manufacturer: Mapped[str] = mapped_column(String(120), default="")
+    model: Mapped[str] = mapped_column(String(160), default="")
+    serial_number: Mapped[str] = mapped_column(String(120), default="")
+    specification: Mapped[str] = mapped_column(Text, default="")
+    observation: Mapped[str] = mapped_column(String(180), default="")
+
+    term: Mapped[InventoryDeliveryTerm] = relationship(back_populates="items")
+    asset: Mapped[Asset] = relationship()
 
 
 class ServiceCatalog(Base):

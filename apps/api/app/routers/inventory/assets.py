@@ -276,6 +276,7 @@ def create_inventory_asset(
         manufacturer=manufacturer.name[:100],
         model=equipment_model.name[:140],
         serial_number=serial_number,
+        specifications=payload.specifications.strip(),
         status=legacy_asset_status(status),
         location=sector.name,
         assigned_user_id=payload.assigned_user_id,
@@ -317,6 +318,8 @@ def update_inventory_asset(
     if "serial_number" in data:
         asset.serial_number = normalize_inventory_serial(data["serial_number"])
         ensure_unique_serial(db, asset.serial_number, asset.id)
+    if "specifications" in data:
+        asset.specifications = (data["specifications"] or "").strip()
     if "assigned_user_id" in data:
         validate_user(db, data["assigned_user_id"])
         asset.assigned_user_id = data["assigned_user_id"]
@@ -561,4 +564,3 @@ def retire_inventory_asset(
     )
     db.commit()
     return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
-
