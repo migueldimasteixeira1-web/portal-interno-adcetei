@@ -359,6 +359,9 @@ for permission in ("inventory.view", "inventory.create", "inventory.bulk_scan", 
 
 status, catalogs = call("GET", "/inventory/catalogs", admin)
 expect(status, 200, "administrador consulta catálogos de inventário")
+if not catalogs["secretariats"]:
+    raise AssertionError("secretarias ausentes nos catálogos")
+default_secretariat = catalogs["secretariats"][0]
 if not any(item["name"] == "ADCETEI" and item["is_active"] for item in catalogs["sectors"]):
     raise AssertionError("setor padrão ADCETEI ausente")
 default_sector = next(item for item in catalogs["sectors"] if item["name"] == "ADCETEI")
@@ -372,7 +375,7 @@ if body.get("detail") != "O setor padrão ADCETEI não pode ser renomeado ou des
     raise AssertionError("mensagem de proteção do setor padrão ausente ao renomear")
 status, _ = call("DELETE", f"/inventory/catalogs/sectors/{default_sector['id']}", admin)
 expect(status, 400, "setor padrão ADCETEI não pode ser excluído")
-status, protected_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Setor Proteção Regressão"})
+status, protected_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Setor Proteção Regressão", "secretariat_id": default_secretariat["id"]})
 expect(status, 201, "administrador cria setor auxiliar para teste de proteção")
 status, protected_sector = call("PATCH", f"/inventory/catalogs/sectors/{protected_sector['id']}", admin, {"is_active": False})
 expect(status, 200, "outros setores podem ser desativados")
@@ -381,11 +384,11 @@ status, protected_sector = call(
     "PATCH",
     f"/inventory/catalogs/sectors/{protected_sector['id']}",
     admin,
-    {"name": "Setor Proteção Renomeado", "is_active": True},
+    {"name": "Setor Proteção Renomeado", "is_active": True, "secretariat_id": default_secretariat["id"]},
 )
 expect(status, 200, "outros setores podem ser renomeados e reativados")
 expect(protected_sector["name"], "Setor Proteção Renomeado", "setor auxiliar renomeado")
-status, _ = call("POST", "/inventory/catalogs/sectors", admin, {"name": "  adcetei  "})
+status, _ = call("POST", "/inventory/catalogs/sectors", admin, {"name": "  adcetei  ", "secretariat_id": default_secretariat["id"]})
 expect(status, 409, "setor padrão não pode ser duplicado")
 
 status, supplier = call("POST", "/inventory/catalogs/suppliers", admin, {"name": "Fornecedor Teste"})
@@ -611,7 +614,7 @@ for created in bulk_confirm["assets"]:
     if not created_movement or created_movement["to_sector"]["name"] != "ADCETEI" or created_movement["to_status"] != "stock":
         raise AssertionError("item do lote não registrou movimento inicial created")
 
-status, external_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Escola Municipal"})
+status, external_sector = call("POST", "/inventory/catalogs/sectors", admin, {"name": "Escola Municipal", "secretariat_id": default_secretariat["id"]})
 expect(status, 201, "administrador cria setor externo")
 status, _ = call(
     "POST",

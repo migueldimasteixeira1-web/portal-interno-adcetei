@@ -134,7 +134,7 @@ export default function InventoryPage() {
         subtitle="Consulte equipamentos por número de série, vínculo atual, setor e situação operacional."
         actions={(canCreate || canBulkScan || canManageCatalogs) ? (
           <div className="flex flex-wrap gap-2">
-            {canManageCatalogs && <Link href="/inventario/cadastros" className={buttonStyles({ variant: "secondary" })}><Settings2 size={16} />Cadastros</Link>}
+            {canManageCatalogs && <Link href="/administracao/base-cadastros" className={buttonStyles({ variant: "secondary" })}><Settings2 size={16} />Base de cadastros</Link>}
             {canBulkScan && <Link href="/inventario/lote" className={buttonStyles({ variant: "secondary" })}><Plus size={16} />Entrada em lote</Link>}
             {canCreate && <Link href="/inventario/novo" className={buttonStyles()}><Plus size={16} />Novo equipamento</Link>}
           </div>

@@ -25,6 +25,16 @@ def user_department_from_sector(db: Session, sector_id: int | None, fallback: st
         raise HTTPException(status_code=400, detail="Setor do usuário inválido")
     return sector.id, sector.name
 
+
+def user_secretariat_from_sector(db: Session, sector_id: int | None, fallback: str) -> str:
+    if sector_id is None:
+        return " ".join((fallback or "Prefeitura de Cabo Frio").strip().split()) or "Prefeitura de Cabo Frio"
+    sector = db.get(InventorySector, sector_id)
+    if sector and sector.secretariat:
+        return sector.secretariat.name
+    return " ".join((fallback or "Prefeitura de Cabo Frio").strip().split()) or "Prefeitura de Cabo Frio"
+
+
 @router.post("/users", response_model=UserOut, status_code=201)
 def create_user(
     payload: UserCreate,
@@ -35,13 +45,14 @@ def create_user(
     email = validate_institutional_email(str(payload.email))
     ensure_unique_user(db, username, email)
     department_sector_id, department = user_department_from_sector(db, payload.department_sector_id, payload.department)
+    secretariat = user_secretariat_from_sector(db, department_sector_id, payload.secretariat)
     user = User(
         username=username,
         full_name=payload.full_name.strip(),
         email=email,
         password_hash=hash_password(payload.password),
         role=payload.role,
-        secretariat=payload.secretariat.strip(),
+        secretariat=secretariat,
         department_sector_id=department_sector_id,
         department=department,
         registration=payload.registration.strip(),
@@ -96,6 +107,7 @@ def update_user(
             changes["department_sector_id"] = {"from": user.department_sector_id, "to": sector_id}
             user.department_sector_id = sector_id
         data["department"] = department
+        data["secretariat"] = user_secretariat_from_sector(db, sector_id, data.get("secretariat", user.secretariat))
     for field in ("username", "full_name", "email", "role", "secretariat", "department", "registration", "phone", "active"):
         if field in data:
             value = data[field]

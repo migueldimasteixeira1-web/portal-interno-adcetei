@@ -12,6 +12,7 @@ from .models import (
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
+    InventorySecretariat,
     InventorySector,
     InventorySupplier,
     ServiceCatalog,
@@ -28,6 +29,11 @@ def _dt(year: int, month: int, day: int) -> datetime:
 
 def _catalog(model, name: str, **extra):
     return model(name=name, normalized_name=normalize_catalog_name(name), **extra)
+
+
+def _existing_or_catalog(db: Session, model, name: str, **extra):
+    existing = db.scalar(select(model).where(model.normalized_name == normalize_catalog_name(name)))
+    return existing or _catalog(model, name, **extra)
 
 
 def _asset(
@@ -123,12 +129,30 @@ def seed_database(db: Session) -> None:
         _catalog(InventoryContract, "Contrato nº 046/2026 - PMCF / IART", supplier_id=supplier_iart.id),
         _catalog(InventoryContract, "Contrato nº 017/2026 - PMCF / IART", supplier_id=supplier_iart.id),
     ]
+    secretariats = [
+        _existing_or_catalog(db, InventorySecretariat, "Secretaria Adjunta de Ciência e Tecnologia"),
+        _existing_or_catalog(db, InventorySecretariat, "Secretaria de Fazenda"),
+        _existing_or_catalog(db, InventorySecretariat, "Secretaria de Governo"),
+        _existing_or_catalog(db, InventorySecretariat, "Secretaria de Administração"),
+        _existing_or_catalog(db, InventorySecretariat, "Secretaria de Desenvolvimento da Cidade"),
+    ]
+    db.add_all(contracts + [item for item in secretariats if item.id is None])
+    db.flush()
+    secretariat = {item.name: item for item in secretariats}
     default_sector = db.scalar(select(InventorySector).where(InventorySector.normalized_name == normalize_catalog_name("ADCETEI")))
+    if default_sector:
+        default_sector.secretariat_id = secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id
     sectors = [
-        default_sector or _catalog(InventorySector, "ADCETEI"),
-        _catalog(InventorySector, "FAZENDA"),
-        _catalog(InventorySector, "SGI"),
-        _catalog(InventorySector, "SEGOV"),
+        default_sector or _catalog(InventorySector, "ADCETEI", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
+        _catalog(InventorySector, "Central de Atendimento", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
+        _catalog(InventorySector, "Desenvolvimento e Sistemas", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
+        _catalog(InventorySector, "Infraestrutura", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
+        _catalog(InventorySector, "FAZENDA", secretariat_id=secretariat["Secretaria de Fazenda"].id),
+        _catalog(InventorySector, "Atendimento", secretariat_id=secretariat["Secretaria de Fazenda"].id),
+        _catalog(InventorySector, "SGI", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
+        _catalog(InventorySector, "SEGOV", secretariat_id=secretariat["Secretaria de Governo"].id),
+        _catalog(InventorySector, "Recursos Humanos", secretariat_id=secretariat["Secretaria de Administração"].id),
+        _catalog(InventorySector, "SEGTEA", secretariat_id=secretariat["Secretaria de Desenvolvimento da Cidade"].id),
     ]
     equipment_types = [
         _catalog(InventoryEquipmentType, "Monitor"),
@@ -147,7 +171,7 @@ def seed_database(db: Session) -> None:
         _catalog(InventoryManufacturer, "Brother"),
         _catalog(InventoryManufacturer, "Cisco"),
     ]
-    db.add_all(contracts + [item for item in sectors if item.id is None] + equipment_types + manufacturers)
+    db.add_all([item for item in sectors if item.id is None] + equipment_types + manufacturers)
     db.flush()
     sector = {item.name: item for item in sectors}
     eq_type = {item.name: item for item in equipment_types}
@@ -156,6 +180,8 @@ def seed_database(db: Session) -> None:
         linked_sector = sector.get(seeded_user.department)
         if linked_sector:
             seeded_user.department_sector_id = linked_sector.id
+            if linked_sector.secretariat_id:
+                seeded_user.secretariat = linked_sector.secretariat.name
 
     models = [
         _catalog(InventoryEquipmentModel, "S24D400GAL", manufacturer_id=maker["SAMSUNG"].id, equipment_type_id=eq_type["Monitor"].id),

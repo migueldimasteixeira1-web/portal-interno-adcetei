@@ -28,13 +28,18 @@ export interface InventoryEquipmentModel extends InventoryCatalogItem {
   equipment_type_id: number;
 }
 
+export interface InventorySector extends InventoryCatalogItem {
+  secretariat_id?: number | null;
+}
+
 export interface InventoryCatalogs {
+  secretariats: InventoryCatalogItem[];
   suppliers: InventoryCatalogItem[];
   contracts: InventoryContract[];
   equipment_types: InventoryCatalogItem[];
   manufacturers: InventoryCatalogItem[];
   models: InventoryEquipmentModel[];
-  sectors: InventoryCatalogItem[];
+  sectors: InventorySector[];
 }
 
 export interface InventoryCatalogCreatePayload {
@@ -45,6 +50,14 @@ export interface InventoryCatalogCreatePayload {
 export interface InventoryCatalogUpdatePayload {
   name?: string;
   is_active?: boolean;
+}
+
+export interface InventorySectorCreatePayload extends InventoryCatalogCreatePayload {
+  secretariat_id: number;
+}
+
+export interface InventorySectorUpdatePayload extends InventoryCatalogUpdatePayload {
+  secretariat_id?: number | null;
 }
 
 export interface InventoryEquipmentModelCreatePayload extends InventoryCatalogCreatePayload {

@@ -52,9 +52,9 @@ const emptyUserDraft: UserDraft = {
   email: "",
   password: "TermoTemporario123",
   role: "user",
-  secretariat: "Prefeitura de Cabo Frio",
+  secretariat: "",
   department_sector_id: "",
-  department: "Não informado",
+  department: "",
   registration: "",
   phone: "",
   active: false,
@@ -225,6 +225,10 @@ export default function InventoryDeliveryTermsPage() {
   };
 
   const saveUser = async () => {
+    if (!userDraft.secretariat) {
+      setError("Selecione uma secretaria cadastrada para o recebedor.");
+      return;
+    }
     if (!userDraft.department_sector_id) {
       setError("Selecione um setor cadastrado no inventário para o recebedor.");
       return;
@@ -522,6 +526,7 @@ export default function InventoryDeliveryTermsPage() {
         draft={userDraft}
         saving={saving}
         error={error}
+        secretariatOptions={activeCatalogItems(catalogs.secretariats)}
         sectorOptions={activeCatalogItems(catalogs.sectors)}
         onOpenChange={setUserDialogOpen}
         onConfirm={saveUser}

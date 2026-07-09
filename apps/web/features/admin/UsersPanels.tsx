@@ -3,7 +3,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { Alert, Badge, Button, ConfirmDialog, Field, Input, Select, Toolbar } from "@/components/ui";
 import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
 import { roleLabels } from "@/lib/format";
-import type { InventoryCatalogItem, Role, User } from "@/lib/types";
+import type { InventoryCatalogItem, InventorySector, Role, User } from "@/lib/types";
 
 export type UserDraft = {
   username: string;
@@ -83,13 +83,23 @@ type FormDialogProps = {
   draft: UserDraft;
   saving: boolean;
   error: string;
-  sectorOptions?: InventoryCatalogItem[];
+  secretariatOptions?: InventoryCatalogItem[];
+  sectorOptions?: InventorySector[];
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   onDraftChange: (draft: UserDraft) => void;
 };
 
-export function UserFormDialog({ open, editing, draft, saving, error, sectorOptions = [], onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+export function UserFormDialog({ open, editing, draft, saving, error, secretariatOptions = [], sectorOptions = [], onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+  const filteredSectors = sectorOptions.filter((sector) => {
+    const selectedSecretariat = secretariatOptions.find((item) => item.name === draft.secretariat);
+    return Boolean(selectedSecretariat) && sector.secretariat_id === selectedSecretariat?.id;
+  });
+
+  const selectSecretariat = (secretariatName: string) => {
+    onDraftChange({ ...draft, secretariat: secretariatName, department_sector_id: "", department: "" });
+  };
+
   const selectSector = (sectorId: string) => {
     const sector = sectorOptions.find((item) => String(item.id) === sectorId);
     onDraftChange({ ...draft, department_sector_id: sectorId, department: sector?.name || draft.department });
@@ -114,11 +124,16 @@ export function UserFormDialog({ open, editing, draft, saving, error, sectorOpti
             {Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </Select>
         </Field>
-        <Field label="Secretaria"><Input value={draft.secretariat} onChange={(e) => onDraftChange({ ...draft, secretariat: e.target.value })} /></Field>
+        <Field label="Secretaria">
+          <Select value={draft.secretariat} onChange={(e) => selectSecretariat(e.target.value)}>
+            <option value="">Selecione uma secretaria</option>
+            {secretariatOptions.map((secretariat) => <option key={secretariat.id} value={secretariat.name}>{secretariat.name}</option>)}
+          </Select>
+        </Field>
         <Field label="Setor">
           <Select value={draft.department_sector_id} onChange={(e) => selectSector(e.target.value)}>
             <option value="">Selecione um setor</option>
-            {sectorOptions.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
+            {filteredSectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
           </Select>
         </Field>
         <Field label="Matrícula"><Input value={draft.registration} onChange={(e) => onDraftChange({ ...draft, registration: e.target.value })} /></Field>

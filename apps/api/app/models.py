@@ -95,6 +95,17 @@ class InventorySupplier(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
+class InventorySecretariat(Base):
+    __tablename__ = "inventory_secretariats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
 class InventoryContract(Base):
     __tablename__ = "inventory_contracts"
 
@@ -154,9 +165,12 @@ class InventorySector(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
     normalized_name: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    secretariat_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_secretariats.id"), nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    secretariat: Mapped[Optional[InventorySecretariat]] = relationship()
 
 
 class AssetMovement(Base):

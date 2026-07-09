@@ -1,17 +1,18 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { Badge, Button } from "@/components/ui";
-import type { InventoryCatalogItem, InventoryContract } from "@/lib/types";
+import type { InventoryCatalogItem, InventoryContract, InventorySector } from "@/lib/types";
 import { activeBadgeClass, isDefaultSector, type CatalogTab } from "./catalog-utils";
 
 type Props = {
   tab: CatalogTab;
   items: InventoryCatalogItem[];
   supplierNameById?: Map<number, string>;
+  secretariatNameById?: Map<number, string>;
   onEdit: (item: InventoryCatalogItem) => void;
   onDelete: (item: InventoryCatalogItem) => void;
 };
 
-export default function CatalogSimpleTable({ tab, items, supplierNameById, onEdit, onDelete }: Props) {
+export default function CatalogSimpleTable({ tab, items, supplierNameById, secretariatNameById, onEdit, onDelete }: Props) {
   return (
     <div className="overflow-x-auto soft-scrollbar">
       <table className="data-table min-w-[720px]">
@@ -20,6 +21,7 @@ export default function CatalogSimpleTable({ tab, items, supplierNameById, onEdi
             <th>Nome</th>
             <th>Status</th>
             {tab === "contracts" && <th>Fornecedor</th>}
+            {tab === "sectors" && <th>Secretaria</th>}
             {tab === "sectors" && <th>Observação</th>}
             <th>Ações</th>
           </tr>
@@ -33,6 +35,9 @@ export default function CatalogSimpleTable({ tab, items, supplierNameById, onEdi
               </td>
               {tab === "contracts" && (
                 <td className="text-[#5c6b7e]">{supplierNameById?.get((item as InventoryContract).supplier_id) || "Fornecedor não informado"}</td>
+              )}
+              {tab === "sectors" && (
+                <td className="text-[#5c6b7e]">{secretariatNameById?.get((item as InventorySector).secretariat_id || 0) || "Secretaria não vinculada"}</td>
               )}
               {tab === "sectors" && (
                 <td className="text-[#5c6b7e]">

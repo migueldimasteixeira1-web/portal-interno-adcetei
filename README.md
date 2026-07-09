@@ -127,7 +127,7 @@ O Inventário está sendo modularizado em etapas. A tabela `assets` continua sen
 
 Direção planejada do módulo: fundação modular, cadastros base, evolução de equipamentos, cadastro individual, movimentações, entrada em lote por leitura de série e importação por planilha.
 
-Os cadastros base do inventário já existem no backend para fornecedores, tipos de equipamento, fabricantes, modelos e setores. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
+Os cadastros base já existem no backend para secretarias, setores, fornecedores, contratos, tipos de equipamento, fabricantes e modelos. Setores pertencem a uma secretaria; contratos pertencem a um fornecedor; modelos pertencem a fabricante e tipo. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
 
 `assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente.
 
@@ -135,7 +135,7 @@ A Parte 6 adicionou histórico e movimentações em `asset_movements`. Alocaçã
 
 A Parte 7 adicionou entrada em lote por leitura/digitação de números de série. O fluxo cria todos os itens como estoque ADCETEI, sem responsável e sem data de envio, registrando movimento inicial `created` para cada equipamento. Importação por planilha continua para etapa posterior.
 
-A Parte 8 adicionou a tela `/inventario/cadastros` para gerenciar fornecedores, contratos, tipos de equipamento, fabricantes, modelos e setores. O acesso exige `inventory.manage_catalogs`. Importação por planilha continua para etapa posterior.
+A Parte 8 adicionou a tela `/administracao/base-cadastros` para gerenciar a base usada por inventário, usuários e termos. O acesso exige `inventory.manage_catalogs`. A rota antiga `/inventario/cadastros` redireciona para essa base administrativa.
 
 O fluxo de termos de recebimento fica separado em `/inventario/termos`. Ele sugere o próximo número, usa contrato cadastrado vinculado a fornecedor, preenche o destino como `Secretaria - Setor`, valida os números de série antes da emissão, emite o DOCX oficial a partir do template cadastrado na API, permite cancelar termo aberto e só altera o inventário quando a entrega assinada é confirmada. A confirmação aloca todos os itens do termo para o setor/usuário e registra uma movimentação por equipamento. Equipamentos também têm campo de especificações, usado na relação do termo.
 

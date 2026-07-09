@@ -269,6 +269,14 @@ class InventoryContractUpdate(InventoryCatalogItemUpdate):
     supplier_id: Optional[int] = None
 
 
+class InventorySectorCreate(InventoryCatalogItemCreate):
+    secretariat_id: int
+
+
+class InventorySectorUpdate(InventoryCatalogItemUpdate):
+    secretariat_id: Optional[int] = None
+
+
 class InventoryCatalogItemOut(BaseModel):
     id: int
     name: str
@@ -291,13 +299,18 @@ class InventoryContractOut(InventoryCatalogItemOut):
     supplier_id: int
 
 
+class InventorySectorOut(InventoryCatalogItemOut):
+    secretariat_id: Optional[int] = None
+
+
 class InventoryCatalogsOut(BaseModel):
+    secretariats: list[InventoryCatalogItemOut]
     suppliers: list[InventoryCatalogItemOut]
     contracts: list[InventoryContractOut]
     equipment_types: list[InventoryCatalogItemOut]
     manufacturers: list[InventoryCatalogItemOut]
     models: list[InventoryEquipmentModelOut]
-    sectors: list[InventoryCatalogItemOut]
+    sectors: list[InventorySectorOut]
 
 
 InventoryAssetStatus = Literal["stock", "allocated", "maintenance", "retired"]

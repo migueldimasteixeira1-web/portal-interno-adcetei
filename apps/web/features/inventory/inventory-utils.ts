@@ -1,6 +1,7 @@
 import type { InventoryAssetCatalogRef, InventoryCatalogs, InventoryRetirementReason } from "@/lib/types";
 
 export const emptyInventoryCatalogs: InventoryCatalogs = {
+  secretariats: [],
   suppliers: [],
   contracts: [],
   equipment_types: [],

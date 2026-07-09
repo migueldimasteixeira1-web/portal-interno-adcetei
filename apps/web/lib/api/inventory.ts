@@ -26,11 +26,19 @@ import type {
   InventoryMovement,
   InventoryMovementPayload,
   InventoryRetirePayload,
+  InventorySectorCreatePayload,
+  InventorySectorUpdatePayload,
 } from "../types";
 import { downloadRequest, request } from "./client";
 
 export const inventoryApi = {
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
+  createInventorySecretariat: (payload: InventoryCatalogCreatePayload) =>
+    request<InventoryCatalogItem>("/inventory/catalogs/secretariats", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventorySecretariat: (id: number, payload: InventoryCatalogUpdatePayload) =>
+    request<InventoryCatalogItem>(`/inventory/catalogs/secretariats/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventorySecretariat: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/secretariats/${id}`, { method: "DELETE" }),
   createInventorySupplier: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/suppliers", { method: "POST", body: JSON.stringify(payload) }),
   updateInventorySupplier: (id: number, payload: InventoryCatalogUpdatePayload) =>
@@ -61,9 +69,9 @@ export const inventoryApi = {
     request<InventoryEquipmentModel>(`/inventory/catalogs/models/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteInventoryModel: (id: number) =>
     request<{ message: string }>(`/inventory/catalogs/models/${id}`, { method: "DELETE" }),
-  createInventorySector: (payload: InventoryCatalogCreatePayload) =>
+  createInventorySector: (payload: InventorySectorCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/sectors", { method: "POST", body: JSON.stringify(payload) }),
-  updateInventorySector: (id: number, payload: InventoryCatalogUpdatePayload) =>
+  updateInventorySector: (id: number, payload: InventorySectorUpdatePayload) =>
     request<InventoryCatalogItem>(`/inventory/catalogs/sectors/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteInventorySector: (id: number) =>
     request<{ message: string }>(`/inventory/catalogs/sectors/${id}`, { method: "DELETE" }),

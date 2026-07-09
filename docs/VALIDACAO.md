@@ -76,8 +76,8 @@ Verificação manual recomendada após mudanças de UI (HTTP `200` com `./inicia
 
 - `/login`, `/dashboard`
 - `/chamados`, `/chamados/novo`
-- `/inventario`, `/inventario/cadastros`, `/inventario/lote`, `/inventario/novo`, `/inventario/termos`
-- `/administracao/usuarios`, `/administracao/catalogo`, `/administracao/perfis`, `/administracao/auditoria`
+- `/inventario`, `/inventario/lote`, `/inventario/novo`, `/inventario/termos`
+- `/administracao/usuarios`, `/administracao/base-cadastros`, `/administracao/catalogo`, `/administracao/perfis`, `/administracao/auditoria`
 
 ## Docker e VM
 

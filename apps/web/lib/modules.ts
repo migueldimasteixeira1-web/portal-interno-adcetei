@@ -9,6 +9,7 @@ import {
   Printer,
   ServerCog,
   Settings2,
+  TableProperties,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -103,12 +104,13 @@ export const portalModules: PortalNavItem[] = [
     icon: Settings2,
     area: "administration",
     status: "available",
-    permissionsAny: ["users.view", "catalog.manage", "roles.manage", "audit.view"],
+    permissionsAny: ["users.view", "inventory.manage_catalogs", "catalog.manage", "roles.manage", "audit.view"],
   },
 ];
 
 export const administrationNav: PortalNavItem[] = [
   { href: "/administracao/usuarios", label: "Usuários", icon: Users, area: "administration", permission: "users.view" },
+  { href: "/administracao/base-cadastros", label: "Base de cadastros", icon: TableProperties, area: "administration", permission: "inventory.manage_catalogs" },
   { href: "/administracao/catalogo", label: "Catálogo", icon: BookOpen, area: "administration", permission: "catalog.manage" },
   { href: "/administracao/perfis", label: "Perfis", icon: Network, area: "administration", permission: "roles.manage" },
   { href: "/administracao/auditoria", label: "Auditoria", icon: History, area: "administration", permission: "audit.view" },
@@ -138,7 +140,7 @@ export function isNavItemActive(pathname: string, item: PortalNavItem): boolean 
     return pathname === "/chamados" || pathname === "/chamados/novo" || /^\/chamados\/\d+/.test(pathname);
   }
   if (item.href === "/inventario") {
-    return pathname === "/inventario" || ["/inventario/novo", "/inventario/lote", "/inventario/cadastros"].includes(pathname) || /^\/inventario\/\d+/.test(pathname);
+    return pathname === "/inventario" || ["/inventario/novo", "/inventario/lote"].includes(pathname) || /^\/inventario\/\d+/.test(pathname);
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
@@ -151,11 +153,12 @@ const PAGE_TITLES: Record<string, string> = {
   "/inventario/termos": "Termos de Recebimento",
   "/inventario/novo": "Inventário · Novo equipamento",
   "/inventario/lote": "Inventário · Entrada em lote",
-  "/inventario/cadastros": "Inventário · Cadastros",
+  "/inventario/cadastros": "Administração · Base de cadastros",
   "/memorandos": "Memorandos",
   "/impressoras": "Impressoras",
   "/servicos-internos": "Serviços Internos",
   "/administracao/usuarios": "Administração · Usuários",
+  "/administracao/base-cadastros": "Administração · Base de cadastros",
   "/administracao/catalogo": "Administração · Catálogo",
   "/administracao/perfis": "Administração · Perfis",
   "/administracao/auditoria": "Auditoria",

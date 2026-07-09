@@ -21,7 +21,7 @@ const emptyDraft: UserDraft = {
   email: "",
   password: "",
   role: "user",
-  secretariat: "Prefeitura de Cabo Frio",
+  secretariat: "",
   department_sector_id: "",
   department: "",
   registration: "",
@@ -101,6 +101,10 @@ export default function UsersPage() {
   };
 
   const save = async () => {
+    if (!draft.secretariat) {
+      setError("Selecione uma secretaria cadastrada.");
+      return;
+    }
     if (!draft.department_sector_id) {
       setError("Selecione um setor cadastrado no inventário.");
       return;
@@ -214,6 +218,7 @@ export default function UsersPage() {
         draft={draft}
         saving={saving}
         error={error}
+        secretariatOptions={activeCatalogItems(catalogs.secretariats)}
         sectorOptions={activeCatalogItems(catalogs.sectors)}
         onOpenChange={setDialogOpen}
         onConfirm={save}
