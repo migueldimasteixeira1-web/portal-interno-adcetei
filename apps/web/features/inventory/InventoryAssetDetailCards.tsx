@@ -32,6 +32,7 @@ export function InventoryAssetDetailsCard({ asset }: SummaryProps) {
         <DetailRow label="Tipo" value={catalogRefName(asset.equipment_type)} />
         <DetailRow label="Fabricante" value={catalogRefName(asset.manufacturer)} />
         <DetailRow label="Modelo" value={catalogRefName(asset.equipment_model)} />
+        <DetailRow label="Especificações" value={notesText(asset.specifications)} className="sm:col-span-2 xl:col-span-3" />
         <DetailRow label="Setor atual" value={catalogRefName(asset.sector)} />
         <DetailRow label="Responsável atual" value={asset.assigned_user?.full_name || "Não vinculado"} />
         <DetailRow label="Data de recebimento" value={formatDate(asset.received_at, false)} />

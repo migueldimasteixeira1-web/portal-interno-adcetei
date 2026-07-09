@@ -61,6 +61,15 @@ export const portalModules: PortalNavItem[] = [
     permission: "inventory.view",
   },
   {
+    href: "/inventario/termos",
+    label: "Termos de Recebimento",
+    description: "Emissão do termo oficial e confirmação de entrega antes de alocar ativos.",
+    icon: FileText,
+    area: "modules",
+    status: "available",
+    permission: "inventory.move",
+  },
+  {
     href: "/memorandos",
     label: "Memorandos",
     description: "Formalizações internas, encaminhamentos e registros administrativos.",
@@ -128,6 +137,9 @@ export function isNavItemActive(pathname: string, item: PortalNavItem): boolean 
   if (item.href === "/chamados") {
     return pathname === "/chamados" || pathname === "/chamados/novo" || /^\/chamados\/\d+/.test(pathname);
   }
+  if (item.href === "/inventario") {
+    return pathname === "/inventario" || ["/inventario/novo", "/inventario/lote", "/inventario/cadastros"].includes(pathname) || /^\/inventario\/\d+/.test(pathname);
+  }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
@@ -136,6 +148,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/chamados": "Chamados",
   "/chamados/novo": "Abrir chamado",
   "/inventario": "Inventário",
+  "/inventario/termos": "Termos de Recebimento",
   "/inventario/novo": "Inventário · Novo equipamento",
   "/inventario/lote": "Inventário · Entrada em lote",
   "/inventario/cadastros": "Inventário · Cadastros",
@@ -152,7 +165,7 @@ export function pageLabelForPath(pathname: string): string {
   if (pathname.startsWith("/chamados/") && pathname !== "/chamados/novo") {
     return "Detalhes do chamado";
   }
-  if (pathname.startsWith("/inventario/") && pathname !== "/inventario/novo" && pathname !== "/inventario/lote" && pathname !== "/inventario/cadastros") {
+  if (pathname.startsWith("/inventario/") && pathname !== "/inventario/novo" && pathname !== "/inventario/lote" && pathname !== "/inventario/cadastros" && pathname !== "/inventario/termos") {
     return "Detalhes do equipamento";
   }
   return PAGE_TITLES[pathname] || "Portal Interno ADCETEI";

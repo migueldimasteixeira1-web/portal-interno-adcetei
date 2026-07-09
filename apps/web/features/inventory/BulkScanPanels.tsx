@@ -10,6 +10,7 @@ export type BulkScanDraft = {
   manufacturer_id: string;
   equipment_model_id: string;
   received_at: string;
+  specifications: string;
   notes: string;
 };
 
@@ -60,6 +61,11 @@ export function BulkScanCommonFields({ draft, catalogs, filteredModels, onDraftC
         <Field label="Data de recebimento">
           <Input type="date" value={draft.received_at} onChange={(event) => onDraftChange({ received_at: event.target.value })} />
         </Field>
+        <div className="sm:col-span-2 xl:col-span-3">
+          <Field label="Especificações">
+            <Textarea value={draft.specifications} onChange={(event) => onDraftChange({ specifications: event.target.value })} placeholder="Ex.: Processador i5, 16 GB RAM, SSD 256 GB." />
+          </Field>
+        </div>
         <div className="sm:col-span-2 xl:col-span-3">
           <Field label="Observação">
             <Textarea value={draft.notes} onChange={(event) => onDraftChange({ notes: event.target.value })} placeholder="Informações complementares da entrada do lote." />

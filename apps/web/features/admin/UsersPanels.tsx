@@ -13,6 +13,7 @@ export type UserDraft = {
   role: Role;
   secretariat: string;
   department: string;
+  registration: string;
   phone: string;
   active: boolean;
   email_verified: boolean;
@@ -108,6 +109,7 @@ export function UserFormDialog({ open, editing, draft, saving, error, onOpenChan
         </Field>
         <Field label="Secretaria"><Input value={draft.secretariat} onChange={(e) => onDraftChange({ ...draft, secretariat: e.target.value })} /></Field>
         <Field label="Setor"><Input value={draft.department} onChange={(e) => onDraftChange({ ...draft, department: e.target.value })} /></Field>
+        <Field label="Matrícula"><Input value={draft.registration} onChange={(e) => onDraftChange({ ...draft, registration: e.target.value })} /></Field>
         <Field label="Telefone"><Input value={draft.phone} onChange={(e) => onDraftChange({ ...draft, phone: e.target.value })} /></Field>
         <Field label={editing ? "Nova senha (opcional)" : "Senha"} help="Mínimo de 10 caracteres."><Input type="password" value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} /></Field>
         <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Conta ativa</label>

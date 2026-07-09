@@ -11,7 +11,15 @@ import type {
   InventoryCatalogItem,
   InventoryCatalogs,
   InventoryCatalogUpdatePayload,
+  InventoryContract,
+  InventoryContractCreatePayload,
+  InventoryContractUpdatePayload,
   InventoryChangeResponsiblePayload,
+  InventoryDeliveryTerm,
+  InventoryDeliveryTermCreatePayload,
+  InventoryDeliveryTermDeliverPayload,
+  InventoryDeliveryTermPreview,
+  InventoryDeliveryTermPreviewPayload,
   InventoryEquipmentModel,
   InventoryEquipmentModelCreatePayload,
   InventoryEquipmentModelUpdatePayload,
@@ -29,6 +37,12 @@ export const inventoryApi = {
     request<InventoryCatalogItem>(`/inventory/catalogs/suppliers/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteInventorySupplier: (id: number) =>
     request<{ message: string }>(`/inventory/catalogs/suppliers/${id}`, { method: "DELETE" }),
+  createInventoryContract: (payload: InventoryContractCreatePayload) =>
+    request<InventoryContract>("/inventory/catalogs/contracts", { method: "POST", body: JSON.stringify(payload) }),
+  updateInventoryContract: (id: number, payload: InventoryContractUpdatePayload) =>
+    request<InventoryContract>(`/inventory/catalogs/contracts/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteInventoryContract: (id: number) =>
+    request<{ message: string }>(`/inventory/catalogs/contracts/${id}`, { method: "DELETE" }),
   createInventoryEquipmentType: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/equipment-types", { method: "POST", body: JSON.stringify(payload) }),
   updateInventoryEquipmentType: (id: number, payload: InventoryCatalogUpdatePayload) =>
@@ -84,4 +98,16 @@ export const inventoryApi = {
     request<InventoryAsset>(`/inventory/assets/${id}/maintenance`, { method: "POST", body: JSON.stringify(payload) }),
   retireInventoryAsset: (id: number | string, payload: InventoryRetirePayload) =>
     request<InventoryAsset>(`/inventory/assets/${id}/retire`, { method: "POST", body: JSON.stringify(payload) }),
+  inventoryDeliveryTerms: () => request<InventoryDeliveryTerm[]>("/inventory/delivery-terms"),
+  nextInventoryDeliveryTermNumber: () => request<{ term_number: string }>("/inventory/delivery-terms/next-number"),
+  previewInventoryDeliveryTerm: (payload: InventoryDeliveryTermPreviewPayload) =>
+    request<InventoryDeliveryTermPreview>("/inventory/delivery-terms/preview", { method: "POST", body: JSON.stringify(payload) }),
+  createInventoryDeliveryTerm: (payload: InventoryDeliveryTermCreatePayload) =>
+    request<InventoryDeliveryTerm>("/inventory/delivery-terms", { method: "POST", body: JSON.stringify(payload) }),
+  downloadInventoryDeliveryTerm: (id: number | string, filename?: string) =>
+    downloadRequest(`/inventory/delivery-terms/${id}/document`, filename || `termo-recebimento-${id}.docx`),
+  confirmInventoryDeliveryTerm: (id: number | string, payload: InventoryDeliveryTermDeliverPayload) =>
+    request<InventoryDeliveryTerm>(`/inventory/delivery-terms/${id}/deliver`, { method: "POST", body: JSON.stringify(payload) }),
+  cancelInventoryDeliveryTerm: (id: number | string) =>
+    request<{ message: string }>(`/inventory/delivery-terms/${id}/cancel`, { method: "POST" }),
 };

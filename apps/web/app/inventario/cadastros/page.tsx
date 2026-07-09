@@ -16,18 +16,20 @@ import {
   catalogDialogTitle,
   catalogTabMeta,
   emptyCatalogs,
+  emptyContractDraft,
   emptyModelDraft,
   emptySimpleDraft,
   isDefaultSector,
   sortByName,
   type CatalogTab,
+  type ContractDraft,
   type DeleteTarget,
   type ModelDraft,
   type SimpleDraft,
 } from "@/features/inventory/catalog-utils";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
-import type { InventoryCatalogItem, InventoryCatalogs, InventoryEquipmentModel } from "@/lib/types";
+import type { InventoryCatalogItem, InventoryCatalogs, InventoryContract, InventoryEquipmentModel } from "@/lib/types";
 
 export default function InventoryCatalogsPage() {
   const { user } = useAuth();
@@ -43,6 +45,7 @@ export default function InventoryCatalogsPage() {
   const [editingSimple, setEditingSimple] = useState<InventoryCatalogItem | null>(null);
   const [editingModel, setEditingModel] = useState<InventoryEquipmentModel | null>(null);
   const [simpleDraft, setSimpleDraft] = useState<SimpleDraft>(emptySimpleDraft);
+  const [contractDraft, setContractDraft] = useState<ContractDraft>(emptyContractDraft);
   const [modelDraft, setModelDraft] = useState<ModelDraft>(emptyModelDraft);
 
   const load = async () => {
@@ -63,12 +66,14 @@ export default function InventoryCatalogsPage() {
   const currentItems = useMemo(() => sortByName(catalogs[tab]), [catalogs, tab]);
   const manufacturerNameById = useMemo(() => new Map(catalogs.manufacturers.map((item) => [item.id, item.name])), [catalogs.manufacturers]);
   const equipmentTypeNameById = useMemo(() => new Map(catalogs.equipment_types.map((item) => [item.id, item.name])), [catalogs.equipment_types]);
+  const supplierNameById = useMemo(() => new Map(catalogs.suppliers.map((item) => [item.id, item.name])), [catalogs.suppliers]);
   const tabMeta = catalogTabMeta(tab);
 
   const openCreate = () => {
     setEditingSimple(null);
     setEditingModel(null);
     setSimpleDraft(emptySimpleDraft);
+    setContractDraft(emptyContractDraft);
     setModelDraft(emptyModelDraft);
     setError("");
     setDialogOpen(true);
@@ -77,7 +82,12 @@ export default function InventoryCatalogsPage() {
   const openEditSimple = (item: InventoryCatalogItem) => {
     setEditingSimple(item);
     setEditingModel(null);
-    setSimpleDraft({ name: item.name, is_active: item.is_active });
+    if (tab === "contracts") {
+      const contract = item as InventoryContract;
+      setContractDraft({ name: contract.name, is_active: contract.is_active, supplier_id: String(contract.supplier_id) });
+    } else {
+      setSimpleDraft({ name: item.name, is_active: item.is_active });
+    }
     setError("");
     setDialogOpen(true);
   };
@@ -99,6 +109,7 @@ export default function InventoryCatalogsPage() {
     setEditingSimple(null);
     setEditingModel(null);
     setSimpleDraft(emptySimpleDraft);
+    setContractDraft(emptyContractDraft);
     setModelDraft(emptyModelDraft);
     setError("");
   };
@@ -181,7 +192,36 @@ export default function InventoryCatalogsPage() {
     }
   };
 
-  const save = () => (tab === "models" ? saveModel() : saveSimple());
+  const saveContract = async () => {
+    const name = contractDraft.name.trim();
+    if (!name) {
+      setError("Informe o contrato.");
+      return;
+    }
+    if (!contractDraft.supplier_id) {
+      setError("Selecione o fornecedor.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const payload = { name, is_active: contractDraft.is_active, supplier_id: Number(contractDraft.supplier_id) };
+      if (editingSimple) await api.updateInventoryContract(editingSimple.id, payload);
+      else await api.createInventoryContract(payload);
+      setMessage(editingSimple ? "Contrato atualizado com sucesso." : "Contrato criado com sucesso.");
+      setDialogOpen(false);
+      resetForm();
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar o contrato");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const save = () => (tab === "models" ? saveModel() : tab === "contracts" ? saveContract() : saveSimple());
 
   const deleteSelected = async () => {
     if (!deleting) return;
@@ -191,6 +231,7 @@ export default function InventoryCatalogsPage() {
     try {
       const id = deleting.item.id;
       if (deleting.tab === "suppliers") await api.deleteInventorySupplier(id);
+      else if (deleting.tab === "contracts") await api.deleteInventoryContract(id);
       else if (deleting.tab === "equipment_types") await api.deleteInventoryEquipmentType(id);
       else if (deleting.tab === "manufacturers") await api.deleteInventoryManufacturer(id);
       else if (deleting.tab === "models") await api.deleteInventoryModel(id);
@@ -254,6 +295,7 @@ export default function InventoryCatalogsPage() {
           <CatalogSimpleTable
             tab={tab}
             items={currentItems as InventoryCatalogItem[]}
+            supplierNameById={supplierNameById}
             onEdit={openEditSimple}
             onDelete={(item) => setDeleting({ tab, item })}
           />
@@ -281,9 +323,11 @@ export default function InventoryCatalogsPage() {
         title={catalogDialogTitle(tab, editingSimple, editingModel)}
         catalogs={catalogs}
         simpleDraft={simpleDraft}
+        contractDraft={contractDraft}
         modelDraft={modelDraft}
         editingDefaultSector={editingDefaultSector}
         onSimpleDraftChange={setSimpleDraft}
+        onContractDraftChange={setContractDraft}
         onModelDraftChange={setModelDraft}
       />
 

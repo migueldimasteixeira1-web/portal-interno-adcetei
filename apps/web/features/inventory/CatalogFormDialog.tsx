@@ -4,6 +4,7 @@ import {
   catalogTabMeta,
   sortByName,
   type CatalogTab,
+  type ContractDraft,
   type ModelDraft,
   type SimpleDraft,
 } from "./catalog-utils";
@@ -18,9 +19,11 @@ type Props = {
   title: string;
   catalogs: InventoryCatalogs;
   simpleDraft: SimpleDraft;
+  contractDraft: ContractDraft;
   modelDraft: ModelDraft;
   editingDefaultSector: boolean;
   onSimpleDraftChange: (draft: SimpleDraft) => void;
+  onContractDraftChange: (draft: ContractDraft) => void;
   onModelDraftChange: (draft: ModelDraft) => void;
 };
 
@@ -34,9 +37,11 @@ export default function CatalogFormDialog({
   title,
   catalogs,
   simpleDraft,
+  contractDraft,
   modelDraft,
   editingDefaultSector,
   onSimpleDraftChange,
+  onContractDraftChange,
   onModelDraftChange,
 }: Props) {
   const tabMeta = catalogTabMeta(tab);
@@ -101,6 +106,32 @@ export default function CatalogFormDialog({
               type="checkbox"
               checked={modelDraft.is_active}
               onChange={(e) => onModelDraftChange({ ...modelDraft, is_active: e.target.checked })}
+            />
+            Cadastro ativo
+          </label>
+        </div>
+      ) : tab === "contracts" ? (
+        <div className="grid gap-4">
+          <Field label="Fornecedor" error={!contractDraft.supplier_id && error ? "Selecione o fornecedor." : undefined}>
+            <Select value={contractDraft.supplier_id} onChange={(e) => onContractDraftChange({ ...contractDraft, supplier_id: e.target.value })}>
+              <option value="">Selecione</option>
+              {sortByName(catalogs.suppliers.filter((item) => item.is_active || String(item.id) === contractDraft.supplier_id)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Contrato">
+            <Input
+              value={contractDraft.name}
+              onChange={(e) => onContractDraftChange({ ...contractDraft, name: e.target.value })}
+              placeholder="Ex.: Contrato nº 046/2026 - PMCF / IART"
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]">
+            <input
+              type="checkbox"
+              checked={contractDraft.is_active}
+              onChange={(e) => onContractDraftChange({ ...contractDraft, is_active: e.target.checked })}
             />
             Cadastro ativo
           </label>

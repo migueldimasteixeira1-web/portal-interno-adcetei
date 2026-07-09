@@ -2,6 +2,7 @@ import type { InventoryAssetCatalogRef, InventoryCatalogs, InventoryRetirementRe
 
 export const emptyInventoryCatalogs: InventoryCatalogs = {
   suppliers: [],
+  contracts: [],
   equipment_types: [],
   manufacturers: [],
   models: [],

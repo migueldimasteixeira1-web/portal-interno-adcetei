@@ -19,6 +19,10 @@ export interface InventoryCatalogItem {
   updated_at: string;
 }
 
+export interface InventoryContract extends InventoryCatalogItem {
+  supplier_id: number;
+}
+
 export interface InventoryEquipmentModel extends InventoryCatalogItem {
   manufacturer_id: number;
   equipment_type_id: number;
@@ -26,6 +30,7 @@ export interface InventoryEquipmentModel extends InventoryCatalogItem {
 
 export interface InventoryCatalogs {
   suppliers: InventoryCatalogItem[];
+  contracts: InventoryContract[];
   equipment_types: InventoryCatalogItem[];
   manufacturers: InventoryCatalogItem[];
   models: InventoryEquipmentModel[];
@@ -52,6 +57,14 @@ export interface InventoryEquipmentModelUpdatePayload extends InventoryCatalogUp
   equipment_type_id?: number;
 }
 
+export interface InventoryContractCreatePayload extends InventoryCatalogCreatePayload {
+  supplier_id: number;
+}
+
+export interface InventoryContractUpdatePayload extends InventoryCatalogUpdatePayload {
+  supplier_id?: number;
+}
+
 export interface InventoryAssetCatalogRef {
   id: number;
   name: string;
@@ -67,6 +80,7 @@ export interface InventoryAssetUserRef {
 export interface InventoryAsset {
   id: number;
   serial_number: string;
+  specifications: string;
   status: InventoryAssetStatus;
   display_name: string;
   supplier_id?: number | null;
@@ -104,6 +118,7 @@ export interface InventoryAssetPage {
 
 export interface InventoryAssetCreatePayload {
   serial_number: string;
+  specifications?: string;
   supplier_id: number;
   equipment_type_id: number;
   manufacturer_id: number;
@@ -158,6 +173,7 @@ export interface InventoryBulkScanPayload {
   equipment_model_id: number;
   received_at: string;
   serial_numbers: string[];
+  specifications?: string;
   notes?: string;
 }
 
@@ -188,3 +204,79 @@ export interface InventoryBulkScanConfirm {
   summary: InventoryBulkScanPreview;
 }
 
+export type InventoryDeliveryTermStatus = "draft" | "emitted" | "delivered" | "cancelled";
+
+export interface InventoryDeliveryTermItem {
+  id: number;
+  asset_id: number;
+  asset_type: string;
+  manufacturer: string;
+  model: string;
+  serial_number: string;
+  specification: string;
+  observation: string;
+}
+
+export interface InventoryDeliveryTerm {
+  id: number;
+  term_number: string;
+  contract_id?: number | null;
+  contract_number: string;
+  issued_at: string;
+  destination_sector_id: number;
+  destination_unit: string;
+  recipient_user_id: number;
+  recipient_name: string;
+  recipient_email: string;
+  recipient_registration: string;
+  recipient_phone: string;
+  adcetei_signer_name: string;
+  adcetei_signer_title: string;
+  item_observation: string;
+  notes: string;
+  status: InventoryDeliveryTermStatus;
+  delivered_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: InventoryDeliveryTermItem[];
+}
+
+export interface InventoryDeliveryTermCreatePayload {
+  term_number: string;
+  contract_id?: number | null;
+  contract_number?: string;
+  issued_at: string;
+  destination_unit: string;
+  recipient_user_id: number;
+  recipient_registration?: string;
+  recipient_phone?: string;
+  adcetei_signer_name: string;
+  adcetei_signer_title: string;
+  item_observation?: string;
+  serial_numbers: string[];
+  notes?: string;
+}
+
+export interface InventoryDeliveryTermPreviewPayload {
+  serial_numbers: string[];
+}
+
+export interface InventoryDeliveryTermPreviewError {
+  index: number;
+  serial_number: string;
+  normalized_serial: string;
+  message: string;
+}
+
+export interface InventoryDeliveryTermPreview {
+  total: number;
+  valid_count: number;
+  invalid_count: number;
+  valid_items: InventoryDeliveryTermItem[];
+  errors: InventoryDeliveryTermPreviewError[];
+}
+
+export interface InventoryDeliveryTermDeliverPayload {
+  movement_date: string;
+  notes?: string;
+}

@@ -8,6 +8,7 @@ export interface User {
   role: Role;
   secretariat: string;
   department: string;
+  registration: string;
   phone: string;
   source: string;
   active: boolean;
@@ -49,4 +50,3 @@ export interface AssetTicketOption {
   last_seen_at?: string | null;
   assigned_user?: User | null;
 }
-

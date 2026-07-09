@@ -13,6 +13,7 @@ export type NewAssetDraft = {
   sector_id: string;
   assigned_user_id: string;
   serial_number: string;
+  specifications: string;
   received_at: string;
   delivered_at: string;
   notes: string;
@@ -77,6 +78,11 @@ export default function NewInventoryAssetForm({
           <Field label="Número de série">
             <Input value={draft.serial_number} onChange={(event) => onDraftChange({ serial_number: event.target.value })} placeholder="Informe o número de série" />
           </Field>
+          <div className="sm:col-span-2 xl:col-span-3">
+            <Field label="Especificações">
+              <Textarea value={draft.specifications} onChange={(event) => onDraftChange({ specifications: event.target.value })} placeholder="Ex.: Processador i5, 16 GB RAM, SSD 256 GB." />
+            </Field>
+          </div>
         </div>
       </Card>
 
