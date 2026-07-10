@@ -123,6 +123,7 @@ export default function InventoryAssetsTable({
                   <td>
                     <Link href={`/inventario/${asset.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })} aria-label={`Ver detalhes de ${asset.serial_number || "equipamento"}`}>
                       <Eye size={15} />
+                      Detalhes
                     </Link>
                   </td>
                 </tr>
