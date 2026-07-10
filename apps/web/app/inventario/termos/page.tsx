@@ -9,41 +9,34 @@ import LoadingScreen from "@/components/LoadingScreen";
 import PageHeader from "@/components/PageHeader";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Textarea } from "@/components/ui";
 import { UserFormDialog, type UserDraft } from "@/features/admin/UsersPanels";
-import { BulkScanSerialPanel } from "@/features/inventory/BulkScanPanels";
 import { activeCatalogItems, displaySerial, emptyInventoryCatalogs, normalizedSerial, todayInputValue } from "@/features/inventory/inventory-utils";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { hasPermission } from "@/lib/permissions";
-import type { InventoryCatalogs, InventoryDeliveryTerm, InventoryDeliveryTermPreview, User } from "@/lib/types";
+import type { InventoryAsset, InventoryCatalogs, InventoryDeliveryTerm, InventoryDeliveryTermPreview, User } from "@/lib/types";
 
 type TermDraft = {
   term_number: string;
   contract_id: string;
-  contract_number: string;
   issued_at: string;
-  destination_unit: string;
   recipient_user_id: string;
   recipient_registration: string;
   recipient_phone: string;
   adcetei_signer_name: string;
   adcetei_signer_title: string;
   item_observation: string;
-  notes: string;
 };
 
 const emptyTermDraft = (): TermDraft => ({
   term_number: "",
   contract_id: "",
-  contract_number: "",
   issued_at: todayInputValue(),
-  destination_unit: "",
   recipient_user_id: "",
   recipient_registration: "",
   recipient_phone: "",
   adcetei_signer_name: "William Barreto Corrêa",
   adcetei_signer_title: "Coordenador Geral de Tecnologia da Informação",
   item_observation: "Equipamento locado",
-  notes: "",
 });
 
 const emptyUserDraft: UserDraft = {
@@ -95,8 +88,10 @@ export default function InventoryDeliveryTermsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
   const [draft, setDraft] = useState<TermDraft>(emptyTermDraft());
-  const [serialInput, setSerialInput] = useState("");
   const [serials, setSerials] = useState<string[]>([]);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetResults, setAssetResults] = useState<InventoryAsset[]>([]);
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false);
   const [preview, setPreview] = useState<InventoryDeliveryTermPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [view, setView] = useState<TermsView>("emit");
@@ -157,6 +152,33 @@ export default function InventoryDeliveryTermsPage() {
     };
   }, [canMove, serials]);
 
+  useEffect(() => {
+    if (!canMove || assetSearch.trim().length < 2) {
+      setAssetResults([]);
+      setAssetSearchLoading(false);
+      return;
+    }
+    let active = true;
+    setAssetSearchLoading(true);
+    const timer = setTimeout(() => {
+      api.inventoryAssets({ search: assetSearch.trim(), status_filter: "stock", page_size: 8 })
+        .then((data) => {
+          if (!active) return;
+          setAssetResults(data.items.filter((asset) => !serials.some((serial) => normalizedSerial(serial) === normalizedSerial(asset.serial_number))));
+        })
+        .catch(() => {
+          if (active) setAssetResults([]);
+        })
+        .finally(() => {
+          if (active) setAssetSearchLoading(false);
+        });
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [assetSearch, canMove, serials]);
+
   const selectedRecipient = useMemo(
     () => users.find((item) => String(item.id) === draft.recipient_user_id) || null,
     [draft.recipient_user_id, users],
@@ -165,6 +187,8 @@ export default function InventoryDeliveryTermsPage() {
     () => catalogs.contracts.find((item) => String(item.id) === draft.contract_id) || null,
     [catalogs.contracts, draft.contract_id],
   );
+  const contractText = selectedContract?.name || "";
+  const destinationText = selectedRecipient ? destinationUnitFor(selectedRecipient) : "";
 
   const filteredUsers = useMemo(() => {
     const term = recipientSearch.trim().toLowerCase();
@@ -180,14 +204,19 @@ export default function InventoryDeliveryTermsPage() {
     }
     if (serials.some((item) => normalizedSerial(item) === normalizedSerial(serial))) {
       setError("Este número de série já foi lido neste termo.");
-      setSerialInput("");
+      setAssetSearch("");
       inputRef.current?.focus();
       return;
     }
     setError("");
     setSerials((current) => [...current, serial]);
-    setSerialInput("");
+    setAssetSearch("");
+    setAssetResults([]);
     requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const addAsset = (asset: InventoryAsset) => {
+    addSerial(asset.serial_number);
   };
 
   const removeSerial = (serial: string) => {
@@ -201,17 +230,19 @@ export default function InventoryDeliveryTermsPage() {
       recipient_user_id: String(recipient.id),
       recipient_registration: recipient.registration || current.recipient_registration,
       recipient_phone: recipient.phone || current.recipient_phone,
-      destination_unit: destinationUnitFor(recipient),
     }));
   };
 
   const selectContract = (contractId: string) => {
-    const contract = catalogs.contracts.find((item) => String(item.id) === contractId);
     setDraft((current) => ({
       ...current,
       contract_id: contractId,
-      contract_number: contract?.name || current.contract_number,
     }));
+  };
+
+  const submitAssetSearch = () => {
+    if (assetResults.length) addAsset(assetResults[0]);
+    else addSerial(assetSearch);
   };
 
   const openUserCreate = () => {
@@ -261,8 +292,8 @@ export default function InventoryDeliveryTermsPage() {
   const canCreateTerm = Boolean(
     draft.term_number &&
     draft.issued_at &&
-    draft.contract_number &&
-    draft.destination_unit &&
+    contractText &&
+    destinationText &&
     draft.recipient_user_id &&
     serials.length &&
     !preview?.invalid_count,
@@ -284,9 +315,9 @@ export default function InventoryDeliveryTermsPage() {
       const term = await api.createInventoryDeliveryTerm({
         term_number: draft.term_number,
         contract_id: draft.contract_id ? Number(draft.contract_id) : null,
-        contract_number: draft.contract_number,
+        contract_number: contractText,
         issued_at: draft.issued_at,
-        destination_unit: draft.destination_unit,
+        destination_unit: destinationText,
         recipient_user_id: Number(draft.recipient_user_id),
         recipient_registration: draft.recipient_registration,
         recipient_phone: draft.recipient_phone,
@@ -294,7 +325,7 @@ export default function InventoryDeliveryTermsPage() {
         adcetei_signer_title: draft.adcetei_signer_title,
         item_observation: draft.item_observation,
         serial_numbers: serials,
-        notes: draft.notes,
+        notes: "",
       });
       setTerms((current) => [term, ...current]);
       setDraft({ ...emptyTermDraft(), term_number: "" });
@@ -385,40 +416,83 @@ export default function InventoryDeliveryTermsPage() {
         <form onSubmit={createTerm} className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <Card className="overflow-hidden">
-              <SectionHeader title="Dados do termo" description="Esses dados substituem os campos variáveis do modelo DOCX oficial." />
+              <SectionHeader title="Dados básicos" />
               <div className="grid gap-4 p-4 sm:grid-cols-2">
                 <Field label="Número do termo"><Input value={draft.term_number} onChange={(e) => setDraft({ ...draft, term_number: e.target.value })} placeholder="017/2026" /></Field>
-                <Field label="Contrato cadastrado">
+                <Field label="Contrato">
                   <Select value={draft.contract_id} onChange={(e) => selectContract(e.target.value)}>
-                    <option value="">Selecionar manualmente</option>
+                    <option value="">Selecione</option>
                     {activeCatalogItems(catalogs.contracts).map((contract) => <option key={contract.id} value={contract.id}>{contract.name}</option>)}
                   </Select>
                 </Field>
-                <Field label="Texto do contrato"><Input value={draft.contract_number} onChange={(e) => setDraft({ ...draft, contract_number: e.target.value, contract_id: "" })} placeholder="Contrato nº 046/2026 - PMCF / IART" /></Field>
                 <Field label="Data do termo"><Input type="date" value={draft.issued_at} onChange={(e) => setDraft({ ...draft, issued_at: e.target.value })} /></Field>
                 <div className="sm:col-span-2">
-                  <Field label="Unidade/setor como aparece no termo"><Input value={draft.destination_unit} onChange={(e) => setDraft({ ...draft, destination_unit: e.target.value })} placeholder="SGI – SUPERVISÃO EXECUTIVA" /></Field>
+                  <Alert tone="info">Destino: <strong>{destinationText || "selecione o recebedor"}</strong></Alert>
                 </div>
-                <Field label="Responsável ADCETEI"><Input value={draft.adcetei_signer_name} onChange={(e) => setDraft({ ...draft, adcetei_signer_name: e.target.value })} /></Field>
-                <Field label="Cargo do responsável ADCETEI"><Input value={draft.adcetei_signer_title} onChange={(e) => setDraft({ ...draft, adcetei_signer_title: e.target.value })} /></Field>
-                <Field label="Observação dos itens"><Input value={draft.item_observation} onChange={(e) => setDraft({ ...draft, item_observation: e.target.value })} /></Field>
-                <Field label="Observação interna"><Input value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></Field>
+                <div className="sm:col-span-2">
+                  <Field label="Observação na relação dos equipamentos"><Input value={draft.item_observation} onChange={(e) => setDraft({ ...draft, item_observation: e.target.value })} /></Field>
+                </div>
               </div>
             </Card>
 
-            <BulkScanSerialPanel
-              inputRef={inputRef}
-              serialInput={serialInput}
-              serials={serials}
-              onSerialInputChange={setSerialInput}
-              onAddSerial={addSerial}
-              onRemoveSerial={removeSerial}
-            />
+            <Card className="overflow-hidden">
+              <SectionHeader title="Equipamentos" />
+              <div className="space-y-3 p-4">
+                <Field label="Buscar equipamento">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+                      <Input
+                        ref={inputRef}
+                        className="pl-8"
+                        value={assetSearch}
+                        onChange={(e) => setAssetSearch(e.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            submitAssetSearch();
+                          }
+                        }}
+                        placeholder="Série, modelo ou tipo"
+                      />
+                    </div>
+                    <Button type="button" variant="secondary" onClick={submitAssetSearch}><Plus size={15} />Adicionar</Button>
+                  </div>
+                </Field>
+                {assetSearch.trim().length >= 2 && (
+                  <div className="overflow-hidden rounded-md border border-[#e8edf2]">
+                    {assetSearchLoading && <p className="px-3 py-2 text-sm text-[#5c6b7e]">Buscando...</p>}
+                    {!assetSearchLoading && assetResults.map((asset) => (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => addAsset(asset)}
+                        className="block w-full border-b border-[#e8edf2] bg-white px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[#f7f9fb]"
+                      >
+                        <span className="font-semibold text-[#1a2332]">{asset.serial_number}</span>
+                        <span className="mt-0.5 block text-xs text-[#5c6b7e]">{asset.display_name}</span>
+                      </button>
+                    ))}
+                    {!assetSearchLoading && !assetResults.length && <p className="px-3 py-2 text-sm text-[#5c6b7e]">Nenhum equipamento em estoque encontrado.</p>}
+                  </div>
+                )}
+                {serials.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {serials.map((serial) => (
+                      <Badge key={serial} className="border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]">
+                        {serial}
+                        <button type="button" className="ml-1 font-bold" onClick={() => removeSerial(serial)} aria-label={`Remover ${serial}`}>x</button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
             {serials.length > 0 && (
               <Card className="overflow-hidden">
                 <SectionHeader
                   title="Prévia dos itens"
-                  description={previewLoading ? "Validando números de série..." : `${preview?.valid_count || 0} válido(s), ${preview?.invalid_count || 0} com erro`}
+                  description={previewLoading ? "Validando..." : `${preview?.valid_count || 0} válido(s), ${preview?.invalid_count || 0} com erro`}
                 />
                 <div className="overflow-x-auto soft-scrollbar">
                   <table className="data-table min-w-[720px]">
@@ -449,7 +523,6 @@ export default function InventoryDeliveryTermsPage() {
             <Card className="overflow-hidden">
               <SectionHeader
                 title="Responsável recebedor"
-                description="Use um usuário existente ou cadastre pelo mesmo modal administrativo."
                 action={canManageUsers ? <Button type="button" variant="secondary" size="sm" onClick={openUserCreate}><Plus size={14} />Cadastrar</Button> : undefined}
               />
               <div className="space-y-3 p-4">

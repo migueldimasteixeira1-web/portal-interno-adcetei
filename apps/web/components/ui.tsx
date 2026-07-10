@@ -33,9 +33,9 @@ export function Badge({ className, children }: { className?: string; children: R
   return <span className={cn("inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-semibold leading-tight", className)}>{children}</span>;
 }
 
-export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn("h-9 w-full rounded-md border border-[#d4dbe4] bg-white px-3 text-sm text-[#1a2332] outline-none transition placeholder:text-[#8b97a8] focus:border-[#1a5f9e] focus:ring-2 focus:ring-[#e8f1f9] disabled:bg-[#f0f3f7] disabled:text-[#8b97a8]", props.className)} />;
-}
+export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(props, ref) {
+  return <input ref={ref} {...props} className={cn("h-9 w-full rounded-md border border-[#d4dbe4] bg-white px-3 text-sm text-[#1a2332] outline-none transition placeholder:text-[#8b97a8] focus:border-[#1a5f9e] focus:ring-2 focus:ring-[#e8f1f9] disabled:bg-[#f0f3f7] disabled:text-[#8b97a8]", props.className)} />;
+});
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={cn("min-h-28 w-full resize-y rounded-md border border-[#d4dbe4] bg-white px-3 py-2.5 text-sm leading-6 text-[#1a2332] outline-none transition placeholder:text-[#8b97a8] focus:border-[#1a5f9e] focus:ring-2 focus:ring-[#e8f1f9] disabled:bg-[#f0f3f7] disabled:text-[#8b97a8]", props.className)} />;
