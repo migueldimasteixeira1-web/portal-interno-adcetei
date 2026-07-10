@@ -20,6 +20,7 @@ DATABASE_URL="sqlite:///$TEST_DB" ENVIRONMENT=test SECRET_KEY="chave-local-para-
 from datetime import date
 from io import BytesIO
 from zipfile import ZipFile
+from xml.etree import ElementTree as ET
 
 from apps.api.app.auth import hash_password
 from apps.api.app.database import Base, SessionLocal, engine, ensure_schema_compatibility
@@ -146,12 +147,34 @@ with SessionLocal() as db:
     assert term_filename(stored_term) == "999-2026 - Termo de Recebimento - Erica Sanches.docx"
     content = render_delivery_term_docx(stored_term)
     with ZipFile(BytesIO(content)) as docx:
-        xml = docx.read("word/document.xml").decode("utf-8")
+        document_xml = docx.read("word/document.xml")
+        xml = document_xml.decode("utf-8")
         assert "999/2026" in xml
         assert "Y5UJHX5YA00227V" in xml
         assert "Monitor 24 polegadas" in xml
         assert "Matrícula: 250401573" in xml
         assert "Telefone: 22-981221739" in xml
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        body = ET.fromstring(document_xml).find("w:body", ns)
+        children = list(body)
+        texts = ["".join(text.text or "" for text in item.findall(".//w:t", ns)).strip() for item in children]
+        signature_index = texts.index("________________________________")
+        relation_index = texts.index("Relação dos equipamentos recebidos")
+        commitment_index = texts.index("Termo de compromisso")
+        tables = [(index, item) for index, item in enumerate(children) if item.tag.endswith("tbl")]
+        assert len(tables) >= 2
+        summary_index, summary_table = tables[0]
+        detail_index, detail_table = tables[1]
+        assert relation_index < summary_index < commitment_index < detail_index < signature_index
+        assert not any(item.findall(".//w:br", ns) for item in children[detail_index + 1:signature_index])
+        assert signature_index - detail_index > 2
+        detail_rows = detail_table.findall("w:tr", ns)
+        detail_cells = detail_rows[1].findall("w:tc", ns)
+        assert "".join(text.text or "" for text in detail_cells[-1].findall(".//w:t", ns)).strip() == ""
+        for table in [summary_table, detail_table]:
+            rows = table.findall("w:tr", ns)
+            assert rows[0].find("w:trPr/w:tblHeader", ns) is not None
+            assert all(row.find("w:trPr/w:cantSplit", ns) is not None for row in rows)
     delivered = confirm_delivery_term(
         term["id"],
         InventoryDeliveryTermDeliver(movement_date=date(2026, 7, 9)),
