@@ -43,7 +43,7 @@ export default function InventoryMovementDialog({
       confirmLabel="Registrar movimentação"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        {action === "allocate" && (
+        {action === "move" && (
           <>
             <Field label="Setor destino">
               <Select value={draft.sector_id} onChange={(event) => onDraftChange({ ...draft, sector_id: event.target.value, assigned_user_id: "" })}>
@@ -66,20 +66,6 @@ export default function InventoryMovementDialog({
               </Select>
             </Field>
           </>
-        )}
-        {action === "responsible" && (
-          <div className="sm:col-span-2">
-            <Field label="Novo responsável" help="Lista limitada ao setor atual do equipamento.">
-              <Select value={draft.assigned_user_id} onChange={(event) => onDraftChange({ ...draft, assigned_user_id: event.target.value })}>
-                <option value="">Selecione</option>
-                {responsibleOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.full_name} · {item.department}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
         )}
         <Field label="Data da movimentação">
           <Input type="date" value={draft.movement_date} onChange={(event) => onDraftChange({ ...draft, movement_date: event.target.value })} />

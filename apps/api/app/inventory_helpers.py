@@ -436,6 +436,7 @@ def inventory_asset_filter_conditions(
     *,
     status_filter: str | None,
     equipment_type_id: int | None,
+    secretariat_id: int | None,
     sector_id: int | None,
     search: str | None,
 ) -> tuple[list[Any], bool]:
@@ -445,6 +446,9 @@ def inventory_asset_filter_conditions(
         conditions.append(inventory_status_db_filter(status_filter))
     if equipment_type_id:
         conditions.append(Asset.equipment_type_id == equipment_type_id)
+    if secretariat_id:
+        needs_join = True
+        conditions.append(InventorySector.secretariat_id == secretariat_id)
     if sector_id:
         conditions.append(Asset.sector_id == sector_id)
     if search and search.strip():
@@ -492,12 +496,14 @@ def list_inventory_assets_filtered(
     *,
     status_filter: str | None,
     equipment_type_id: int | None,
+    secretariat_id: int | None,
     sector_id: int | None,
     search: str | None,
 ) -> list[Asset]:
     conditions, needs_join = inventory_asset_filter_conditions(
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )

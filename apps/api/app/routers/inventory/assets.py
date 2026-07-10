@@ -81,6 +81,7 @@ def list_inventory_assets(
     page_size: int = Query(20, ge=1, le=100),
     status_filter: str | None = None,
     equipment_type_id: int | None = None,
+    secretariat_id: int | None = None,
     sector_id: int | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
@@ -89,6 +90,7 @@ def list_inventory_assets(
     conditions, needs_join = inventory_asset_filter_conditions(
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )
@@ -141,6 +143,7 @@ def list_inventory_assets(
 def export_inventory_assets_spreadsheet(
     status_filter: str | None = None,
     equipment_type_id: int | None = None,
+    secretariat_id: int | None = None,
     sector_id: int | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
@@ -151,6 +154,7 @@ def export_inventory_assets_spreadsheet(
         actor=current_user,
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )
@@ -167,6 +171,7 @@ def export_inventory_assets_spreadsheet(
                 "search": search or "",
                 "status_filter": status_filter or "",
                 "equipment_type_id": equipment_type_id,
+                "secretariat_id": secretariat_id,
                 "sector_id": sector_id,
             },
         },

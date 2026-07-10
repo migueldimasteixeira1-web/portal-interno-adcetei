@@ -670,6 +670,10 @@ status, listed_assets = call("GET", "/inventory/assets", admin, params={"status_
 expect(status, 200, "administrador lista equipamentos no contrato novo")
 if not any(item["id"] == modular_asset["id"] for item in listed_assets["items"]):
     raise AssertionError("equipamento em estoque não retornou no filtro do contrato novo")
+status, secretariat_assets = call("GET", "/inventory/assets", admin, params={"secretariat_id": requester_sector["secretariat_id"], "page_size": 100})
+expect(status, 200, "administrador filtra inventário por secretaria")
+if not secretariat_assets["items"] or any(item["sector"]["secretariat_id"] != requester_sector["secretariat_id"] for item in secretariat_assets["items"]):
+    raise AssertionError("filtro por secretaria retornou item de outra secretaria")
 
 def call_binary(method, path, token=None, params=None):
     if params:
@@ -687,7 +691,7 @@ def call_binary(method, path, token=None, params=None):
 
 status, _, _ = call_binary("GET", "/inventory/assets/export", requester)
 expect(status, 403, "usuário comum não exporta inventário")
-status, export_headers, export_body = call_binary("GET", "/inventory/assets/export", admin, params={"status_filter": "stock"})
+status, export_headers, export_body = call_binary("GET", "/inventory/assets/export", admin, params={"status_filter": "stock", "secretariat_id": requester_sector["secretariat_id"]})
 expect(status, 200, "administrador exporta inventário filtrado")
 if "spreadsheetml" not in export_headers.get("content-type", ""):
     raise AssertionError("exportação não retornou xlsx")

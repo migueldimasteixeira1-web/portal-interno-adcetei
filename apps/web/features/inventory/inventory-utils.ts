@@ -67,7 +67,7 @@ export function manufacturerModel(asset: { manufacturer?: InventoryAssetCatalogR
   return value || "Não informado";
 }
 
-export type MovementAction = "allocate" | "responsible" | "stock" | "maintenance";
+export type MovementAction = "move" | "stock" | "maintenance";
 
 export type MovementDraft = {
   sector_id: string;
@@ -77,8 +77,7 @@ export type MovementDraft = {
 };
 
 export const movementActionTitle: Record<MovementAction, string> = {
-  allocate: "Enviar para setor/responsável",
-  responsible: "Trocar responsável",
+  move: "Movimentar equipamento",
   stock: "Devolver ao estoque",
   maintenance: "Enviar para manutenção",
 };

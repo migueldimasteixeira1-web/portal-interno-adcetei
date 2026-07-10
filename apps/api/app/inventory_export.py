@@ -222,6 +222,7 @@ def export_inventory_assets(
     actor: User,
     status_filter: str | None,
     equipment_type_id: int | None,
+    secretariat_id: int | None,
     sector_id: int | None,
     search: str | None,
 ) -> tuple[bytes, str, int]:
@@ -229,6 +230,7 @@ def export_inventory_assets(
         db,
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )

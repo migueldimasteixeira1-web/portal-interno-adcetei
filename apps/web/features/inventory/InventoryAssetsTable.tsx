@@ -4,12 +4,13 @@ import ListPagination from "@/components/ListPagination";
 import { Badge, Button, Card, EmptyState, Input, SectionHeader, Select, Toolbar, buttonStyles } from "@/components/ui";
 import { assetStatusTone, formatDate, inventoryAssetStatusLabels } from "@/lib/format";
 import type { InventoryAsset, InventoryCatalogs } from "@/lib/types";
-import { activeCatalogItems, catalogRefName, manufacturerModel, sectorWithSecretariat } from "./inventory-utils";
+import { activeCatalogItems, catalogRefName, manufacturerModel } from "./inventory-utils";
 
 type FilterState = {
   search: string;
   typeFilter: string;
   statusFilter: string;
+  secretariatFilter: string;
   sectorFilter: string;
 };
 
@@ -47,12 +48,15 @@ export default function InventoryAssetsTable({
   onExport,
 }: Props) {
   const typeOptions = activeCatalogItems(catalogs.equipment_types);
-  const sectorOptions = activeCatalogItems(catalogs.sectors);
+  const secretariatOptions = activeCatalogItems(catalogs.secretariats);
+  const sectorOptions = activeCatalogItems(
+    catalogs.sectors.filter((item) => !filters.secretariatFilter || String(item.secretariat_id) === filters.secretariatFilter),
+  );
 
   return (
     <>
       <Toolbar className="mb-4">
-        <div className="grid w-full gap-2 xl:grid-cols-[minmax(240px,1fr)_180px_180px_180px_auto_auto]">
+        <div className="grid w-full gap-2 xl:grid-cols-[minmax(220px,1fr)_170px_170px_190px_170px_auto_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
             <Input
@@ -71,9 +75,13 @@ export default function InventoryAssetsTable({
             <option value="">Todos os status</option>
             {Object.entries(inventoryAssetStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </Select>
-          <Select aria-label="Filtrar por setor" value={filters.sectorFilter} onChange={(e) => onFiltersChange({ sectorFilter: e.target.value })}>
+          <Select aria-label="Filtrar por secretaria" value={filters.secretariatFilter} onChange={(e) => onFiltersChange({ secretariatFilter: e.target.value })}>
+            <option value="">Todas as secretarias</option>
+            {secretariatOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </Select>
+          <Select aria-label="Filtrar por setor" value={filters.sectorFilter} disabled={!filters.secretariatFilter} onChange={(e) => onFiltersChange({ sectorFilter: e.target.value })}>
             <option value="">Todos os setores</option>
-            {sectorOptions.map((item) => <option key={item.id} value={item.id}>{sectorWithSecretariat(item)}</option>)}
+            {sectorOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </Select>
           {hasFilters && (
             <Button type="button" variant="ghost" onClick={onClearFilters} aria-label="Limpar filtros"><X size={16} /></Button>
@@ -81,7 +89,7 @@ export default function InventoryAssetsTable({
           {canExport && (
             <Button type="button" variant="secondary" disabled={exporting} onClick={onExport}>
               {exporting ? <LoaderCircle className="animate-spin" size={16} /> : <FileSpreadsheet size={16} />}
-              {exporting ? "Exportando..." : "Exportar planilha"}
+              {exporting ? "Exportando..." : "Exportar"}
             </Button>
           )}
         </div>

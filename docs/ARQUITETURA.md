@@ -128,11 +128,11 @@ A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados).
 - Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
 - Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI
 - Termos: `/api/inventory/delivery-terms` — número sugerido, contrato cadastrado, prévia por número de série, emissão/cancelamento do DOCX oficial a partir do template e confirmação de entrega sem alterar o inventário antes da assinatura
-- Exportação: `GET /api/inventory/assets/export` — planilha `.xlsx` com os mesmos filtros da listagem (`inventory.view`); inclui `Secretaria` antes de `Setor`; coluna “Última movimentação” usa a entrada mais recente por `movement_date` (desempate por `id`)
+- Exportação: `GET /api/inventory/assets/export` — planilha `.xlsx` com os mesmos filtros da listagem (`inventory.view`), incluindo secretaria e setor; inclui `Secretaria` antes de `Setor`; coluna “Última movimentação” usa a entrada mais recente por `movement_date` (desempate por `id`)
 - Baixa: `POST /api/inventory/assets/{id}/retire` — status `retired` com motivo, justificativa, movimentação `retired` e auditoria `inventory_asset_retired` (`inventory.move`; correção administrativa só admin)
 - Tela `/administracao/base-cadastros` para CRUD dos cadastros base; `/inventario/cadastros` redireciona para ela
 - Setor `ADCETEI` protegido contra renomeação/desativação via API
-- Alocação direta valida que o responsável selecionado pertence ao setor de destino
+- Ação única de movimentação direta define setor e, opcionalmente, responsável; a API valida que o responsável pertence ao setor de destino
 
 Termos de recebimento usam o cadastro existente de `users` como cadastro único de pessoas. Uma conta pode ficar bloqueada para login (`active=false`) e ainda ser usada como responsável recebedor do termo. A confirmação de entrega aplica a alocação em lote nos ativos e registra uma movimentação individual para cada equipamento.
 
