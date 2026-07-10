@@ -244,8 +244,8 @@ def create_delivery_term(
     contract = validate_contract(db, payload.contract_id)
 
     assets = assets_by_serial(db, payload.serial_numbers)
-    recipient_registration = payload.recipient_registration.strip() or recipient.registration
-    recipient_phone = payload.recipient_phone.strip() or recipient.phone
+    recipient_registration = payload.recipient_registration.strip()
+    recipient_phone = payload.recipient_phone.strip()
     if recipient_registration and not recipient.registration:
         recipient.registration = recipient_registration
     if recipient_phone and not recipient.phone:

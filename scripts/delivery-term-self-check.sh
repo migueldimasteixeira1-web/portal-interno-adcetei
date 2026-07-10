@@ -57,11 +57,23 @@ with SessionLocal() as db:
         registration="",
         phone="",
     )
+    empty_recipient = User(
+        username="sem.dados",
+        full_name="Recebedor Sem Dados",
+        email="sem.dados@adcetei.cabofrio.rj.gov.br",
+        password_hash=hash_password("senha-temporaria"),
+        role="user",
+        active=False,
+        secretariat="Secretaria Adjunta de Ciência e Tecnologia",
+        department="SGI",
+        registration="",
+        phone="",
+    )
     supplier = InventorySupplier(name="Fornecedor", normalized_name="fornecedor")
     equipment_type = InventoryEquipmentType(name="Monitor", normalized_name="monitor")
     manufacturer = InventoryManufacturer(name="Samsung", normalized_name="samsung")
     sector = InventorySector(name="SGI", normalized_name="sgi")
-    db.add_all([admin, recipient, supplier, equipment_type, manufacturer, sector])
+    db.add_all([admin, recipient, empty_recipient, supplier, equipment_type, manufacturer, sector])
     db.flush()
     contract = InventoryContract(
         name="Contrato nº 046/2026 – PMCF / IART",
@@ -91,7 +103,22 @@ with SessionLocal() as db:
         equipment_model_id=model.id,
         sector_id=sector.id,
     )
-    db.add(asset)
+    empty_asset = Asset(
+        name="Monitor Samsung S24D400GAL",
+        asset_type="Monitor",
+        manufacturer="Samsung",
+        model="S24D400GAL",
+        serial_number="Y5UJHX5YA00228V",
+        specifications="Monitor 24 polegadas, resolução Full HD",
+        status="stock",
+        location="ADCETEI",
+        supplier_id=supplier.id,
+        equipment_type_id=equipment_type.id,
+        manufacturer_id=manufacturer.id,
+        equipment_model_id=model.id,
+        sector_id=sector.id,
+    )
+    db.add_all([asset, empty_asset])
     db.commit()
 
     preview = preview_delivery_term(InventoryDeliveryTermPreview(serial_numbers=["Y5UJHX5YA00227V", "Y5UJHX5YA00227V", "NAO-EXISTE"]), db, admin)
@@ -184,6 +211,36 @@ with SessionLocal() as db:
     assert delivered["status"] == "delivered"
     db.refresh(asset)
     assert asset.assigned_user_id == recipient.id
+
+    empty_field_term = create_delivery_term(
+        InventoryDeliveryTermCreate(
+            term_number="100/2026",
+            contract_id=contract.id,
+            issued_at=date(2026, 7, 8),
+            destination_unit="Secretaria Adjunta de Ciência e Tecnologia - SGI",
+            recipient_user_id=empty_recipient.id,
+            recipient_registration="",
+            recipient_phone="",
+            adcetei_signer_name="William Barreto Corrêa",
+            adcetei_signer_title="Coordenador Geral de Tecnologia da Informação",
+            item_observation="Equipamento locado",
+            serial_numbers=["Y5UJHX5YA00228V"],
+        ),
+        db,
+        admin,
+    )
+    assert empty_field_term["recipient_registration"] == ""
+    assert empty_field_term["recipient_phone"] == ""
+    db.refresh(empty_recipient)
+    assert empty_recipient.registration == ""
+    assert empty_recipient.phone == ""
+    empty_content = render_delivery_term_docx(db.get(InventoryDeliveryTerm, empty_field_term["id"]))
+    with ZipFile(BytesIO(empty_content)) as docx:
+        empty_xml = docx.read("word/document.xml").decode("utf-8")
+        assert "Matrícula:" in empty_xml
+        assert "Telefone:" in empty_xml
+        assert "250401573" not in empty_xml
+        assert "22-981221739" not in empty_xml
 
 print("Termo de recebimento: OK")
 PY
