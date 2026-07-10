@@ -120,7 +120,11 @@ export default function InventoryAssetsTable({
                   <td><Badge className={assetStatusTone(asset.status)}>{inventoryAssetStatusLabels[asset.status] || asset.status}</Badge></td>
                   <td className="text-[#5c6b7e]">{formatDate(asset.received_at, false)}</td>
                   <td className="text-[#5c6b7e]">{formatDate(asset.delivered_at, false)}</td>
-                  <td><Link href={`/inventario/${asset.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })}><Eye size={15} />Ver detalhes</Link></td>
+                  <td>
+                    <Link href={`/inventario/${asset.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })} aria-label={`Ver detalhes de ${asset.serial_number || "equipamento"}`}>
+                      <Eye size={15} />
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>
