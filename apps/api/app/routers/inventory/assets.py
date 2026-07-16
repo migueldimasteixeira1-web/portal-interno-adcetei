@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ...audit import add_audit
 from ...database import get_db
-from ...delivery_terms_service import ensure_asset_not_reserved
+from ...delivery_terms_service import asset_has_delivery_term_history, ensure_asset_not_reserved
 from ...inventory_export import export_inventory_assets
 from ...inventory_helpers import (
     add_asset_movement,
@@ -386,6 +386,8 @@ def delete_inventory_asset(
     asset = db.get(Asset, asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    if asset_has_delivery_term_history(db, asset.id):
+        raise HTTPException(status_code=409, detail="Equipamento possui termo de recebimento vinculado. Use a baixa em vez de excluir.")
     if has_rows(db, select(Ticket.id).where(Ticket.asset_id == asset.id)):
         raise HTTPException(status_code=409, detail="Equipamento possui chamados vinculados. Baixe ou arquive em vez de excluir.")
     db.execute(delete(AssetMovement).where(AssetMovement.asset_id == asset.id))

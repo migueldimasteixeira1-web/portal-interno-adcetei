@@ -28,9 +28,12 @@ from sqlalchemy import select
 from apps.api.app.auth import hash_password
 from apps.api.app.database import Base, SessionLocal, engine, ensure_schema_compatibility
 from apps.api.app.delivery_terms_docx import render_delivery_term_docx, term_filename
-from apps.api.app.models import Asset, InventoryContract, InventoryDeliveryTerm, InventoryEquipmentModel, InventoryEquipmentType, InventoryManufacturer, InventorySecretariat, InventorySector, InventorySupplier, User
+from apps.api.app.models import Asset, InventoryContract, InventoryDeliveryTerm, InventoryDeliveryTermItem, InventoryEquipmentModel, InventoryEquipmentType, InventoryManufacturer, InventorySecretariat, InventorySector, InventorySupplier, User
 from apps.api.app.permissions import ensure_role_configs
-from apps.api.app.routers.inventory.assets import allocate_inventory_asset, retire_inventory_asset
+from apps.api.app.routers.admin.assets import delete_asset as delete_admin_asset
+from apps.api.app.routers.admin.users import delete_user
+from apps.api.app.routers.inventory.assets import allocate_inventory_asset, delete_inventory_asset, retire_inventory_asset
+from apps.api.app.routers.inventory.catalogs import delete_sector
 from apps.api.app.routers.inventory.terms import cancel_delivery_term, confirm_delivery_term, create_delivery_term, next_term_number, preview_delivery_term
 from apps.api.app.schemas import InventoryAllocateRequest, InventoryDeliveryTermCreate, InventoryDeliveryTermDeliver, InventoryDeliveryTermPreview, InventoryRetireRequest
 from apps.api.app.time_utils import utc_now
@@ -338,6 +341,8 @@ with SessionLocal() as db:
     db.refresh(atomic_asset_b)
     assert atomic_asset_a.status == atomic_asset_b.status == "active"
 
+    empty_recipient.department_sector_id = alternate_sector.id
+    db.commit()
     empty_field_term = create_delivery_term(
         InventoryDeliveryTermCreate(
             term_number="100/2026",
@@ -371,6 +376,16 @@ with SessionLocal() as db:
         lambda: confirm_delivery_term(empty_field_term["id"], InventoryDeliveryTermDeliver(movement_date=date(2026, 7, 9)), db, admin),
         "anterior ao recebimento",
     )
+    empty_recipient.department_sector_id = sector.id
+    db.commit()
+    expect_conflict(lambda: delete_inventory_asset(asset.id, db, admin), "termo de recebimento vinculado")
+    expect_conflict(lambda: delete_admin_asset(asset.id, db, admin), "termo de recebimento vinculado")
+    expect_conflict(lambda: delete_user(empty_recipient.id, db, admin), "histórico vinculado")
+    expect_conflict(lambda: delete_sector(alternate_sector.id, db, admin), "Cadastro possui vínculos")
+    assert db.get(Asset, asset.id)
+    assert db.get(User, empty_recipient.id)
+    assert db.get(InventorySector, alternate_sector.id)
+    assert db.scalar(select(InventoryDeliveryTermItem.id).where(InventoryDeliveryTermItem.term_id == empty_field_term["id"]))
 
 print("Termo de recebimento: OK")
 PY

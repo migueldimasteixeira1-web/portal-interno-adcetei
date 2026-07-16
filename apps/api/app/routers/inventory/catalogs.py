@@ -372,5 +372,6 @@ def delete_sector(
             select(Asset.id).where(Asset.sector_id == item_id),
             select(AssetMovement.id).where(or_(AssetMovement.from_sector_id == item_id, AssetMovement.to_sector_id == item_id)),
             select(User.id).where(User.department_sector_id == item_id),
+            select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.destination_sector_id == item_id),
         ),
     )
