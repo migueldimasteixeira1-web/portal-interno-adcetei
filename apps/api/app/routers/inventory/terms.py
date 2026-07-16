@@ -77,7 +77,16 @@ def term_payload(term: InventoryDeliveryTerm) -> dict:
     }
 
 
-def get_term_or_404(db: Session, term_id: int) -> InventoryDeliveryTerm:
+def get_term_or_404(db: Session, term_id: int, *, lock: bool = False) -> InventoryDeliveryTerm:
+    if lock and db.bind and db.bind.dialect.name == "postgresql":
+        locked = db.scalar(
+            select(InventoryDeliveryTerm)
+            .where(InventoryDeliveryTerm.id == term_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if not locked:
+            raise HTTPException(status_code=404, detail="Termo não encontrado")
     term = db.scalar(term_query().where(InventoryDeliveryTerm.id == term_id))
     if not term:
         raise HTTPException(status_code=404, detail="Termo não encontrado")
@@ -328,7 +337,7 @@ def cancel_delivery_term(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.move")),
 ):
-    term = get_term_or_404(db, term_id)
+    term = get_term_or_404(db, term_id, lock=True)
     if term.status == "delivered":
         raise HTTPException(status_code=409, detail="Termo entregue não pode ser cancelado")
     if term.status == "cancelled":
@@ -369,7 +378,7 @@ def confirm_delivery_term(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.move")),
 ):
-    term = get_term_or_404(db, term_id)
+    term = get_term_or_404(db, term_id, lock=True)
     if term.status == "delivered":
         raise HTTPException(status_code=409, detail="Termo já foi confirmado")
     if term.status == "cancelled":

@@ -386,6 +386,7 @@ def delete_inventory_asset(
     asset = db.get(Asset, asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    ensure_asset_not_reserved(db, asset.id)
     if asset_has_delivery_term_history(db, asset.id):
         raise HTTPException(status_code=409, detail="Equipamento possui termo de recebimento vinculado. Use a baixa em vez de excluir.")
     if has_rows(db, select(Ticket.id).where(Ticket.asset_id == asset.id)):
