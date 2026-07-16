@@ -69,7 +69,7 @@ with SessionLocal() as db:
         password_hash=hash_password("senha-temporaria"),
         role="user",
         active=False,
-        secretariat="Secretaria de Governo e Integridade",
+        secretariat="Secretaria de Gestão e Inovação",
         department="ADCETEI",
         registration="",
         phone="",
@@ -81,7 +81,7 @@ with SessionLocal() as db:
         password_hash=hash_password("senha-temporaria"),
         role="user",
         active=False,
-        secretariat="Secretaria de Governo e Integridade",
+        secretariat="Secretaria de Gestão e Inovação",
         department="ADCETEI",
         registration="",
         phone="",
@@ -89,7 +89,7 @@ with SessionLocal() as db:
     supplier = InventorySupplier(name="Fornecedor", normalized_name="fornecedor")
     equipment_type = InventoryEquipmentType(name="Monitor", normalized_name="monitor")
     manufacturer = InventoryManufacturer(name="Samsung", normalized_name="samsung")
-    secretariat = db.scalar(select(InventorySecretariat).where(InventorySecretariat.normalized_name == "secretaria de governo e integridade"))
+    secretariat = db.scalar(select(InventorySecretariat).where(InventorySecretariat.normalized_name == "secretaria de gestão e inovação"))
     db.add_all([admin, recipient, empty_recipient, supplier, equipment_type, manufacturer])
     db.flush()
     sector = db.scalar(select(InventorySector).where(InventorySector.normalized_name == "adcetei"))
@@ -234,7 +234,7 @@ with SessionLocal() as db:
     assert term["status"] == "emitted"
     assert term["contract_number"] == "Contrato nº 046/2026 – PMCF / IART"
     assert term["destination_sector_id"] == sector.id
-    assert term["destination_unit"] == "Secretaria de Governo e Integridade - ADCETEI"
+    assert term["destination_unit"] == "Secretaria de Gestão e Inovação - ADCETEI"
     db.refresh(recipient)
     assert recipient.registration == "250401573"
     assert recipient.phone == "22-981221739"
@@ -348,7 +348,7 @@ with SessionLocal() as db:
             term_number="100/2026",
             contract_id=contract.id,
             issued_at=date(2026, 7, 8),
-            destination_unit="Secretaria de Governo e Integridade - ADCETEI",
+            destination_unit="Secretaria de Gestão e Inovação - ADCETEI",
             recipient_user_id=empty_recipient.id,
             recipient_registration="",
             recipient_phone="",

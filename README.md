@@ -129,7 +129,7 @@ Direção planejada do módulo: fundação modular, cadastros base, evolução d
 
 Os cadastros base já existem no backend para secretarias, setores, fornecedores, contratos, tipos de equipamento, fabricantes e modelos. Setores pertencem a uma secretaria; contratos pertencem a um fornecedor; modelos pertencem a fabricante e tipo. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
 
-A hierarquia organizacional conhecida é `Secretaria de Governo e Integridade (SGI) → ADCETEI`. A compatibilidade de bancos antigos vincula automaticamente somente o setor ADCETEI; setores sem classificação permanecem sem secretaria até revisão administrativa.
+A hierarquia organizacional conhecida é `Secretaria de Gestão e Inovação (SGI) → ADCETEI`. A compatibilidade de bancos antigos vincula automaticamente somente o setor ADCETEI; setores sem classificação permanecem sem secretaria até revisão administrativa.
 
 `assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente.
 

@@ -159,6 +159,10 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (3, 'Setor Existente', 'setor existente', 1, 1)")
 
 ensure_schema_compatibility()
+with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
+    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (3, 'Secretaria de Governo e Integridade', 'secretaria de governo e integridade', 1)")
+    connection.execute("UPDATE inventory_sectors SET secretariat_id = 3 WHERE normalized_name = 'adcetei'")
+ensure_schema_compatibility()
 ensure_schema_compatibility()
 columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
 expected = {"form_data", "form_schema_snapshot", "service_id"}
@@ -178,12 +182,13 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     assert "requester" not in roles, "perfil requester legado não deve permanecer ativo"
     secretariats = dict(connection.execute("select normalized_name, id from inventory_secretariats").fetchall())
     sectors = dict(connection.execute("select normalized_name, secretariat_id from inventory_sectors").fetchall())
-    assert "secretaria de governo e integridade" in secretariats, "SGI deve existir como secretaria"
-    assert sectors["adcetei"] == secretariats["secretaria de governo e integridade"], "ADCETEI deve pertencer à SGI"
+    assert "secretaria de gestão e inovação" in secretariats, "SGI deve existir como secretaria"
+    assert sectors["adcetei"] == secretariats["secretaria de gestão e inovação"], "ADCETEI deve pertencer à SGI"
     assert sectors["fazenda"] is None, "FAZENDA sem classificação deve permanecer sem secretaria"
     assert sectors["setor existente"] == 1, "vínculo organizacional existente deve ser preservado"
+    assert "secretaria de governo e integridade" not in secretariats, "nome incorreto desta branch deve ser removido quando estiver sem uso"
     assert "secretaria adjunta de ciência e tecnologia" not in secretariats, "migração não deve criar secretaria incorreta"
-    assert len([name for name in secretariats if name == "secretaria de governo e integridade"]) == 1, "migração deve ser idempotente"
+    assert len([name for name in secretariats if name == "secretaria de gestão e inovação"]) == 1, "migração deve ser idempotente"
 with engine.connect() as connection:
     assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1, "SQLite deve validar chaves estrangeiras"
 print("Migração legada: OK")
@@ -1248,7 +1253,7 @@ status, temporary_user = call(
         "email": "recebedor.temporario@adcetei.cabofrio.rj.gov.br",
         "password": "",
         "role": "user",
-        "secretariat": "Secretaria de Governo e Integridade",
+        "secretariat": "Secretaria de Gestão e Inovação",
         "department_sector_id": default_sector["id"],
         "department": "ADCETEI",
         "phone": "",
