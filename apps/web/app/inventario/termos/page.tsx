@@ -43,7 +43,7 @@ const emptyUserDraft: UserDraft = {
   username: "",
   full_name: "",
   email: "",
-  password: "TermoTemporario123",
+  password: "",
   role: "user",
   secretariat: "",
   department_sector_id: "",
@@ -60,6 +60,14 @@ const statusLabels: Record<string, string> = {
   delivered: "Entregue",
   cancelled: "Cancelado",
 };
+
+function termRecipientFields(recipient: User) {
+  return {
+    recipient_user_id: String(recipient.id),
+    recipient_registration: recipient.registration || "",
+    recipient_phone: recipient.phone || "",
+  };
+}
 
 type TermsView = "emit" | "pending" | "history";
 
@@ -227,9 +235,7 @@ export default function InventoryDeliveryTermsPage() {
   const selectRecipient = (recipient: User) => {
     setDraft((current) => ({
       ...current,
-      recipient_user_id: String(recipient.id),
-      recipient_registration: recipient.registration || current.recipient_registration,
-      recipient_phone: recipient.phone || current.recipient_phone,
+      ...termRecipientFields(recipient),
     }));
   };
 
