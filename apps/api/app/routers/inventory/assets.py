@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ...audit import add_audit
 from ...database import get_db
+from ...delivery_terms_service import ensure_asset_not_reserved
 from ...inventory_export import export_inventory_assets
 from ...inventory_helpers import (
     add_asset_movement,
@@ -319,6 +320,7 @@ def update_inventory_asset(
     asset = db.scalar(inventory_asset_query().where(Asset.id == asset_id))
     if not asset:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    ensure_asset_not_reserved(db, asset.id)
     data = payload.model_dump(exclude_unset=True)
     if "serial_number" in data:
         asset.serial_number = normalize_inventory_serial(data["serial_number"])
@@ -415,6 +417,7 @@ def allocate_inventory_asset(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     sector = db.get(InventorySector, payload.sector_id)
     if not sector:
@@ -444,6 +447,7 @@ def change_inventory_asset_responsible(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
     validate_user_for_sector(db, payload.assigned_user_id, sector)
@@ -474,6 +478,7 @@ def return_inventory_asset_to_stock(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
@@ -499,6 +504,7 @@ def send_inventory_asset_to_maintenance(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
@@ -526,6 +532,7 @@ def retire_inventory_asset(
     if payload.reason == "CORRECAO_ADMINISTRATIVA" and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Correção administrativa disponível apenas para administrador")
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     previous_status = before.get("status")

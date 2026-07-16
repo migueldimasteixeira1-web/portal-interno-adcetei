@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from ...admin_helpers import ensure_unique_asset, has_rows, reject_null_fields, validate_assigned_user
 from ...audit import add_audit
 from ...database import get_db
+from ...delivery_terms_service import ensure_asset_not_reserved
 from ...models import Asset, AssetMovement, Ticket, User
 from ...permissions import require_permission
 from ...schemas import AssetCreate, AssetOut, AssetUpdate
@@ -48,6 +49,7 @@ def update_asset(
     asset = db.get(Asset, asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    ensure_asset_not_reserved(db, asset.id)
     data = payload.model_dump(exclude_unset=True)
     reject_null_fields(
         data,
@@ -118,5 +120,4 @@ def delete_asset(
     )
     db.commit()
     return {"message": "Equipamento excluído com sucesso"}
-
 

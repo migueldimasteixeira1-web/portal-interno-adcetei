@@ -4,13 +4,15 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ...audit import add_audit
 from ...database import get_db
+from ...delivery_terms_service import open_delivery_term_for_asset, reservation_conflict_message
 from ...delivery_terms_docx import render_delivery_term_docx, term_filename
-from ...inventory_helpers import add_asset_movement, fresh_inventory_asset, has_rows, validate_contract
-from ...inventory_service import apply_asset_allocation, asset_is_retired, asset_movement_state, build_asset_display_name, movement_datetime, normalize_catalog_name, normalize_serial_number
+from ...inventory_helpers import add_asset_movement, validate_contract
+from ...inventory_service import apply_asset_allocation, asset_is_retired, asset_movement_state, build_asset_display_name, inventory_status_from_asset, movement_datetime, normalize_serial_number
 from ...models import Asset, InventoryDeliveryTerm, InventoryDeliveryTermItem, InventorySector, User
 from ...permissions import require_permission
 from ...schemas import (
@@ -102,6 +104,17 @@ def asset_condition_observation(asset: Asset) -> str:
     return "Equipamento usado" if asset.delivered_at else "Equipamento novo"
 
 
+def asset_term_error(db: Session, asset: Asset) -> str | None:
+    if asset_is_retired(asset):
+        return "Equipamento baixado não pode entrar em termo"
+    if inventory_status_from_asset(asset) != "stock":
+        return "Somente equipamento em estoque pode entrar em termo"
+    open_term = open_delivery_term_for_asset(db, asset.id)
+    if open_term:
+        return reservation_conflict_message(open_term)
+    return None
+
+
 def validate_assets_by_serial(db: Session, serial_numbers: list[str]) -> tuple[list[Asset], list[dict]]:
     normalized_to_input: dict[str, tuple[int, str]] = {}
     errors: list[dict] = []
@@ -127,29 +140,29 @@ def validate_assets_by_serial(db: Session, serial_numbers: list[str]) -> tuple[l
         if not asset:
             errors.append({"index": index, "serial_number": serial, "normalized_serial": normalized, "message": "Número de série não encontrado"})
             continue
-        if asset_is_retired(asset):
-            errors.append({"index": index, "serial_number": serial, "normalized_serial": normalized, "message": "Equipamento baixado não pode entrar em termo"})
-            continue
-        if has_rows(
-            db,
-            select(InventoryDeliveryTermItem.id)
-            .join(InventoryDeliveryTerm, InventoryDeliveryTerm.id == InventoryDeliveryTermItem.term_id)
-            .where(
-                InventoryDeliveryTermItem.asset_id == asset.id,
-                InventoryDeliveryTerm.status.in_(["draft", "emitted"]),
-            ),
-        ):
-            errors.append({"index": index, "serial_number": serial, "normalized_serial": normalized, "message": "Equipamento já está em termo aberto"})
+        message = asset_term_error(db, asset)
+        if message:
+            errors.append({"index": index, "serial_number": serial, "normalized_serial": normalized, "message": message})
             continue
         valid_assets.append(asset)
     return valid_assets, errors
 
 
-def assets_by_serial(db: Session, serial_numbers: list[str]) -> list[Asset]:
+def assets_by_serial(db: Session, serial_numbers: list[str], *, lock: bool = False) -> list[Asset]:
     assets, errors = validate_assets_by_serial(db, serial_numbers)
     if errors:
         first = errors[0]
         raise HTTPException(status_code=409, detail=f"{first['message']}: {first['serial_number']}")
+    if lock:
+        query = select(Asset).where(Asset.id.in_([asset.id for asset in assets]))
+        if db.bind and db.bind.dialect.name == "postgresql":
+            query = query.with_for_update()
+        locked = {asset.id: asset for asset in db.scalars(query.execution_options(populate_existing=True))}
+        assets = [locked[asset.id] for asset in assets]
+        for asset in assets:
+            message = asset_term_error(db, asset)
+            if message:
+                raise HTTPException(status_code=409, detail=f"{message}: {asset.serial_number}")
     return assets
 
 
@@ -165,26 +178,24 @@ def next_term_number(db: Session) -> str:
 
 
 def destination_sector_for_recipient(db: Session, recipient: User) -> InventorySector:
-    if recipient.department_sector_id:
-        sector = db.get(InventorySector, recipient.department_sector_id)
-        if sector:
-            return sector
-    name = " ".join((recipient.department or "").strip().split()) or "Não informado"
-    normalized = normalize_catalog_name(name)
-    sector = db.scalar(select(InventorySector).where(InventorySector.normalized_name == normalized))
+    if not recipient.department_sector_id:
+        raise HTTPException(status_code=409, detail="Recebedor sem lotação cadastrada. Corrija o setor do usuário na Administração.")
+    sector = db.scalar(
+        select(InventorySector)
+        .options(joinedload(InventorySector.secretariat))
+        .where(InventorySector.id == recipient.department_sector_id)
+    )
     if not sector:
-        sector = InventorySector(name=name, normalized_name=normalized, is_active=True)
-        db.add(sector)
-        db.flush()
-    recipient.department_sector_id = sector.id
-    recipient.department = sector.name
+        raise HTTPException(status_code=409, detail="Setor do recebedor não existe. Corrija a lotação do usuário na Administração.")
+    if not sector.is_active:
+        raise HTTPException(status_code=409, detail="Setor do recebedor está inativo. Corrija a lotação do usuário na Administração.")
+    if not sector.secretariat:
+        raise HTTPException(status_code=409, detail="Setor do recebedor está sem secretaria. Corrija o cadastro organizacional na Administração.")
     return sector
 
 
-def destination_unit_for_recipient(recipient: User) -> str:
-    secretariat = " ".join((recipient.secretariat or "").strip().split()) or "Prefeitura de Cabo Frio"
-    department = " ".join((recipient.department or "").strip().split())
-    return f"{secretariat} - {department}" if department else secretariat
+def destination_unit_for_sector(sector: InventorySector) -> str:
+    return f"{sector.secretariat.name} - {sector.name}"
 
 
 @router.get("/delivery-terms", response_model=list[InventoryDeliveryTermOut])
@@ -243,7 +254,7 @@ def create_delivery_term(
     sector = destination_sector_for_recipient(db, recipient)
     contract = validate_contract(db, payload.contract_id)
 
-    assets = assets_by_serial(db, payload.serial_numbers)
+    assets = assets_by_serial(db, payload.serial_numbers, lock=True)
     recipient_registration = payload.recipient_registration.strip()
     recipient_phone = payload.recipient_phone.strip()
     if recipient_registration and not recipient.registration:
@@ -258,7 +269,7 @@ def create_delivery_term(
         contract_number=contract.name if contract else payload.contract_number.strip(),
         issued_at=issued_at,
         destination_sector_id=sector.id,
-        destination_unit=payload.destination_unit.strip() or destination_unit_for_recipient(recipient),
+        destination_unit=destination_unit_for_sector(sector),
         recipient_user_id=recipient.id,
         recipient_name=recipient.full_name,
         recipient_email=recipient.email,
@@ -271,36 +282,43 @@ def create_delivery_term(
         status="emitted",
         created_by_user_id=current_user.id,
     )
-    db.add(term)
-    db.flush()
-    for asset in assets:
-        item_observation = asset_condition_observation(asset) if asset.delivered_at else payload.item_observation.strip()
-        term.items.append(
-            InventoryDeliveryTermItem(
-                asset_id=asset.id,
-                asset_type=(asset.equipment_type.name if asset.equipment_type else asset.asset_type).strip(),
-                manufacturer=(asset.manufacturer_ref.name if asset.manufacturer_ref else asset.manufacturer).strip(),
-                model=(asset.equipment_model.name if asset.equipment_model else asset.model).strip(),
-                serial_number=asset.serial_number,
-                specification=asset.specifications.strip() or build_asset_display_name(
-                    asset.equipment_type.name if asset.equipment_type else asset.asset_type,
-                    asset.manufacturer_ref.name if asset.manufacturer_ref else asset.manufacturer,
-                    asset.equipment_model.name if asset.equipment_model else asset.model,
-                    "",
-                ),
-                observation=item_observation,
+    try:
+        db.add(term)
+        db.flush()
+        for asset in assets:
+            item_observation = asset_condition_observation(asset) if asset.delivered_at else payload.item_observation.strip()
+            term.items.append(
+                InventoryDeliveryTermItem(
+                    asset_id=asset.id,
+                    asset_type=(asset.equipment_type.name if asset.equipment_type else asset.asset_type).strip(),
+                    manufacturer=(asset.manufacturer_ref.name if asset.manufacturer_ref else asset.manufacturer).strip(),
+                    model=(asset.equipment_model.name if asset.equipment_model else asset.model).strip(),
+                    serial_number=asset.serial_number,
+                    specification=asset.specifications.strip() or build_asset_display_name(
+                        asset.equipment_type.name if asset.equipment_type else asset.asset_type,
+                        asset.manufacturer_ref.name if asset.manufacturer_ref else asset.manufacturer,
+                        asset.equipment_model.name if asset.equipment_model else asset.model,
+                        "",
+                    ),
+                    observation=item_observation,
+                )
             )
+        add_audit(
+            db,
+            actor=current_user,
+            action="create_delivery_term",
+            entity_type="inventory_delivery_term",
+            entity_id=term.id,
+            summary=f"Emissão do termo de recebimento {term.term_number}",
+            changes={"asset_ids": [asset.id for asset in assets], "recipient_user_id": recipient.id},
         )
-    add_audit(
-        db,
-        actor=current_user,
-        action="create_delivery_term",
-        entity_type="inventory_delivery_term",
-        entity_id=term.id,
-        summary=f"Emissão do termo de recebimento {term.term_number}",
-        changes={"asset_ids": [asset.id for asset in assets], "recipient_user_id": recipient.id},
-    )
-    db.commit()
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Já existe um termo com este número") from exc
+    except Exception:
+        db.rollback()
+        raise
     return term_payload(get_term_or_404(db, term.id))
 
 
@@ -356,37 +374,60 @@ def confirm_delivery_term(
         raise HTTPException(status_code=409, detail="Termo já foi confirmado")
     if term.status == "cancelled":
         raise HTTPException(status_code=409, detail="Termo cancelado não pode ser confirmado")
+    recipient = db.get(User, term.recipient_user_id)
+    if not recipient:
+        raise HTTPException(status_code=409, detail="Recebedor do termo não existe mais. Cancele o termo e corrija o cadastro.")
+    if recipient.department_sector_id != term.destination_sector_id:
+        raise HTTPException(status_code=409, detail="A lotação do recebedor mudou após a emissão. Cancele e reemita o termo para a nova lotação.")
     sector = db.get(InventorySector, term.destination_sector_id)
     if not sector or not sector.is_active:
         raise HTTPException(status_code=400, detail="Setor de destino inválido")
     movement_at = movement_datetime(payload.movement_date)
+    if movement_at.date() < term.issued_at.date():
+        raise HTTPException(status_code=409, detail="Data da entrega não pode ser anterior à data de emissão do termo")
     notes = payload.notes.strip() or f"Entrega confirmada pelo termo {term.term_number}."
-    for item in term.items:
-        asset = fresh_inventory_asset(db, item.asset_id)
-        if asset_is_retired(asset):
-            raise HTTPException(status_code=409, detail=f"Equipamento baixado não pode ser entregue: {item.serial_number}")
-        before = asset_movement_state(asset)
-        apply_asset_allocation(asset, sector, term.recipient_user_id, movement_at)
-        add_asset_movement(
+    asset_ids = [item.asset_id for item in term.items]
+    query = select(Asset).where(Asset.id.in_(asset_ids))
+    if db.bind and db.bind.dialect.name == "postgresql":
+        query = query.with_for_update()
+    assets = {asset.id: asset for asset in db.scalars(query.execution_options(populate_existing=True))}
+    try:
+        for item in term.items:
+            asset = assets.get(item.asset_id)
+            if not asset:
+                raise HTTPException(status_code=409, detail=f"Equipamento do termo não existe mais: {item.serial_number}")
+            if inventory_status_from_asset(asset) != "stock":
+                raise HTTPException(status_code=409, detail=f"Equipamento não está mais em estoque: {item.serial_number}")
+            reservation = open_delivery_term_for_asset(db, asset.id)
+            if not reservation or reservation.id != term.id:
+                raise HTTPException(status_code=409, detail=f"Equipamento não está mais reservado por este termo: {item.serial_number}")
+            if asset.received_at and movement_at.date() < asset.received_at.date():
+                raise HTTPException(status_code=409, detail=f"Data da entrega não pode ser anterior ao recebimento do equipamento: {item.serial_number}")
+            before = asset_movement_state(asset)
+            apply_asset_allocation(asset, sector, term.recipient_user_id, movement_at)
+            add_asset_movement(
+                db,
+                asset=asset,
+                action="allocated",
+                before=before,
+                movement_at=movement_at,
+                notes=notes,
+                actor_id=current_user.id,
+            )
+        term.status = "delivered"
+        term.delivered_at = movement_at
+        term.delivered_by_user_id = current_user.id
+        add_audit(
             db,
-            asset=asset,
-            action="allocated",
-            before=before,
-            movement_at=movement_at,
-            notes=notes,
-            actor_id=current_user.id,
+            actor=current_user,
+            action="confirm_delivery_term",
+            entity_type="inventory_delivery_term",
+            entity_id=term.id,
+            summary=f"Confirmação de entrega do termo {term.term_number}",
+            changes={"asset_ids": asset_ids, "recipient_user_id": term.recipient_user_id},
         )
-    term.status = "delivered"
-    term.delivered_at = movement_at
-    term.delivered_by_user_id = current_user.id
-    add_audit(
-        db,
-        actor=current_user,
-        action="confirm_delivery_term",
-        entity_type="inventory_delivery_term",
-        entity_id=term.id,
-        summary=f"Confirmação de entrega do termo {term.term_number}",
-        changes={"asset_ids": [item.asset_id for item in term.items], "recipient_user_id": term.recipient_user_id},
-    )
-    db.commit()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return term_payload(get_term_or_404(db, term.id))

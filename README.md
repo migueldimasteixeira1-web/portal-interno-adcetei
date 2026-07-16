@@ -141,6 +141,8 @@ A Parte 8 adicionou a tela `/administracao/base-cadastros` para gerenciar a base
 
 O fluxo de termos de recebimento fica separado em `/inventario/termos`. Ele sugere o próximo número, usa contrato cadastrado vinculado a fornecedor, preenche o destino como `Secretaria - Setor`, valida os números de série antes da emissão, emite o DOCX oficial a partir do template cadastrado na API, permite cancelar termo aberto e só altera o inventário quando a entrega assinada é confirmada. A confirmação aloca todos os itens do termo para o setor/usuário e registra uma movimentação por equipamento. Equipamentos também têm campo de especificações, usado na relação do termo. Movimentações diretas usam uma ação única para setor/responsável e bloqueiam responsável fora do setor selecionado.
 
+Enquanto um termo está aberto (`draft` ou `emitted`), seus equipamentos ficam reservados e não podem ser editados ou movimentados. A confirmação revalida estoque, lotação e datas e aplica todos os itens em uma única transação; o cancelamento libera a reserva.
+
 O setor padrão `ADCETEI` é protegido no backend: não pode ser renomeado nem desativado via API.
 
 `GET /api/assets` exige a permissão `assets.view`.
