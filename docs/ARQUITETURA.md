@@ -139,6 +139,8 @@ A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados).
 
 Termos de recebimento usam o cadastro existente de `users` como cadastro único de pessoas. Uma conta pode ficar bloqueada para login (`active=false`) e ainda ser usada como responsável recebedor do termo. A confirmação de entrega aplica a alocação em lote nos ativos e registra uma movimentação individual para cada equipamento.
 
+Quando o cadastro administrativo não informa senha, o backend gera uma credencial aleatória que não é exibida nem registrada. A conta permanece bloqueada até uma futura redefinição administrativa.
+
 Duas superfícies para equipamentos:
 
 | Endpoint | Uso |

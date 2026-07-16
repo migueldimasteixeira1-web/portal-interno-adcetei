@@ -1,3 +1,4 @@
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -50,7 +51,7 @@ def create_user(
         username=username,
         full_name=payload.full_name.strip(),
         email=email,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(payload.password if payload.password.strip() else secrets.token_urlsafe(32)),
         role=payload.role,
         secretariat=secretariat,
         department_sector_id=department_sector_id,

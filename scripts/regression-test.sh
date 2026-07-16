@@ -289,6 +289,8 @@ from urllib.request import Request, urlopen
 
 from openpyxl import load_workbook
 
+from apps.api.app.auth import verify_password
+
 BASE = os.environ["API_URL"]
 DB_PATH = os.environ["TEST_DB"]
 ZONE_PATTERN = re.compile(r"(Z|[+-]\d{2}:\d{2})$")
@@ -1225,6 +1227,32 @@ expect(status, 201, "administrador cria usuário local")
 status, login_result = call("POST", "/auth/login", payload={"username": "teste.admin@adcetei.cabofrio.rj.gov.br", "password": "SenhaTeste123"})
 expect(status, 200, "usuário administrativo verificado autentica")
 created_user_token = login_result["access_token"]
+status, temporary_user = call(
+    "POST",
+    "/admin/users",
+    admin,
+    {
+        "username": "recebedor.temporario",
+        "full_name": "Recebedor Temporário",
+        "email": "recebedor.temporario@adcetei.cabofrio.rj.gov.br",
+        "password": "",
+        "role": "user",
+        "secretariat": "Secretaria de Governo e Integridade",
+        "department_sector_id": default_sector["id"],
+        "department": "ADCETEI",
+        "phone": "",
+        "active": False,
+        "email_verified": False,
+    },
+)
+expect(status, 201, "recebedor sem senha informada")
+expect(temporary_user["active"], False, "recebedor temporário bloqueado")
+expect(temporary_user["email_verified_at"], None, "recebedor temporário não verificado")
+with sqlite3.connect(DB_PATH) as connection:
+    temporary_hash = connection.execute("select password_hash from users where id = ?", (temporary_user["id"],)).fetchone()[0]
+assert temporary_hash and not verify_password("TermoTemporario123", temporary_hash), "senha fixa não pode ser reutilizada"
+status, _ = call("DELETE", f"/admin/users/{temporary_user['id']}", admin)
+expect(status, 200, "recebedor temporário sem histórico pode ser excluído")
 status, email_changed_user = call(
     "PATCH",
     f"/admin/users/{created_user['id']}",

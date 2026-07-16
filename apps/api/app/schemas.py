@@ -134,7 +134,7 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=120, pattern=r"^[A-Za-z0-9._-]+$")
     full_name: str = Field(min_length=3, max_length=180)
     email: EmailStr
-    password: str = Field(min_length=10, max_length=128)
+    password: str = Field(default="", max_length=128)
     role: RoleName = "user"
     secretariat: str = Field(default="Prefeitura de Cabo Frio", max_length=150)
     department_sector_id: Optional[int] = None

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import secrets
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -115,7 +116,7 @@ def seed_database(db: Session) -> None:
         User(username="servidor", full_name="Kathlelyn Cristina Santos de Abreu", email="kathlelyn.abreu@sedec.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Desenvolvimento da Cidade", department="SEGTEA", registration="250401573", phone="(22) 98122-1739", email_verified_at=utc_now()),
         User(username="marcelo", full_name="Marcelo Godiano dos Santos", email="marcelo.santos@administracao.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Administração", department="Recursos Humanos", email_verified_at=utc_now()),
         User(username="thamires", full_name="Thamires de Jesus Gonçalves", email="thamires.goncalves@fazenda.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Fazenda", department="Atendimento", email_verified_at=utc_now()),
-        User(username="erica.sanches", full_name="Erica Sanches", email="erica.sanches@adppe.cabofrio.rj.gov.br", password_hash=hash_password("TermoTemporario123"), role="user", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", active=False, email_verified_at=None),
+        User(username="erica.sanches", full_name="Erica Sanches", email="erica.sanches@adppe.cabofrio.rj.gov.br", password_hash=hash_password(secrets.token_urlsafe(32)), role="user", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", active=False, email_verified_at=None),
         User(username="rafael.marques", full_name="Rafael da Silva Marques", email="rafael.marques@segov.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Governo", department="SEGOV", registration="SEGOV-001", phone="(22) 99708-4112", email_verified_at=utc_now()),
         User(username="vitor.gomes", full_name="Vitor Gomes Coelho Júnior", email="vitor.gomes@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", registration="SGI-002", email_verified_at=utc_now()),
     ]
