@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import InventoryDeliveryTerm, InventoryDeliveryTermItem
+from .models import Asset, InventoryDeliveryTerm, InventoryDeliveryTermItem
 
 
 OPEN_DELIVERY_TERM_STATUSES = ("draft", "emitted")
@@ -21,7 +21,13 @@ def open_delivery_term_for_asset(db: Session, asset_id: int) -> InventoryDeliver
 
 
 def asset_has_delivery_term_history(db: Session, asset_id: int) -> bool:
-    return bool(db.scalar(select(InventoryDeliveryTermItem.id).where(InventoryDeliveryTermItem.asset_id == asset_id).limit(1)))
+    return bool(
+        db.scalar(
+            select(InventoryDeliveryTermItem.id)
+            .where(InventoryDeliveryTermItem.asset_id == asset_id)
+            .limit(1)
+        )
+    )
 
 
 def reservation_conflict_message(term: InventoryDeliveryTerm) -> str:
@@ -29,6 +35,8 @@ def reservation_conflict_message(term: InventoryDeliveryTerm) -> str:
 
 
 def ensure_asset_not_reserved(db: Session, asset_id: int) -> None:
+    if db.bind and db.bind.dialect.name == "postgresql":
+        db.scalar(select(Asset.id).where(Asset.id == asset_id).with_for_update())
     term = open_delivery_term_for_asset(db, asset_id)
     if term:
         raise HTTPException(status_code=409, detail=reservation_conflict_message(term))

@@ -167,6 +167,9 @@ def assets_by_serial(db: Session, serial_numbers: list[str], *, lock: bool = Fal
         if db.bind and db.bind.dialect.name == "postgresql":
             query = query.with_for_update()
         locked = {asset.id: asset for asset in db.scalars(query.execution_options(populate_existing=True))}
+        missing = next((asset for asset in assets if asset.id not in locked), None)
+        if missing:
+            raise HTTPException(status_code=409, detail=f"Equipamento não existe mais: {missing.serial_number}")
         assets = [locked[asset.id] for asset in assets]
         for asset in assets:
             message = asset_term_error(db, asset)
