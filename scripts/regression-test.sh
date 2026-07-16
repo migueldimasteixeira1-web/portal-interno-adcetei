@@ -151,7 +151,14 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     connection.execute("CREATE TABLE role_configs (role VARCHAR(40) PRIMARY KEY, label VARCHAR(80), description VARCHAR(300), ldap_group VARCHAR(180), permissions JSON, updated_at TIMESTAMP)")
     connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('helpdesk', 'Helpdesk', '', '', '[]')")
     connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('requester', 'Solicitante', '', '', '[]')")
+    connection.execute("CREATE TABLE inventory_secretariats (id INTEGER PRIMARY KEY, name VARCHAR(160), normalized_name VARCHAR(180) UNIQUE, is_active BOOLEAN, created_at TIMESTAMP, updated_at TIMESTAMP)")
+    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (1, 'Secretaria Existente', 'secretaria existente', 1)")
+    connection.execute("CREATE TABLE inventory_sectors (id INTEGER PRIMARY KEY, name VARCHAR(160), normalized_name VARCHAR(180) UNIQUE, secretariat_id INTEGER, is_active BOOLEAN, created_at TIMESTAMP, updated_at TIMESTAMP)")
+    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (1, 'ADCETEI', 'adcetei', NULL, 1)")
+    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (2, 'FAZENDA', 'fazenda', NULL, 1)")
+    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (3, 'Setor Existente', 'setor existente', 1, 1)")
 
+ensure_schema_compatibility()
 ensure_schema_compatibility()
 columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
 expected = {"form_data", "form_schema_snapshot", "service_id"}
@@ -169,6 +176,16 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     roles = {row[0] for row in connection.execute("select role from role_configs").fetchall()}
     assert "helpdesk" not in roles, "perfil helpdesk legado não deve permanecer ativo"
     assert "requester" not in roles, "perfil requester legado não deve permanecer ativo"
+    secretariats = dict(connection.execute("select normalized_name, id from inventory_secretariats").fetchall())
+    sectors = dict(connection.execute("select normalized_name, secretariat_id from inventory_sectors").fetchall())
+    assert "secretaria de governo e integridade" in secretariats, "SGI deve existir como secretaria"
+    assert sectors["adcetei"] == secretariats["secretaria de governo e integridade"], "ADCETEI deve pertencer à SGI"
+    assert sectors["fazenda"] is None, "FAZENDA sem classificação deve permanecer sem secretaria"
+    assert sectors["setor existente"] == 1, "vínculo organizacional existente deve ser preservado"
+    assert "secretaria adjunta de ciência e tecnologia" not in secretariats, "migração não deve criar secretaria incorreta"
+    assert len([name for name in secretariats if name == "secretaria de governo e integridade"]) == 1, "migração deve ser idempotente"
+with engine.connect() as connection:
+    assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1, "SQLite deve validar chaves estrangeiras"
 print("Migração legada: OK")
 PY
 

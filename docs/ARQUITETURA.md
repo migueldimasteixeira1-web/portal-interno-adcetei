@@ -124,6 +124,7 @@ Padrão aceito: `usuario@secretaria.cabofrio.rj.gov.br`. Contas públicas nascem
 A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Rotas legadas de `/api/assets` coexistem com o contrato modular em `/api/inventory/assets`.
 
 - Cadastros base: `/api/inventory/catalogs` — secretarias, setores vinculados a secretaria, fornecedores, contratos vinculados a fornecedor, tipos, fabricantes e modelos (`inventory.view` / `inventory.manage_catalogs`)
+- Hierarquia conhecida: `Secretaria de Governo e Integridade (SGI) → ADCETEI`; a ponte de compatibilidade não classifica automaticamente outros setores
 - Equipamentos: número de série como ID principal, especificações e vínculos opcionais aos cadastros
 - Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
 - Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI

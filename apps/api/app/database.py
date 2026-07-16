@@ -1,13 +1,23 @@
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import settings
-from .inventory_constants import DEFAULT_INVENTORY_SECTOR
+from .inventory_constants import DEFAULT_INVENTORY_SECRETARIAT, DEFAULT_INVENTORY_SECTOR
 from .inventory_service import normalize_catalog_name
 
 database_url = settings.effective_database_url
 connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
 engine = create_engine(database_url, pool_pre_ping=True, connect_args=connect_args)
+
+
+if database_url.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
@@ -92,6 +102,7 @@ def ensure_schema_compatibility() -> None:
     if "inventory_sectors" in table_names:
         sector_columns = {column["name"] for column in inspector.get_columns("inventory_sectors")}
         normalized_default_sector = normalize_catalog_name(DEFAULT_INVENTORY_SECTOR)
+        normalized_default_secretariat = normalize_catalog_name(DEFAULT_INVENTORY_SECRETARIAT)
         with engine.begin() as connection:
             if "secretariat_id" not in sector_columns:
                 connection.execute(text("ALTER TABLE inventory_sectors ADD COLUMN secretariat_id INTEGER"))
@@ -99,12 +110,13 @@ def ensure_schema_compatibility() -> None:
                 text(
                     """
                     INSERT INTO inventory_secretariats (name, normalized_name, is_active, created_at, updated_at)
-                    SELECT 'Secretaria Adjunta de Ciência e Tecnologia', 'secretaria adjunta de ciência e tecnologia', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    SELECT CAST(:name AS VARCHAR), CAST(:normalized_name AS VARCHAR), TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                     WHERE NOT EXISTS (
-                        SELECT 1 FROM inventory_secretariats WHERE normalized_name = 'secretaria adjunta de ciência e tecnologia'
+                        SELECT 1 FROM inventory_secretariats WHERE normalized_name = CAST(:normalized_name AS VARCHAR)
                     )
                     """
-                )
+                ),
+                {"name": DEFAULT_INVENTORY_SECRETARIAT, "normalized_name": normalized_default_secretariat},
             )
             connection.execute(
                 text(
@@ -124,12 +136,17 @@ def ensure_schema_compatibility() -> None:
                     UPDATE inventory_sectors
                     SET secretariat_id = (
                         SELECT id FROM inventory_secretariats
-                        WHERE normalized_name = 'secretaria adjunta de ciência e tecnologia'
+                        WHERE normalized_name = CAST(:secretariat_name AS VARCHAR)
                         LIMIT 1
                     )
                     WHERE secretariat_id IS NULL
+                      AND normalized_name = CAST(:sector_name AS VARCHAR)
                     """
-                )
+                ),
+                {
+                    "secretariat_name": normalized_default_secretariat,
+                    "sector_name": normalized_default_sector,
+                },
             )
 
     if "assets" in table_names:

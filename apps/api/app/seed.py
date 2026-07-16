@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .auth import hash_password
+from .inventory_constants import DEFAULT_INVENTORY_SECRETARIAT
 from .inventory_service import build_asset_display_name, legacy_asset_status, normalize_catalog_name
 from .models import (
     Asset,
@@ -106,17 +107,17 @@ def seed_database(db: Session) -> None:
         return
 
     users = [
-        User(username="admin", full_name="Miguel Dimas", email="admin@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("admin123"), role="admin", department="Desenvolvimento e Sistemas", source="local", email_verified_at=utc_now()),
-        User(username="helpdesk1", full_name="Maiana Ignácio", email="maiana.ignacio@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", department="Central de Atendimento", email_verified_at=utc_now()),
-        User(username="helpdesk2", full_name="Herika Raquel", email="herika.raquel@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", department="Central de Atendimento", email_verified_at=utc_now()),
-        User(username="helpdesk3", full_name="Paulo Vitor", email="paulo.vitor@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", department="Central de Atendimento", email_verified_at=utc_now()),
-        User(username="tecnico", full_name="Lucas Pereira Martins", email="lucas.martins@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", department="Infraestrutura", email_verified_at=utc_now()),
+        User(username="admin", full_name="Miguel Dimas", email="admin@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("admin123"), role="admin", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", source="local", email_verified_at=utc_now()),
+        User(username="helpdesk1", full_name="Maiana Ignácio", email="maiana.ignacio@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", email_verified_at=utc_now()),
+        User(username="helpdesk2", full_name="Herika Raquel", email="herika.raquel@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", email_verified_at=utc_now()),
+        User(username="helpdesk3", full_name="Paulo Vitor", email="paulo.vitor@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", email_verified_at=utc_now()),
+        User(username="tecnico", full_name="Lucas Pereira Martins", email="lucas.martins@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="technician", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", email_verified_at=utc_now()),
         User(username="servidor", full_name="Kathlelyn Cristina Santos de Abreu", email="kathlelyn.abreu@sedec.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Desenvolvimento da Cidade", department="SEGTEA", registration="250401573", phone="(22) 98122-1739", email_verified_at=utc_now()),
         User(username="marcelo", full_name="Marcelo Godiano dos Santos", email="marcelo.santos@administracao.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Administração", department="Recursos Humanos", email_verified_at=utc_now()),
         User(username="thamires", full_name="Thamires de Jesus Gonçalves", email="thamires.goncalves@fazenda.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Fazenda", department="Atendimento", email_verified_at=utc_now()),
-        User(username="erica.sanches", full_name="Erica Sanches", email="erica.sanches@adppe.cabofrio.rj.gov.br", password_hash=hash_password("TermoTemporario123"), role="user", secretariat="Secretaria Adjunta de Ciência e Tecnologia", department="SGI", active=False, email_verified_at=None),
+        User(username="erica.sanches", full_name="Erica Sanches", email="erica.sanches@adppe.cabofrio.rj.gov.br", password_hash=hash_password("TermoTemporario123"), role="user", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", active=False, email_verified_at=None),
         User(username="rafael.marques", full_name="Rafael da Silva Marques", email="rafael.marques@segov.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria de Governo", department="SEGOV", registration="SEGOV-001", phone="(22) 99708-4112", email_verified_at=utc_now()),
-        User(username="vitor.gomes", full_name="Vitor Gomes Coelho Júnior", email="vitor.gomes@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat="Secretaria Adjunta de Ciência e Tecnologia", department="SGI", registration="SGI-002", email_verified_at=utc_now()),
+        User(username="vitor.gomes", full_name="Vitor Gomes Coelho Júnior", email="vitor.gomes@adcetei.cabofrio.rj.gov.br", password_hash=hash_password("123456"), role="user", secretariat=DEFAULT_INVENTORY_SECRETARIAT, department="ADCETEI", registration="SGI-002", email_verified_at=utc_now()),
     ]
     db.add_all(users)
     db.flush()
@@ -130,7 +131,7 @@ def seed_database(db: Session) -> None:
         _catalog(InventoryContract, "Contrato nº 017/2026 - PMCF / IART", supplier_id=supplier_iart.id),
     ]
     secretariats = [
-        _existing_or_catalog(db, InventorySecretariat, "Secretaria Adjunta de Ciência e Tecnologia"),
+        _existing_or_catalog(db, InventorySecretariat, DEFAULT_INVENTORY_SECRETARIAT),
         _existing_or_catalog(db, InventorySecretariat, "Secretaria de Fazenda"),
         _existing_or_catalog(db, InventorySecretariat, "Secretaria de Governo"),
         _existing_or_catalog(db, InventorySecretariat, "Secretaria de Administração"),
@@ -141,15 +142,11 @@ def seed_database(db: Session) -> None:
     secretariat = {item.name: item for item in secretariats}
     default_sector = db.scalar(select(InventorySector).where(InventorySector.normalized_name == normalize_catalog_name("ADCETEI")))
     if default_sector:
-        default_sector.secretariat_id = secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id
+        default_sector.secretariat_id = secretariat[DEFAULT_INVENTORY_SECRETARIAT].id
     sectors = [
-        default_sector or _catalog(InventorySector, "ADCETEI", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
-        _catalog(InventorySector, "Central de Atendimento", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
-        _catalog(InventorySector, "Desenvolvimento e Sistemas", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
-        _catalog(InventorySector, "Infraestrutura", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
+        default_sector or _catalog(InventorySector, "ADCETEI", secretariat_id=secretariat[DEFAULT_INVENTORY_SECRETARIAT].id),
         _catalog(InventorySector, "FAZENDA", secretariat_id=secretariat["Secretaria de Fazenda"].id),
         _catalog(InventorySector, "Atendimento", secretariat_id=secretariat["Secretaria de Fazenda"].id),
-        _catalog(InventorySector, "SGI", secretariat_id=secretariat["Secretaria Adjunta de Ciência e Tecnologia"].id),
         _catalog(InventorySector, "SEGOV", secretariat_id=secretariat["Secretaria de Governo"].id),
         _catalog(InventorySector, "Recursos Humanos", secretariat_id=secretariat["Secretaria de Administração"].id),
         _catalog(InventorySector, "SEGTEA", secretariat_id=secretariat["Secretaria de Desenvolvimento da Cidade"].id),
@@ -201,12 +198,12 @@ def seed_database(db: Session) -> None:
 
     stock_note = "Entrada em lote por serie (scan 07/07/2026)."
     assets = [
-        _asset(supplier=supplier_iart, equipment_type=eq_type["Computador"], manufacturer=maker["HP"], model=model["HP 280 BR G5 Small Form Factor"], sector=sector["SGI"], serial_number="BRJ2402M64", status="allocated", assigned_user=users[1], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 11), specifications="Desktop HP, Intel Core i5, 8 GB RAM, SSD 256 GB.", notes="Equipamento legado mantido para chamados de exemplo."),
+        _asset(supplier=supplier_iart, equipment_type=eq_type["Computador"], manufacturer=maker["HP"], model=model["HP 280 BR G5 Small Form Factor"], sector=sector["ADCETEI"], serial_number="BRJ2402M64", status="allocated", assigned_user=users[1], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 11), specifications="Desktop HP, Intel Core i5, 8 GB RAM, SSD 256 GB.", notes="Equipamento legado mantido para chamados de exemplo."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Computador"], manufacturer=maker["LENOVO"], model=model["NEO30S"], sector=sector["FAZENDA"], serial_number="BRJ2453TZG", status="allocated", assigned_user=user_by_username["servidor"], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 12), specifications="Desktop Lenovo Neo 30s, Intel Core i5, 8 GB RAM, SSD 256 GB.", notes="Responsável textual original: Kathlelyn Cristina Santos de Abreu."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Computador"], manufacturer=maker["LENOVO"], model=model["NEO50S"], sector=sector["FAZENDA"], serial_number="DL7829A1", status="allocated", assigned_user=user_by_username["marcelo"], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 12), specifications="Desktop Lenovo Neo 50s, Intel Core i5, 16 GB RAM, SSD 512 GB.", notes="Equipamento alocado para teste de movimentação."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Impressora"], manufacturer=maker["Brother"], model=model["DCP-L2540DW"], sector=sector["FAZENDA"], serial_number="E74472J9N112", status="allocated", received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 12), specifications="Impressora multifuncional laser monocromática.", notes="Impressora usada em chamados de instalação."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["AOC"], model=model["22B35HM23"], sector=sector["FAZENDA"], serial_number="AOC990177", status="allocated", assigned_user=user_by_username["servidor"], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 12), specifications="Monitor 21,5 polegadas Full HD.", notes="Monitor legado mantido para chamados de exemplo."),
-        _asset(supplier=supplier_iart, equipment_type=eq_type["Rede"], manufacturer=maker["Cisco"], model=model["Catalyst 9300"], sector=sector["SGI"], serial_number="FCW2334L0AA", status="allocated", received_at=_dt(2026, 6, 1), delivered_at=_dt(2026, 6, 1), specifications="Switch core 48 portas gerenciável.", notes="Ativo de rede de exemplo."),
+        _asset(supplier=supplier_iart, equipment_type=eq_type["Rede"], manufacturer=maker["Cisco"], model=model["Catalyst 9300"], sector=sector["ADCETEI"], serial_number="FCW2334L0AA", status="allocated", received_at=_dt(2026, 6, 1), delivered_at=_dt(2026, 6, 1), specifications="Switch core 48 portas gerenciável.", notes="Ativo de rede de exemplo."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Notebook"], manufacturer=maker["LENOVO"], model=model["V15"], sector=sector["ADCETEI"], serial_number="PF4M2201", status="maintenance", received_at=_dt(2026, 6, 1), specifications="Notebook Lenovo V15, Intel Core i5, 8 GB RAM, SSD 256 GB.", notes="Notebook em manutenção para testar filtro de situação."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Impressora"], manufacturer=maker["Brother"], model=model["DCP-L2540DW"], sector=sector["ADCETEI"], serial_number="QL800-3340", status="stock", received_at=_dt(2026, 7, 7), specifications="Impressora de etiquetas Brother.", notes="Estoque ADCETEI para teste de alocação."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["SAMSUNG"], model=model["S24D400GAL"], sector=sector["ADCETEI"], serial_number="Y5UJHX5YA01307V", received_at=_dt(2026, 7, 7), specifications="Monitor Samsung 24 polegadas Full HD.", notes=stock_note),
@@ -214,7 +211,7 @@ def seed_database(db: Session) -> None:
         _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["SAMSUNG"], model=model["S24D400GAL"], sector=sector["ADCETEI"], serial_number="Y5UJHX5L300474", received_at=_dt(2026, 7, 7), specifications="Monitor Samsung 24 polegadas Full HD.", notes=stock_note),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Computador"], manufacturer=maker["LENOVO"], model=model["NEO50S"], sector=sector["ADCETEI"], serial_number="PE0DJANZ", received_at=_dt(2026, 6, 1), specifications="Desktop Lenovo Neo 50s, Intel Core i5, 16 GB RAM, SSD 512 GB.", notes="Origem importacao: EXPORTAÇÃO SERVIDOR.xlsx / Planilha1 / linha 82"),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Computador"], manufacturer=maker["LENOVO"], model=model["NEO30S"], sector=sector["ADCETEI"], serial_number="PE0FQG1X", received_at=_dt(2026, 6, 1), specifications="Desktop Lenovo Neo 30s, Intel Core i5, 8 GB RAM, SSD 256 GB.", notes="Origem importacao: EXPORTAÇÃO SERVIDOR.xlsx / Planilha1 / linha 81"),
-        _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["SAMSUNG"], model=model["S24D400GAL"], sector=sector["SGI"], serial_number="Y5UJHX5L300447", status="allocated", assigned_user=user_by_username["vitor.gomes"], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 11), specifications="Monitor Samsung 24 polegadas Full HD.", notes="Responsavel textual original: Vitor Gomes Coelho Júnior"),
+        _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["SAMSUNG"], model=model["S24D400GAL"], sector=sector["ADCETEI"], serial_number="Y5UJHX5L300447", status="allocated", assigned_user=user_by_username["vitor.gomes"], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 11), specifications="Monitor Samsung 24 polegadas Full HD.", notes="Responsavel textual original: Vitor Gomes Coelho Júnior"),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["SAMSUNG"], model=model["S24D400GAL"], sector=sector["SEGOV"], serial_number="Y5UJHX5YA01455L", status="allocated", assigned_user=user_by_username["rafael.marques"], received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 12), specifications="Monitor Samsung 24 polegadas Full HD.", notes="Responsavel textual original: Rafael da Silva Marques"),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["SAMSUNG"], model=model["S24D400GAL"], sector=sector["ADCETEI"], serial_number="Y5UJHX5YA00640Y", status="stock", received_at=_dt(2026, 6, 10), delivered_at=_dt(2026, 6, 10), specifications="Monitor Samsung 24 polegadas Full HD.", notes="Item devolvido ao estoque para testar termo de equipamento usado."),
         _asset(supplier=supplier_iart, equipment_type=eq_type["Monitor"], manufacturer=maker["ACER"], model=model["MK241Y"], sector=sector["ADCETEI"], serial_number="MMV9SAA002544007E29501", status="retired", received_at=_dt(2026, 6, 1), retired_at=_dt(2026, 8, 6), retired_by=user_by_username["admin"], retirement_reason="SUBSTITUICAO", retirement_justification="Substituicao por monitor Samsung conforme controle IART.", specifications="Monitor Acer 23,8 polegadas.", notes="Responsavel textual original: DEVOLUÇÃO"),
