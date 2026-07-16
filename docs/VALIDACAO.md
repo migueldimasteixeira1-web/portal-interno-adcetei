@@ -2,8 +2,8 @@
 
 ## Última rodada
 
-**Data:** 9 de julho de 2026
-**Branch:** `feature/inventory-delivery-terms`
+**Data:** 16 de julho de 2026
+**Branch:** `fix/inventory-delivery-terms-integrity`
 **Resultado:** todos os checks abaixo aprovados.
 
 ## Comandos
@@ -29,7 +29,7 @@ docker compose build
 
 Os testes `regression-test.sh` e `smoke-test.sh` usam SQLite temporário e **não alteram** o banco local.
 
-## Resultados (6 jul 2026)
+## Resultados (16 jul 2026)
 
 | Check | Status |
 |-------|--------|
@@ -39,7 +39,7 @@ Os testes `regression-test.sh` e `smoke-test.sh` usam SQLite temporário e **nã
 | `./scripts/smoke-test.sh` | OK |
 | `./scripts/delivery-term-self-check.sh` | OK |
 | `npm run typecheck` | OK |
-| `npm run build` (22 rotas) | OK |
+| `npm run build` (23 rotas) | OK |
 
 Build de produção com variáveis de homologação (rodada anterior, ainda válida como referência):
 
@@ -65,8 +65,9 @@ O `scripts/regression-test.sh` valida, entre outros:
 8. proteção do último administrador e dependências de permissões;
 9. auditoria administrativa;
 10. inventário modular (cadastros, equipamentos, movimentações, lote, exportação `.xlsx` filtrada, baixa com motivo e auditoria);
-11. datas serializadas com `Z` ou offset explícito;
-12. migração não destrutiva de schema legado.
+11. integridade dos termos (hierarquia SGI → ADCETEI, reserva, atomicidade, datas, lotação e guards de exclusão);
+12. datas serializadas com `Z` ou offset explícito;
+13. migração não destrutiva de schema legado.
 
 Lista completa e numerada permanece alinhada ao script — consulte `scripts/regression-test.sh` para o detalhe de cada assert.
 
