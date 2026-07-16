@@ -337,6 +337,17 @@ operator, _ = login("maiana.ignacio@adcetei.cabofrio.rj.gov.br")
 technician, _ = login("lucas.martins@adcetei.cabofrio.rj.gov.br")
 admin, admin_user = login("admin@adcetei.cabofrio.rj.gov.br", "admin123")
 
+with sqlite3.connect(DB_PATH) as connection:
+    inconsistent_allocations = connection.execute(
+        """
+        select assets.serial_number
+        from assets
+        join users on users.id = assets.assigned_user_id
+        where assets.sector_id is not users.department_sector_id
+        """
+    ).fetchall()
+assert not inconsistent_allocations, f"seed possui responsável fora do setor do equipamento: {inconsistent_allocations}"
+
 # Usuário inativo permanece bloqueado.
 with sqlite3.connect(DB_PATH) as connection:
     connection.execute("update users set active = 0 where username = 'marcelo'")
