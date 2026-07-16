@@ -96,6 +96,8 @@ def update_user(
     ensure_last_admin(db, user, data)
     if actor.id == user.id and data.get("active") is False:
         raise HTTPException(status_code=409, detail="Você não pode desativar sua própria conta")
+    if not user.active and data.get("active") is True and not data.get("password"):
+        raise HTTPException(status_code=409, detail="Defina uma nova senha antes de ativar a conta")
     target_username = data["username"].strip().lower() if "username" in data else user.username
     target_email = validate_institutional_email(str(data["email"])) if "email" in data else user.email
     ensure_unique_user(db, target_username, target_email, user.id)

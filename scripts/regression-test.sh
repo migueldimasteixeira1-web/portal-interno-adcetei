@@ -1251,6 +1251,13 @@ expect(temporary_user["email_verified_at"], None, "recebedor temporário não ve
 with sqlite3.connect(DB_PATH) as connection:
     temporary_hash = connection.execute("select password_hash from users where id = ?", (temporary_user["id"],)).fetchone()[0]
 assert temporary_hash and not verify_password("TermoTemporario123", temporary_hash), "senha fixa não pode ser reutilizada"
+status, body = call("PATCH", f"/admin/users/{temporary_user['id']}", admin, {"active": True})
+expect(status, 409, "ativação sem redefinir senha")
+if body.get("detail") != "Defina uma nova senha antes de ativar a conta":
+    raise AssertionError("ativação sem senha deve orientar a redefinição")
+status, temporary_user = call("PATCH", f"/admin/users/{temporary_user['id']}", admin, {"active": True, "password": "NovaSenhaTeste123"})
+expect(status, 200, "ativação com nova senha")
+expect(temporary_user["active"], True, "recebedor ativado após redefinir senha")
 status, _ = call("DELETE", f"/admin/users/{temporary_user['id']}", admin)
 expect(status, 200, "recebedor temporário sem histórico pode ser excluído")
 status, email_changed_user = call(
