@@ -2,8 +2,8 @@
 
 ## Última rodada
 
-**Data:** 6 de julho de 2026  
-**Branch:** `refactor/modular-structure`  
+**Data:** 16 de julho de 2026
+**Branch:** `fix/inventory-delivery-terms-integrity`
 **Resultado:** todos os checks abaixo aprovados.
 
 ## Comandos
@@ -14,6 +14,7 @@ apps/api/.venv/bin/python -m compileall apps/api/app
 bash -n iniciar-local.sh resetar-dados.sh scripts/*.sh
 ./scripts/regression-test.sh
 ./scripts/smoke-test.sh
+./scripts/delivery-term-self-check.sh
 
 # Frontend
 cd apps/web
@@ -28,7 +29,7 @@ docker compose build
 
 Os testes `regression-test.sh` e `smoke-test.sh` usam SQLite temporário e **não alteram** o banco local.
 
-## Resultados (6 jul 2026)
+## Resultados (16 jul 2026)
 
 | Check | Status |
 |-------|--------|
@@ -36,8 +37,9 @@ Os testes `regression-test.sh` e `smoke-test.sh` usam SQLite temporário e **nã
 | Sintaxe dos scripts (`bash -n`) | OK |
 | `./scripts/regression-test.sh` (9 etapas) | OK |
 | `./scripts/smoke-test.sh` | OK |
+| `./scripts/delivery-term-self-check.sh` | OK |
 | `npm run typecheck` | OK |
-| `npm run build` (21 rotas) | OK |
+| `npm run build` (23 rotas) | OK |
 
 Build de produção com variáveis de homologação (rodada anterior, ainda válida como referência):
 
@@ -63,8 +65,9 @@ O `scripts/regression-test.sh` valida, entre outros:
 8. proteção do último administrador e dependências de permissões;
 9. auditoria administrativa;
 10. inventário modular (cadastros, equipamentos, movimentações, lote, exportação `.xlsx` filtrada, baixa com motivo e auditoria);
-11. datas serializadas com `Z` ou offset explícito;
-12. migração não destrutiva de schema legado.
+11. integridade dos termos (hierarquia SGI → ADCETEI, reserva, atomicidade, datas, lotação e guards de exclusão);
+12. datas serializadas com `Z` ou offset explícito;
+13. migração não destrutiva de schema legado.
 
 Lista completa e numerada permanece alinhada ao script — consulte `scripts/regression-test.sh` para o detalhe de cada assert.
 
@@ -74,8 +77,8 @@ Verificação manual recomendada após mudanças de UI (HTTP `200` com `./inicia
 
 - `/login`, `/dashboard`
 - `/chamados`, `/chamados/novo`
-- `/inventario`, `/inventario/cadastros`, `/inventario/lote`, `/inventario/novo`
-- `/administracao/usuarios`, `/administracao/catalogo`, `/administracao/perfis`, `/administracao/auditoria`
+- `/inventario`, `/inventario/lote`, `/inventario/novo`, `/inventario/termos`
+- `/administracao/usuarios`, `/administracao/base-cadastros`, `/administracao/catalogo`, `/administracao/perfis`, `/administracao/auditoria`
 
 ## Docker e VM
 

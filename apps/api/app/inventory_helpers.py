@@ -32,9 +32,11 @@ from .inventory_service import (
 from .models import (
     Asset,
     AssetMovement,
+    InventoryContract,
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
+    InventorySecretariat,
     InventorySector,
     InventorySupplier,
     Ticket,
@@ -117,7 +119,11 @@ def ensure_model_references(db: Session, manufacturer_id: int, equipment_type_id
 def catalog_ref(item: Any | None) -> dict[str, Any] | None:
     if not item:
         return None
-    return {"id": item.id, "name": item.name}
+    payload = {"id": item.id, "name": item.name}
+    if isinstance(item, InventorySector):
+        payload["secretariat_id"] = item.secretariat_id
+        payload["secretariat"] = catalog_ref(item.secretariat)
+    return payload
 
 
 def normalize_inventory_serial(value: str) -> str:
@@ -161,6 +167,13 @@ def validate_user(db: Session, user_id: int | None) -> User | None:
     return user
 
 
+def validate_user_for_sector(db: Session, user_id: int | None, sector: InventorySector | None) -> User | None:
+    user = validate_user(db, user_id)
+    if user and sector and user.department_sector_id != sector.id:
+        raise HTTPException(status_code=400, detail="Responsável não pertence ao setor selecionado")
+    return user
+
+
 def validate_optional_catalogs(
     db: Session,
     supplier_id: int | None,
@@ -173,6 +186,15 @@ def validate_optional_catalogs(
     if sector_id is not None and not sector:
         raise HTTPException(status_code=400, detail="Setor inválido")
     return supplier, sector
+
+
+def validate_contract(db: Session, contract_id: int | None) -> InventoryContract | None:
+    if contract_id is None:
+        return None
+    contract = db.get(InventoryContract, contract_id)
+    if not contract or not contract.is_active:
+        raise HTTPException(status_code=400, detail="Contrato inválido")
+    return contract
 
 
 def validate_asset_catalogs(
@@ -203,7 +225,7 @@ def inventory_asset_query():
         joinedload(Asset.equipment_type),
         joinedload(Asset.manufacturer_ref),
         joinedload(Asset.equipment_model),
-        joinedload(Asset.sector),
+        joinedload(Asset.sector).joinedload(InventorySector.secretariat),
         joinedload(Asset.assigned_user),
         joinedload(Asset.retired_by),
     )
@@ -226,6 +248,7 @@ def inventory_asset_payload(asset: Asset) -> dict[str, Any]:
     return {
         "id": asset.id,
         "serial_number": asset.serial_number,
+        "specifications": asset.specifications or "",
         "status": asset_inventory_status(asset),
         "display_name": asset_display_name(asset),
         "supplier_id": asset.supplier_id,
@@ -365,6 +388,7 @@ def create_bulk_scan_asset(
         manufacturer=manufacturer.name[:100],
         model=equipment_model.name[:140],
         serial_number=serial_number,
+        specifications=payload.specifications.strip(),
         status=legacy_asset_status("stock"),
         location=sector.name,
         assigned_user_id=None,
@@ -412,6 +436,7 @@ def inventory_asset_filter_conditions(
     *,
     status_filter: str | None,
     equipment_type_id: int | None,
+    secretariat_id: int | None,
     sector_id: int | None,
     search: str | None,
 ) -> tuple[list[Any], bool]:
@@ -421,6 +446,9 @@ def inventory_asset_filter_conditions(
         conditions.append(inventory_status_db_filter(status_filter))
     if equipment_type_id:
         conditions.append(Asset.equipment_type_id == equipment_type_id)
+    if secretariat_id:
+        needs_join = True
+        conditions.append(InventorySector.secretariat_id == secretariat_id)
     if sector_id:
         conditions.append(Asset.sector_id == sector_id)
     if search and search.strip():
@@ -439,6 +467,7 @@ def inventory_asset_filter_conditions(
                 InventoryEquipmentType.name.ilike(like),
                 InventoryManufacturer.name.ilike(like),
                 InventoryEquipmentModel.name.ilike(like),
+                InventorySecretariat.name.ilike(like),
                 InventorySector.name.ilike(like),
                 User.full_name.ilike(like),
                 User.department.ilike(like),
@@ -456,6 +485,7 @@ def inventory_assets_base_query(*, conditions: list[Any], needs_join: bool):
             .outerjoin(Asset.manufacturer_ref)
             .outerjoin(Asset.equipment_model)
             .outerjoin(Asset.sector)
+            .outerjoin(InventorySector.secretariat)
             .outerjoin(Asset.assigned_user)
         )
     return query.where(*conditions) if conditions else query
@@ -466,12 +496,14 @@ def list_inventory_assets_filtered(
     *,
     status_filter: str | None,
     equipment_type_id: int | None,
+    secretariat_id: int | None,
     sector_id: int | None,
     search: str | None,
 ) -> list[Asset]:
     conditions, needs_join = inventory_asset_filter_conditions(
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )
@@ -488,5 +520,3 @@ def list_inventory_assets_filtered(
     return list(
         db.scalars(inventory_asset_query().where(Asset.id.in_(asset_ids)).order_by(Asset.id.desc())).unique()
     )
-
-

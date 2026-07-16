@@ -4,12 +4,18 @@ export type {
   InventoryMovementAction,
   InventoryRetirementReason,
   InventoryCatalogItem,
+  InventoryContract,
   InventoryEquipmentModel,
+  InventorySector,
   InventoryCatalogs,
   InventoryCatalogCreatePayload,
   InventoryCatalogUpdatePayload,
+  InventorySectorCreatePayload,
+  InventorySectorUpdatePayload,
   InventoryEquipmentModelCreatePayload,
   InventoryEquipmentModelUpdatePayload,
+  InventoryContractCreatePayload,
+  InventoryContractUpdatePayload,
   InventoryAssetCatalogRef,
   InventoryAssetUserRef,
   InventoryAsset,
@@ -25,8 +31,15 @@ export type {
   InventoryBulkScanError,
   InventoryBulkScanPreview,
   InventoryBulkScanConfirm,
+  InventoryDeliveryTermStatus,
+  InventoryDeliveryTermItem,
+  InventoryDeliveryTerm,
+  InventoryDeliveryTermCreatePayload,
+  InventoryDeliveryTermPreviewPayload,
+  InventoryDeliveryTermPreviewError,
+  InventoryDeliveryTermPreview,
+  InventoryDeliveryTermDeliverPayload,
 } from "./types/inventory";
 export type { CatalogFormField, CatalogIconOption, CatalogOptions, CatalogService } from "./types/catalog";
 export type { TicketComment, Ticket, TicketPage, DashboardData } from "./types/tickets";
 export type { RoleConfig, PermissionDefinition, AuditLog } from "./types/admin";
-

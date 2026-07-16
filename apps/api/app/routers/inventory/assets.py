@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ...audit import add_audit
 from ...database import get_db
+from ...delivery_terms_service import asset_has_delivery_term_history, ensure_asset_not_reserved
 from ...inventory_export import export_inventory_assets
 from ...inventory_helpers import (
     add_asset_movement,
@@ -28,7 +29,7 @@ from ...inventory_helpers import (
     normalize_inventory_serial,
     validate_asset_catalogs,
     validate_optional_catalogs,
-    validate_user,
+    validate_user_for_sector,
     has_rows,
 )
 from ...inventory_service import (
@@ -81,6 +82,7 @@ def list_inventory_assets(
     page_size: int = Query(20, ge=1, le=100),
     status_filter: str | None = None,
     equipment_type_id: int | None = None,
+    secretariat_id: int | None = None,
     sector_id: int | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
@@ -89,6 +91,7 @@ def list_inventory_assets(
     conditions, needs_join = inventory_asset_filter_conditions(
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )
@@ -141,6 +144,7 @@ def list_inventory_assets(
 def export_inventory_assets_spreadsheet(
     status_filter: str | None = None,
     equipment_type_id: int | None = None,
+    secretariat_id: int | None = None,
     sector_id: int | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
@@ -151,6 +155,7 @@ def export_inventory_assets_spreadsheet(
         actor=current_user,
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )
@@ -167,6 +172,7 @@ def export_inventory_assets_spreadsheet(
                 "search": search or "",
                 "status_filter": status_filter or "",
                 "equipment_type_id": equipment_type_id,
+                "secretariat_id": secretariat_id,
                 "sector_id": sector_id,
             },
         },
@@ -251,10 +257,10 @@ def create_inventory_asset(
 ):
     serial_number = normalize_inventory_serial(payload.serial_number)
     ensure_unique_serial(db, serial_number)
-    validate_user(db, payload.assigned_user_id)
     supplier, sector = validate_optional_catalogs(db, payload.supplier_id, payload.sector_id)
     if sector is None:
         sector = get_default_sector(db)
+    validate_user_for_sector(db, payload.assigned_user_id, sector)
     equipment_type, manufacturer, equipment_model = validate_asset_catalogs(
         db,
         payload.equipment_type_id,
@@ -276,6 +282,7 @@ def create_inventory_asset(
         manufacturer=manufacturer.name[:100],
         model=equipment_model.name[:140],
         serial_number=serial_number,
+        specifications=payload.specifications.strip(),
         status=legacy_asset_status(status),
         location=sector.name,
         assigned_user_id=payload.assigned_user_id,
@@ -313,13 +320,14 @@ def update_inventory_asset(
     asset = db.scalar(inventory_asset_query().where(Asset.id == asset_id))
     if not asset:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    ensure_asset_not_reserved(db, asset.id)
     data = payload.model_dump(exclude_unset=True)
     if "serial_number" in data:
         asset.serial_number = normalize_inventory_serial(data["serial_number"])
         ensure_unique_serial(db, asset.serial_number, asset.id)
-    if "assigned_user_id" in data:
-        validate_user(db, data["assigned_user_id"])
-        asset.assigned_user_id = data["assigned_user_id"]
+    if "specifications" in data:
+        asset.specifications = (data["specifications"] or "").strip()
+    next_assigned_user_id = data.get("assigned_user_id", asset.assigned_user_id)
     if "supplier_id" in data:
         supplier, _ = validate_optional_catalogs(db, data["supplier_id"], None)
         asset.supplier_id = supplier.id if supplier else None
@@ -345,6 +353,10 @@ def update_inventory_asset(
         _, sector = validate_optional_catalogs(db, None, data["sector_id"])
         asset.sector_id = sector.id if sector else None
         asset.location = sector.name if sector else ""
+    sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
+    validate_user_for_sector(db, next_assigned_user_id, sector)
+    if "assigned_user_id" in data:
+        asset.assigned_user_id = data["assigned_user_id"]
     if "received_at" in data:
         asset.received_at = data["received_at"]
     if "delivered_at" in data:
@@ -357,7 +369,6 @@ def update_inventory_asset(
     if asset_is_retired(asset) and "status" in data:
         raise HTTPException(status_code=409, detail="Equipamento baixado não pode ter status alterado por edição direta")
 
-    sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
     status = data.get("status") if data.get("status") == "maintenance" else calculated_asset_status(sector, asset.assigned_user_id)
     ensure_shipping_date(status, asset.delivered_at)
     asset.status = legacy_asset_status(status)
@@ -375,6 +386,9 @@ def delete_inventory_asset(
     asset = db.get(Asset, asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado")
+    ensure_asset_not_reserved(db, asset.id)
+    if asset_has_delivery_term_history(db, asset.id):
+        raise HTTPException(status_code=409, detail="Equipamento possui termo de recebimento vinculado. Use a baixa em vez de excluir.")
     if has_rows(db, select(Ticket.id).where(Ticket.asset_id == asset.id)):
         raise HTTPException(status_code=409, detail="Equipamento possui chamados vinculados. Baixe ou arquive em vez de excluir.")
     db.execute(delete(AssetMovement).where(AssetMovement.asset_id == asset.id))
@@ -406,11 +420,12 @@ def allocate_inventory_asset(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     sector = db.get(InventorySector, payload.sector_id)
     if not sector:
         raise HTTPException(status_code=400, detail="Setor inválido")
-    validate_user(db, payload.assigned_user_id)
+    validate_user_for_sector(db, payload.assigned_user_id, sector)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     apply_asset_allocation(asset, sector, payload.assigned_user_id, movement_at)
@@ -435,8 +450,10 @@ def change_inventory_asset_responsible(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
-    validate_user(db, payload.assigned_user_id)
+    sector = db.get(InventorySector, asset.sector_id) if asset.sector_id else get_default_sector(db)
+    validate_user_for_sector(db, payload.assigned_user_id, sector)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     try:
@@ -464,6 +481,7 @@ def return_inventory_asset_to_stock(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
@@ -489,6 +507,7 @@ def send_inventory_asset_to_maintenance(
     current_user: User = Depends(require_permission("inventory.move")),
 ):
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     _guard_movable(asset)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
@@ -516,6 +535,7 @@ def retire_inventory_asset(
     if payload.reason == "CORRECAO_ADMINISTRATIVA" and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Correção administrativa disponível apenas para administrador")
     asset = get_inventory_asset_or_404(db, asset_id)
+    ensure_asset_not_reserved(db, asset.id)
     movement_at = movement_datetime(payload.movement_date)
     before = asset_movement_state(asset)
     previous_status = before.get("status")
@@ -561,4 +581,3 @@ def retire_inventory_asset(
     )
     db.commit()
     return inventory_asset_payload(fresh_inventory_asset(db, asset.id))
-

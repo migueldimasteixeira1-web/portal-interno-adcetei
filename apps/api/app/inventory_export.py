@@ -52,6 +52,7 @@ EXPORT_HEADERS = (
     "Fabricante",
     "Modelo",
     "Número de série",
+    "Secretaria",
     "Setor",
     "Responsável",
     "Situação",
@@ -86,6 +87,10 @@ def _type_label(asset: Asset) -> str:
         return catalog
     legacy = (asset.asset_type or "").strip()
     return LEGACY_TYPE_LABELS.get(legacy, legacy) or EMPTY_VALUE
+
+
+def _sector_secretariat_name(asset: Asset) -> str:
+    return _catalog_name(asset.sector.secretariat) if asset.sector and asset.sector.secretariat else ""
 
 
 def _format_date(value: datetime | None) -> str:
@@ -146,6 +151,7 @@ def asset_export_row(asset: Asset, last_movement: AssetMovement | None) -> tuple
         _text(_catalog_name(asset.manufacturer_ref) or asset.manufacturer),
         _text(_catalog_name(asset.equipment_model) or asset.model),
         _text(asset.serial_number, empty="Não informado"),
+        _text(_sector_secretariat_name(asset) or (asset.assigned_user.secretariat if asset.assigned_user else None)),
         _text(_catalog_name(asset.sector) or asset.location),
         _text(asset.assigned_user.full_name if asset.assigned_user else None),
         INVENTORY_STATUS_LABELS.get(status, status),
@@ -201,7 +207,7 @@ def build_inventory_export_workbook(
     sheet.auto_filter.ref = f"A{header_row}:{last_column}{last_row}"
     sheet.freeze_panes = f"A{data_start}"
 
-    column_widths = (22, 18, 18, 24, 22, 22, 28, 16, 24, 18, 36, 20, 18, 28, 36)
+    column_widths = (22, 18, 18, 24, 22, 34, 22, 28, 16, 24, 18, 36, 20, 18, 28, 36)
     for index, width in enumerate(column_widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
 
@@ -216,6 +222,7 @@ def export_inventory_assets(
     actor: User,
     status_filter: str | None,
     equipment_type_id: int | None,
+    secretariat_id: int | None,
     sector_id: int | None,
     search: str | None,
 ) -> tuple[bytes, str, int]:
@@ -223,6 +230,7 @@ def export_inventory_assets(
         db,
         status_filter=status_filter,
         equipment_type_id=equipment_type_id,
+        secretariat_id=secretariat_id,
         sector_id=sector_id,
         search=search,
     )

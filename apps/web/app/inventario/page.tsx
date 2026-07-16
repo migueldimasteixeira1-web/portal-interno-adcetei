@@ -26,8 +26,9 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [secretariatFilter, setSecretariatFilter] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({ search: "", typeFilter: "", statusFilter: "", sectorFilter: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ search: "", typeFilter: "", statusFilter: "", secretariatFilter: "", sectorFilter: "" });
   const [page, setPage] = useState(1);
   const [summary, setSummary] = useState({ stock: 0, allocated: 0, maintenance: 0, retired: 0 });
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
@@ -39,7 +40,7 @@ export default function InventoryPage() {
   const hasLoaded = useRef(false);
 
   const load = async (
-    filters: { search: string; typeFilter: string; statusFilter: string; sectorFilter: string },
+    filters: { search: string; typeFilter: string; statusFilter: string; secretariatFilter: string; sectorFilter: string },
     requestedPage = 1,
   ) => {
     const requestId = ++requestSequence.current;
@@ -50,6 +51,7 @@ export default function InventoryPage() {
         search: filters.search || undefined,
         status_filter: filters.statusFilter || undefined,
         equipment_type_id: filters.typeFilter || undefined,
+        secretariat_id: filters.secretariatFilter || undefined,
         sector_id: filters.sectorFilter || undefined,
         page: requestedPage,
         page_size: 20,
@@ -79,7 +81,7 @@ export default function InventoryPage() {
       return;
     }
     void api.inventoryCatalogs().then(setCatalogs).catch(() => setCatalogs(emptyInventoryCatalogs));
-    void load({ search: "", typeFilter: "", statusFilter: "", sectorFilter: "" }, 1);
+    void load({ search: "", typeFilter: "", statusFilter: "", secretariatFilter: "", sectorFilter: "" }, 1);
   }, [canView, user]);
 
   useEffect(() => {
@@ -88,22 +90,24 @@ export default function InventoryPage() {
       search === appliedFilters.search &&
       typeFilter === appliedFilters.typeFilter &&
       statusFilter === appliedFilters.statusFilter &&
+      secretariatFilter === appliedFilters.secretariatFilter &&
       sectorFilter === appliedFilters.sectorFilter
     ) return;
     const timer = setTimeout(() => {
-      void load({ search, typeFilter, statusFilter, sectorFilter }, 1);
+      void load({ search, typeFilter, statusFilter, secretariatFilter, sectorFilter }, 1);
     }, 250);
     return () => clearTimeout(timer);
-  }, [canView, search, typeFilter, statusFilter, sectorFilter, appliedFilters]);
+  }, [canView, search, typeFilter, statusFilter, secretariatFilter, sectorFilter, appliedFilters]);
 
-  const hasFilters = !!(appliedFilters.search || appliedFilters.typeFilter || appliedFilters.statusFilter || appliedFilters.sectorFilter);
+  const hasFilters = !!(appliedFilters.search || appliedFilters.typeFilter || appliedFilters.statusFilter || appliedFilters.secretariatFilter || appliedFilters.sectorFilter);
   const totalPages = Math.max(1, Math.ceil(total / 20));
   const clearFilters = () => {
     setSearch("");
     setTypeFilter("");
     setStatusFilter("");
+    setSecretariatFilter("");
     setSectorFilter("");
-    void load({ search: "", typeFilter: "", statusFilter: "", sectorFilter: "" }, 1);
+    void load({ search: "", typeFilter: "", statusFilter: "", secretariatFilter: "", sectorFilter: "" }, 1);
   };
 
   const exportSpreadsheet = async () => {
@@ -114,6 +118,7 @@ export default function InventoryPage() {
         search: appliedFilters.search || undefined,
         status_filter: appliedFilters.statusFilter || undefined,
         equipment_type_id: appliedFilters.typeFilter || undefined,
+        secretariat_id: appliedFilters.secretariatFilter || undefined,
         sector_id: appliedFilters.sectorFilter || undefined,
       });
     } catch (err) {
@@ -134,7 +139,7 @@ export default function InventoryPage() {
         subtitle="Consulte equipamentos por número de série, vínculo atual, setor e situação operacional."
         actions={(canCreate || canBulkScan || canManageCatalogs) ? (
           <div className="flex flex-wrap gap-2">
-            {canManageCatalogs && <Link href="/inventario/cadastros" className={buttonStyles({ variant: "secondary" })}><Settings2 size={16} />Cadastros</Link>}
+            {canManageCatalogs && <Link href="/administracao/base-cadastros" className={buttonStyles({ variant: "secondary" })}><Settings2 size={16} />Base de cadastros</Link>}
             {canBulkScan && <Link href="/inventario/lote" className={buttonStyles({ variant: "secondary" })}><Plus size={16} />Entrada em lote</Link>}
             {canCreate && <Link href="/inventario/novo" className={buttonStyles()}><Plus size={16} />Novo equipamento</Link>}
           </div>
@@ -158,11 +163,15 @@ export default function InventoryPage() {
         updating={updating}
         hasFilters={hasFilters}
         catalogs={catalogs}
-        filters={{ search, typeFilter, statusFilter, sectorFilter }}
+        filters={{ search, typeFilter, statusFilter, secretariatFilter, sectorFilter }}
         onFiltersChange={(changes) => {
           if ("search" in changes) setSearch(changes.search ?? "");
           if ("typeFilter" in changes) setTypeFilter(changes.typeFilter ?? "");
           if ("statusFilter" in changes) setStatusFilter(changes.statusFilter ?? "");
+          if ("secretariatFilter" in changes) {
+            setSecretariatFilter(changes.secretariatFilter ?? "");
+            setSectorFilter("");
+          }
           if ("sectorFilter" in changes) setSectorFilter(changes.sectorFilter ?? "");
         }}
         onClearFilters={clearFilters}

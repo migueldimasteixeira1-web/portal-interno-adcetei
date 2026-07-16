@@ -4,7 +4,9 @@ import {
   catalogTabMeta,
   sortByName,
   type CatalogTab,
+  type ContractDraft,
   type ModelDraft,
+  type SectorDraft,
   type SimpleDraft,
 } from "./catalog-utils";
 
@@ -18,10 +20,14 @@ type Props = {
   title: string;
   catalogs: InventoryCatalogs;
   simpleDraft: SimpleDraft;
+  contractDraft: ContractDraft;
   modelDraft: ModelDraft;
+  sectorDraft: SectorDraft;
   editingDefaultSector: boolean;
   onSimpleDraftChange: (draft: SimpleDraft) => void;
+  onContractDraftChange: (draft: ContractDraft) => void;
   onModelDraftChange: (draft: ModelDraft) => void;
+  onSectorDraftChange: (draft: SectorDraft) => void;
 };
 
 export default function CatalogFormDialog({
@@ -34,10 +40,14 @@ export default function CatalogFormDialog({
   title,
   catalogs,
   simpleDraft,
+  contractDraft,
   modelDraft,
+  sectorDraft,
   editingDefaultSector,
   onSimpleDraftChange,
+  onContractDraftChange,
   onModelDraftChange,
+  onSectorDraftChange,
 }: Props) {
   const tabMeta = catalogTabMeta(tab);
 
@@ -50,7 +60,9 @@ export default function CatalogFormDialog({
       title={title}
       description={
         tab === "sectors"
-          ? "Setores desativados deixam de aparecer em novos cadastros. O setor ADCETEI permanece como estoque padrão do sistema."
+          ? "Setores pertencem a uma secretaria e deixam de aparecer em novos cadastros quando desativados."
+          : tab === "secretariats"
+            ? "Secretarias organizam os setores usados em usuários, inventário e termos."
           : "Cadastros desativados permanecem no histórico e deixam de ser usados em novos registros."
       }
       confirmLabel="Salvar"
@@ -101,6 +113,63 @@ export default function CatalogFormDialog({
               type="checkbox"
               checked={modelDraft.is_active}
               onChange={(e) => onModelDraftChange({ ...modelDraft, is_active: e.target.checked })}
+            />
+            Cadastro ativo
+          </label>
+        </div>
+      ) : tab === "contracts" ? (
+        <div className="grid gap-4">
+          <Field label="Fornecedor" error={!contractDraft.supplier_id && error ? "Selecione o fornecedor." : undefined}>
+            <Select value={contractDraft.supplier_id} onChange={(e) => onContractDraftChange({ ...contractDraft, supplier_id: e.target.value })}>
+              <option value="">Selecione</option>
+              {sortByName(catalogs.suppliers.filter((item) => item.is_active || String(item.id) === contractDraft.supplier_id)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Contrato">
+            <Input
+              value={contractDraft.name}
+              onChange={(e) => onContractDraftChange({ ...contractDraft, name: e.target.value })}
+              placeholder="Ex.: Contrato nº 046/2026 - PMCF / IART"
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]">
+            <input
+              type="checkbox"
+              checked={contractDraft.is_active}
+              onChange={(e) => onContractDraftChange({ ...contractDraft, is_active: e.target.checked })}
+            />
+            Cadastro ativo
+          </label>
+        </div>
+      ) : tab === "sectors" ? (
+        <div className="grid gap-4">
+          <Field label="Secretaria" error={!sectorDraft.secretariat_id && error ? "Selecione a secretaria." : undefined}>
+            <Select value={sectorDraft.secretariat_id} onChange={(e) => onSectorDraftChange({ ...sectorDraft, secretariat_id: e.target.value })}>
+              <option value="">Selecione</option>
+              {sortByName(catalogs.secretariats.filter((item) => item.is_active || String(item.id) === sectorDraft.secretariat_id)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Nome do setor">
+            <Input
+              value={sectorDraft.name}
+              onChange={(e) => onSectorDraftChange({ ...sectorDraft, name: e.target.value })}
+              placeholder="Ex.: SGI"
+              disabled={editingDefaultSector}
+            />
+          </Field>
+          {editingDefaultSector && (
+            <Alert tone="info">O setor ADCETEI é o estoque padrão do sistema. O nome não pode ser alterado por aqui.</Alert>
+          )}
+          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]">
+            <input
+              type="checkbox"
+              checked={sectorDraft.is_active}
+              onChange={(e) => onSectorDraftChange({ ...sectorDraft, is_active: e.target.checked })}
+              disabled={editingDefaultSector}
             />
             Cadastro ativo
           </label>

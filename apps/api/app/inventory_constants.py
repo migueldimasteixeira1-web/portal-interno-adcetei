@@ -1,4 +1,5 @@
 DEFAULT_INVENTORY_SECTOR = "ADCETEI"
+DEFAULT_INVENTORY_SECRETARIAT = "Secretaria de Gestão e Inovação"
 
 INVENTORY_STATUSES = ("stock", "allocated", "maintenance", "retired")
 

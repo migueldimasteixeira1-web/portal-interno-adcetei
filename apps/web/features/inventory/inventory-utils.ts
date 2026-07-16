@@ -1,7 +1,9 @@
 import type { InventoryAssetCatalogRef, InventoryCatalogs, InventoryRetirementReason } from "@/lib/types";
 
 export const emptyInventoryCatalogs: InventoryCatalogs = {
+  secretariats: [],
   suppliers: [],
+  contracts: [],
   equipment_types: [],
   manufacturers: [],
   models: [],
@@ -35,6 +37,11 @@ export function catalogRefName(ref?: InventoryAssetCatalogRef | null, empty = "N
   return ref?.name || empty;
 }
 
+export function sectorWithSecretariat(ref?: InventoryAssetCatalogRef | null, empty = "Não informado") {
+  if (!ref) return empty;
+  return ref.secretariat?.name ? `${ref.secretariat.name} - ${ref.name}` : ref.name;
+}
+
 export function notesText(value: string) {
   return value.trim() || "Não informado";
 }
@@ -60,7 +67,7 @@ export function manufacturerModel(asset: { manufacturer?: InventoryAssetCatalogR
   return value || "Não informado";
 }
 
-export type MovementAction = "allocate" | "responsible" | "stock" | "maintenance";
+export type MovementAction = "move" | "stock" | "maintenance";
 
 export type MovementDraft = {
   sector_id: string;
@@ -70,8 +77,7 @@ export type MovementDraft = {
 };
 
 export const movementActionTitle: Record<MovementAction, string> = {
-  allocate: "Enviar para setor/responsável",
-  responsible: "Trocar responsável",
+  move: "Movimentar equipamento",
   stock: "Devolver ao estoque",
   maintenance: "Enviar para manutenção",
 };

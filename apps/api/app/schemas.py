@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
 
 from .domain import TicketPriority, TicketStatus
 from .time_utils import iso_utc
@@ -14,7 +14,9 @@ class UserOut(BaseModel):
     email: EmailStr
     role: str
     secretariat: str
+    department_sector_id: Optional[int] = None
     department: str
+    registration: str = ""
     phone: str
     source: str
     active: bool
@@ -132,14 +134,23 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=120, pattern=r"^[A-Za-z0-9._-]+$")
     full_name: str = Field(min_length=3, max_length=180)
     email: EmailStr
-    password: str = Field(min_length=10, max_length=128)
+    password: str = Field(default="", max_length=128)
     role: RoleName = "user"
     secretariat: str = Field(default="Prefeitura de Cabo Frio", max_length=150)
+    department_sector_id: Optional[int] = None
     department: str = Field(default="Não informado", max_length=150)
+    registration: str = Field(default="", max_length=80)
     phone: str = Field(default="", max_length=40)
     active: bool = True
     email_verified: bool = True
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("password")
+    @classmethod
+    def validate_optional_password(cls, value: str) -> str:
+        if value.strip() and len(value) < 10:
+            raise ValueError("Senha deve ter no mínimo 10 caracteres")
+        return value
 
 
 class UserUpdate(BaseModel):
@@ -149,11 +160,20 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(default=None, min_length=10, max_length=128)
     role: Optional[RoleName] = None
     secretariat: Optional[str] = Field(default=None, max_length=150)
+    department_sector_id: Optional[int] = None
     department: Optional[str] = Field(default=None, max_length=150)
+    registration: Optional[str] = Field(default=None, max_length=80)
     phone: Optional[str] = Field(default=None, max_length=40)
     active: Optional[bool] = None
     email_verified: Optional[bool] = None
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def normalize_blank_password(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class AssetCreate(BaseModel):
@@ -255,6 +275,22 @@ class InventoryEquipmentModelUpdate(InventoryCatalogItemUpdate):
     equipment_type_id: Optional[int] = None
 
 
+class InventoryContractCreate(InventoryCatalogItemCreate):
+    supplier_id: int
+
+
+class InventoryContractUpdate(InventoryCatalogItemUpdate):
+    supplier_id: Optional[int] = None
+
+
+class InventorySectorCreate(InventoryCatalogItemCreate):
+    secretariat_id: int
+
+
+class InventorySectorUpdate(InventoryCatalogItemUpdate):
+    secretariat_id: Optional[int] = None
+
+
 class InventoryCatalogItemOut(BaseModel):
     id: int
     name: str
@@ -273,12 +309,23 @@ class InventoryEquipmentModelOut(InventoryCatalogItemOut):
     equipment_type_id: int
 
 
+class InventoryContractOut(InventoryCatalogItemOut):
+    supplier_id: int
+
+
+class InventorySectorOut(InventoryCatalogItemOut):
+    secretariat_id: Optional[int] = None
+    secretariat: Optional[InventoryCatalogItemOut] = None
+
+
 class InventoryCatalogsOut(BaseModel):
+    secretariats: list[InventoryCatalogItemOut]
     suppliers: list[InventoryCatalogItemOut]
+    contracts: list[InventoryContractOut]
     equipment_types: list[InventoryCatalogItemOut]
     manufacturers: list[InventoryCatalogItemOut]
     models: list[InventoryEquipmentModelOut]
-    sectors: list[InventoryCatalogItemOut]
+    sectors: list[InventorySectorOut]
 
 
 InventoryAssetStatus = Literal["stock", "allocated", "maintenance", "retired"]
@@ -299,12 +346,16 @@ InventoryRetirementReason = Literal[
 class InventoryAssetCatalogRefOut(BaseModel):
     id: int
     name: str
+    secretariat_id: Optional[int] = None
+    secretariat: Optional["InventoryAssetCatalogRefOut"] = None
 
 
 class InventoryAssetUserRefOut(BaseModel):
     id: int
     full_name: str
     email: EmailStr
+    secretariat: str
+    department_sector_id: Optional[int] = None
     department: str
     model_config = ConfigDict(from_attributes=True)
 
@@ -312,6 +363,7 @@ class InventoryAssetUserRefOut(BaseModel):
 class InventoryAssetOut(BaseModel):
     id: int
     serial_number: str
+    specifications: str = ""
     status: InventoryAssetStatus
     display_name: str
     supplier_id: Optional[int] = None
@@ -360,6 +412,7 @@ class InventoryAssetPageOut(BaseModel):
 
 class InventoryAssetCreate(BaseModel):
     serial_number: str = Field(min_length=1, max_length=120)
+    specifications: str = Field(default="", max_length=4000)
     supplier_id: Optional[int] = None
     equipment_type_id: int
     manufacturer_id: int
@@ -379,6 +432,7 @@ class InventoryBulkScanRequest(BaseModel):
     equipment_model_id: int
     received_at: date
     serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    specifications: str = Field(default="", max_length=4000)
     notes: str = Field(default="", max_length=2000)
     model_config = ConfigDict(extra="forbid")
 
@@ -412,6 +466,7 @@ class InventoryBulkScanConfirmOut(BaseModel):
 
 class InventoryAssetUpdate(BaseModel):
     serial_number: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    specifications: Optional[str] = Field(default=None, max_length=4000)
     status: Optional[InventoryAssetStatus] = None
     supplier_id: Optional[int] = None
     equipment_type_id: Optional[int] = None
@@ -473,6 +528,95 @@ class InventoryMovementOut(BaseModel):
     @field_serializer("movement_date", "created_at")
     def serialize_movement_datetimes(self, value: datetime) -> str:
         return iso_utc(value) or ""
+
+
+InventoryDeliveryTermStatus = Literal["draft", "emitted", "delivered", "cancelled"]
+
+
+class InventoryDeliveryTermCreate(BaseModel):
+    term_number: str = Field(min_length=1, max_length=40)
+    contract_id: Optional[int] = None
+    contract_number: str = Field(default="", max_length=120)
+    issued_at: date
+    destination_unit: str = Field(default="", max_length=180)
+    recipient_user_id: int
+    recipient_registration: str = Field(default="", max_length=80)
+    recipient_phone: str = Field(default="", max_length=40)
+    adcetei_signer_name: str = Field(default="William Barreto Corrêa", min_length=3, max_length=180)
+    adcetei_signer_title: str = Field(default="Coordenador Geral de Tecnologia da Informação", min_length=3, max_length=180)
+    item_observation: str = Field(default="Equipamento locado", max_length=180)
+    serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryDeliveryTermPreview(BaseModel):
+    serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryDeliveryTermDeliver(BaseModel):
+    movement_date: date
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryDeliveryTermItemOut(BaseModel):
+    id: int
+    asset_id: int
+    asset_type: str
+    manufacturer: str
+    model: str
+    serial_number: str
+    specification: str
+    observation: str
+
+
+class InventoryDeliveryTermPreviewError(BaseModel):
+    index: int
+    serial_number: str
+    normalized_serial: str
+    message: str
+
+
+class InventoryDeliveryTermPreviewOut(BaseModel):
+    total: int
+    valid_count: int
+    invalid_count: int
+    valid_items: list[InventoryDeliveryTermItemOut] = Field(default_factory=list)
+    errors: list[InventoryDeliveryTermPreviewError] = Field(default_factory=list)
+
+
+class InventoryDeliveryTermNextNumberOut(BaseModel):
+    term_number: str
+
+
+class InventoryDeliveryTermOut(BaseModel):
+    id: int
+    term_number: str
+    contract_id: Optional[int] = None
+    contract_number: str
+    issued_at: datetime
+    destination_sector_id: int
+    destination_unit: str
+    recipient_user_id: int
+    recipient_name: str
+    recipient_email: EmailStr
+    recipient_registration: str
+    recipient_phone: str
+    adcetei_signer_name: str
+    adcetei_signer_title: str
+    item_observation: str
+    notes: str
+    status: InventoryDeliveryTermStatus
+    delivered_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    items: list[InventoryDeliveryTermItemOut] = Field(default_factory=list)
+
+    @field_serializer("issued_at", "delivered_at", "created_at", "updated_at")
+    def serialize_term_datetimes(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
 
 
 class AuditLogOut(BaseModel):

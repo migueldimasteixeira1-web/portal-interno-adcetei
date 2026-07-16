@@ -76,8 +76,8 @@ export default function InventoryAssetDetailPage() {
     setMessage("");
     setActiveAction(action);
     setDraft({
-      sector_id: action === "allocate" && asset?.sector_id ? String(asset.sector_id) : "",
-      assigned_user_id: (action === "allocate" || action === "responsible") && asset?.assigned_user_id ? String(asset.assigned_user_id) : "",
+      sector_id: action === "move" && asset?.sector_id ? String(asset.sector_id) : "",
+      assigned_user_id: action === "move" && asset?.assigned_user_id ? String(asset.assigned_user_id) : "",
       movement_date: emptyMovementDraft().movement_date,
       notes: "",
     });
@@ -85,8 +85,7 @@ export default function InventoryAssetDetailPage() {
 
   const requiredMissing =
     !draft.movement_date ||
-    (activeAction === "allocate" && !draft.sector_id) ||
-    (activeAction === "responsible" && !draft.assigned_user_id);
+    (activeAction === "move" && !draft.sector_id);
 
   const retireRequiredMissing = !retireDraft.reason || !retireDraft.movement_date || !retireDraft.justification.trim();
   const retireJustificationTooShort = retireDraft.justification.trim().length > 0 && retireDraft.justification.trim().length < 10;
@@ -98,16 +97,10 @@ export default function InventoryAssetDetailPage() {
     setError("");
     setMessage("");
     try {
-      if (activeAction === "allocate") {
+      if (activeAction === "move") {
         await api.allocateInventoryAsset(params.id, {
           sector_id: Number(draft.sector_id),
           assigned_user_id: draft.assigned_user_id ? Number(draft.assigned_user_id) : null,
-          movement_date: draft.movement_date,
-          notes: draft.notes.trim(),
-        });
-      } else if (activeAction === "responsible") {
-        await api.changeInventoryAssetResponsible(params.id, {
-          assigned_user_id: Number(draft.assigned_user_id),
           movement_date: draft.movement_date,
           notes: draft.notes.trim(),
         });
@@ -185,10 +178,8 @@ export default function InventoryAssetDetailPage() {
             <InventoryAssetActionBar
               canMove={canMove}
               canEdit={canEdit}
-              canViewUsers={canViewUsers}
               isRetired={isRetired}
-              onAllocate={() => openAction("allocate")}
-              onChangeResponsible={() => openAction("responsible")}
+              onMove={() => openAction("move")}
               onReturnToStock={() => openAction("stock")}
               onMaintenance={() => openAction("maintenance")}
               onRetire={() => {

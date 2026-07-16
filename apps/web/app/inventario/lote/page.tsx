@@ -25,6 +25,7 @@ export default function BulkInventoryAssetPage() {
     manufacturer_id: "",
     equipment_model_id: "",
     received_at: todayInputValue(),
+    specifications: "",
     notes: "",
   });
   const [serialInput, setSerialInput] = useState("");
@@ -113,6 +114,7 @@ export default function BulkInventoryAssetPage() {
     equipment_model_id: Number(draft.equipment_model_id),
     received_at: draft.received_at,
     serial_numbers: serials,
+    specifications: draft.specifications.trim(),
     notes: draft.notes.trim(),
   });
 

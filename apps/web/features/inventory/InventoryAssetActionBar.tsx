@@ -1,14 +1,12 @@
-import { ArrowLeft, Archive, PackageCheck, Send, Trash2, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, Archive, PackageCheck, Send, Trash2, Wrench } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonStyles } from "@/components/ui";
 
 type Props = {
   canMove: boolean;
   canEdit: boolean;
-  canViewUsers: boolean;
   isRetired: boolean;
-  onAllocate: () => void;
-  onChangeResponsible: () => void;
+  onMove: () => void;
   onReturnToStock: () => void;
   onMaintenance: () => void;
   onRetire: () => void;
@@ -18,10 +16,8 @@ type Props = {
 export default function InventoryAssetActionBar({
   canMove,
   canEdit,
-  canViewUsers,
   isRetired,
-  onAllocate,
-  onChangeResponsible,
+  onMove,
   onReturnToStock,
   onMaintenance,
   onRetire,
@@ -40,18 +36,9 @@ export default function InventoryAssetActionBar({
     <div className="flex flex-wrap gap-2">
       {canMove && !isRetired && (
         <>
-          <Button variant="secondary" onClick={onAllocate}>
+          <Button variant="secondary" onClick={onMove}>
             <Send size={16} />
-            Enviar para setor
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={!canViewUsers}
-            title={!canViewUsers ? "Seu perfil não possui acesso à lista de usuários." : undefined}
-            onClick={onChangeResponsible}
-          >
-            <UserRound size={16} />
-            Trocar responsável
+            Movimentar
           </Button>
           <Button variant="secondary" onClick={onReturnToStock}>
             <PackageCheck size={16} />

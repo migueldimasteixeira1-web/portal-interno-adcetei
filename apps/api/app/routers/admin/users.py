@@ -1,3 +1,4 @@
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,12 +10,31 @@ from ...audit import add_audit
 from ...auth import hash_password, validate_institutional_email
 from ...database import get_db
 from ...email_verification import send_user_verification
-from ...models import Asset, AssetMovement, AuditLog, Ticket, TicketComment, User
+from ...models import Asset, AssetMovement, AuditLog, InventoryDeliveryTerm, InventorySector, Ticket, TicketComment, User
 from ...permissions import require_permission
 from ...schemas import UserCreate, UserOut, UserUpdate
 from ...time_utils import utc_now
 
 router = APIRouter()
+
+
+def user_department_from_sector(db: Session, sector_id: int | None, fallback: str) -> tuple[int | None, str]:
+    if sector_id is None:
+        return None, fallback.strip()
+    sector = db.get(InventorySector, sector_id)
+    if not sector:
+        raise HTTPException(status_code=400, detail="Setor do usuário inválido")
+    return sector.id, sector.name
+
+
+def user_secretariat_from_sector(db: Session, sector_id: int | None, fallback: str) -> str:
+    if sector_id is None:
+        return " ".join((fallback or "Prefeitura de Cabo Frio").strip().split()) or "Prefeitura de Cabo Frio"
+    sector = db.get(InventorySector, sector_id)
+    if sector and sector.secretariat:
+        return sector.secretariat.name
+    return " ".join((fallback or "Prefeitura de Cabo Frio").strip().split()) or "Prefeitura de Cabo Frio"
+
 
 @router.post("/users", response_model=UserOut, status_code=201)
 def create_user(
@@ -22,17 +42,23 @@ def create_user(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permission("users.manage")),
 ):
+    if payload.active and not payload.password.strip():
+        raise HTTPException(status_code=400, detail="Defina uma senha antes de criar uma conta ativa")
     username = payload.username.strip().lower()
     email = validate_institutional_email(str(payload.email))
     ensure_unique_user(db, username, email)
+    department_sector_id, department = user_department_from_sector(db, payload.department_sector_id, payload.department)
+    secretariat = user_secretariat_from_sector(db, department_sector_id, payload.secretariat)
     user = User(
         username=username,
         full_name=payload.full_name.strip(),
         email=email,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(payload.password if payload.password.strip() else secrets.token_urlsafe(32)),
         role=payload.role,
-        secretariat=payload.secretariat.strip(),
-        department=payload.department.strip(),
+        secretariat=secretariat,
+        department_sector_id=department_sector_id,
+        department=department,
+        registration=payload.registration.strip(),
         phone=payload.phone.strip(),
         source="local",
         active=payload.active,
@@ -67,18 +93,27 @@ def update_user(
     data = payload.model_dump(exclude_unset=True)
     reject_null_fields(
         data,
-        {"username", "full_name", "email", "role", "secretariat", "department", "phone", "active", "email_verified"},
+        {"username", "full_name", "email", "role", "secretariat", "department", "registration", "phone", "active", "email_verified"},
     )
     ensure_last_admin(db, user, data)
     if actor.id == user.id and data.get("active") is False:
         raise HTTPException(status_code=409, detail="Você não pode desativar sua própria conta")
+    if not user.active and data.get("active") is True and not data.get("password"):
+        raise HTTPException(status_code=409, detail="Defina uma nova senha antes de ativar a conta")
     target_username = data["username"].strip().lower() if "username" in data else user.username
     target_email = validate_institutional_email(str(data["email"])) if "email" in data else user.email
     ensure_unique_user(db, target_username, target_email, user.id)
 
     changes: dict[str, Any] = {}
     email_changed = False
-    for field in ("username", "full_name", "email", "role", "secretariat", "department", "phone", "active"):
+    if "department_sector_id" in data:
+        sector_id, department = user_department_from_sector(db, data["department_sector_id"], data.get("department", user.department))
+        if user.department_sector_id != sector_id:
+            changes["department_sector_id"] = {"from": user.department_sector_id, "to": sector_id}
+            user.department_sector_id = sector_id
+        data["department"] = department
+        data["secretariat"] = user_secretariat_from_sector(db, sector_id, data.get("secretariat", user.secretariat))
+    for field in ("username", "full_name", "email", "role", "secretariat", "department", "registration", "phone", "active"):
         if field in data:
             value = data[field]
             if isinstance(value, str):
@@ -191,6 +226,13 @@ def delete_user(
                 )
             ),
             select(AuditLog.id).where(AuditLog.actor_id == user.id),
+            select(InventoryDeliveryTerm.id).where(
+                or_(
+                    InventoryDeliveryTerm.recipient_user_id == user.id,
+                    InventoryDeliveryTerm.created_by_user_id == user.id,
+                    InventoryDeliveryTerm.delivered_by_user_id == user.id,
+                )
+            ),
         )
     ):
         raise HTTPException(status_code=409, detail="Usuário possui histórico vinculado. Bloqueie a conta em vez de excluir.")
@@ -208,5 +250,3 @@ def delete_user(
     )
     db.commit()
     return {"message": "Usuário excluído com sucesso"}
-
-

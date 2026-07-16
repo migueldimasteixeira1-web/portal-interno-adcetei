@@ -1,6 +1,6 @@
 import { Alert, ConfirmDialog, Field, Input, Select, Textarea } from "@/components/ui";
-import type { InventoryCatalogItem, User } from "@/lib/types";
-import { type MovementAction, type MovementDraft, movementActionTitle } from "./inventory-utils";
+import type { InventorySector, User } from "@/lib/types";
+import { sectorWithSecretariat, type MovementAction, type MovementDraft, movementActionTitle } from "./inventory-utils";
 
 type Props = {
   open: boolean;
@@ -9,7 +9,7 @@ type Props = {
   saving: boolean;
   canViewUsers: boolean;
   requiredMissing: boolean;
-  sectorOptions: InventoryCatalogItem[];
+  sectorOptions: InventorySector[];
   userOptions: User[];
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
@@ -29,6 +29,9 @@ export default function InventoryMovementDialog({
   onConfirm,
   onDraftChange,
 }: Props) {
+  const selectedSectorId = Number(draft.sector_id || 0);
+  const responsibleOptions = userOptions.filter((item) => !selectedSectorId || item.department_sector_id === selectedSectorId);
+
   return (
     <ConfirmDialog
       open={open}
@@ -40,22 +43,22 @@ export default function InventoryMovementDialog({
       confirmLabel="Registrar movimentação"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        {action === "allocate" && (
+        {action === "move" && (
           <>
             <Field label="Setor destino">
-              <Select value={draft.sector_id} onChange={(event) => onDraftChange({ ...draft, sector_id: event.target.value })}>
+              <Select value={draft.sector_id} onChange={(event) => onDraftChange({ ...draft, sector_id: event.target.value, assigned_user_id: "" })}>
                 <option value="">Selecione</option>
                 {sectorOptions.map((sector) => (
                   <option key={sector.id} value={sector.id}>
-                    {sector.name}
+                    {sectorWithSecretariat(sector)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="Responsável" help={!canViewUsers ? "Seu perfil não possui acesso à lista de usuários." : "Opcional. Use apenas usuário cadastrado no portal."}>
-              <Select disabled={!canViewUsers} value={draft.assigned_user_id} onChange={(event) => onDraftChange({ ...draft, assigned_user_id: event.target.value })}>
+            <Field label="Responsável" help={!canViewUsers ? "Seu perfil não possui acesso à lista de usuários." : "Opcional. Lista limitada ao setor selecionado."}>
+              <Select disabled={!canViewUsers || !draft.sector_id} value={draft.assigned_user_id} onChange={(event) => onDraftChange({ ...draft, assigned_user_id: event.target.value })}>
                 <option value="">Não vinculado</option>
-                {userOptions.map((item) => (
+                {responsibleOptions.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.full_name} · {item.department}
                   </option>
@@ -63,20 +66,6 @@ export default function InventoryMovementDialog({
               </Select>
             </Field>
           </>
-        )}
-        {action === "responsible" && (
-          <div className="sm:col-span-2">
-            <Field label="Novo responsável" help="Use apenas usuário cadastrado no portal.">
-              <Select value={draft.assigned_user_id} onChange={(event) => onDraftChange({ ...draft, assigned_user_id: event.target.value })}>
-                <option value="">Selecione</option>
-                {userOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.full_name} · {item.department}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
         )}
         <Field label="Data da movimentação">
           <Input type="date" value={draft.movement_date} onChange={(event) => onDraftChange({ ...draft, movement_date: event.target.value })} />

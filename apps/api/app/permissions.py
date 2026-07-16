@@ -35,6 +35,7 @@ PERMISSION_DEPENDENCIES = {
     "users.manage": {"users.view"},
     "assets.manage": {"assets.view"},
     **{permission: {"inventory.view"} for permission in INVENTORY_PERMISSIONS if permission != "inventory.view"},
+    "inventory.move": {"inventory.view", "users.view"},
 }
 
 DEFAULT_ROLE_CONFIGS = {

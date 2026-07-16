@@ -3,7 +3,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { Alert, Badge, Button, ConfirmDialog, Field, Input, Select, Toolbar } from "@/components/ui";
 import { InstitutionalEmailInput } from "@/components/InstitutionalEmailInput";
 import { roleLabels } from "@/lib/format";
-import type { Role, User } from "@/lib/types";
+import type { InventoryCatalogItem, InventorySector, Role, User } from "@/lib/types";
 
 export type UserDraft = {
   username: string;
@@ -12,7 +12,9 @@ export type UserDraft = {
   password: string;
   role: Role;
   secretariat: string;
+  department_sector_id: string;
   department: string;
+  registration: string;
   phone: string;
   active: boolean;
   email_verified: boolean;
@@ -81,12 +83,29 @@ type FormDialogProps = {
   draft: UserDraft;
   saving: boolean;
   error: string;
+  secretariatOptions?: InventoryCatalogItem[];
+  sectorOptions?: InventorySector[];
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   onDraftChange: (draft: UserDraft) => void;
 };
 
-export function UserFormDialog({ open, editing, draft, saving, error, onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+export function UserFormDialog({ open, editing, draft, saving, error, secretariatOptions = [], sectorOptions = [], onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+  const passwordRequired = draft.active && (!editing || !editing.active);
+  const filteredSectors = sectorOptions.filter((sector) => {
+    const selectedSecretariat = secretariatOptions.find((item) => item.name === draft.secretariat);
+    return Boolean(selectedSecretariat) && sector.secretariat_id === selectedSecretariat?.id;
+  });
+
+  const selectSecretariat = (secretariatName: string) => {
+    onDraftChange({ ...draft, secretariat: secretariatName, department_sector_id: "", department: "" });
+  };
+
+  const selectSector = (sectorId: string) => {
+    const sector = sectorOptions.find((item) => String(item.id) === sectorId);
+    onDraftChange({ ...draft, department_sector_id: sectorId, department: sector?.name || draft.department });
+  };
+
   return (
     <ConfirmDialog
       open={open}
@@ -106,10 +125,26 @@ export function UserFormDialog({ open, editing, draft, saving, error, onOpenChan
             {Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </Select>
         </Field>
-        <Field label="Secretaria"><Input value={draft.secretariat} onChange={(e) => onDraftChange({ ...draft, secretariat: e.target.value })} /></Field>
-        <Field label="Setor"><Input value={draft.department} onChange={(e) => onDraftChange({ ...draft, department: e.target.value })} /></Field>
+        <Field label="Secretaria">
+          <Select value={draft.secretariat} onChange={(e) => selectSecretariat(e.target.value)}>
+            <option value="">Selecione uma secretaria</option>
+            {secretariatOptions.map((secretariat) => <option key={secretariat.id} value={secretariat.name}>{secretariat.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="Setor">
+          <Select value={draft.department_sector_id} onChange={(e) => selectSector(e.target.value)}>
+            <option value="">Selecione um setor</option>
+            {filteredSectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="Matrícula"><Input value={draft.registration} onChange={(e) => onDraftChange({ ...draft, registration: e.target.value })} /></Field>
         <Field label="Telefone"><Input value={draft.phone} onChange={(e) => onDraftChange({ ...draft, phone: e.target.value })} /></Field>
-        <Field label={editing ? "Nova senha (opcional)" : "Senha"} help="Mínimo de 10 caracteres."><Input type="password" value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} /></Field>
+        <Field
+          label={editing ? `Nova senha${passwordRequired ? "" : " (opcional)"}` : `Senha${passwordRequired ? "" : " (opcional)"}`}
+          help={passwordRequired ? "Mínimo de 10 caracteres." : draft.active ? "Preencha somente para alterar a senha atual." : "Pode ficar vazia; deverá ser definida ao ativar a conta."}
+        >
+          <Input type="password" required={passwordRequired} minLength={10} value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} />
+        </Field>
         <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Conta ativa</label>
         <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.email_verified} onChange={(e) => onDraftChange({ ...draft, email_verified: e.target.checked })} />E-mail verificado</label>
       </div>

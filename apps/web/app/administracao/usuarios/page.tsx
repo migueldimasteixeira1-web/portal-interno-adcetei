@@ -10,9 +10,10 @@ import PageHeader from "@/components/PageHeader";
 import { Alert, Button, Card, ConfirmDialog, EmptyState, SectionHeader } from "@/components/ui";
 import { UserFormDialog, UsersTable, type UserDraft } from "@/features/admin/UsersPanels";
 import { completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
+import { activeCatalogItems, emptyInventoryCatalogs } from "@/features/inventory/inventory-utils";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
-import type { User } from "@/lib/types";
+import type { InventoryCatalogs, User } from "@/lib/types";
 
 const emptyDraft: UserDraft = {
   username: "",
@@ -20,8 +21,10 @@ const emptyDraft: UserDraft = {
   email: "",
   password: "",
   role: "user",
-  secretariat: "Prefeitura de Cabo Frio",
+  secretariat: "",
+  department_sector_id: "",
   department: "",
+  registration: "",
   phone: "",
   active: true,
   email_verified: true,
@@ -30,6 +33,7 @@ const emptyDraft: UserDraft = {
 export default function UsersPage() {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [message, setMessage] = useState("");
@@ -46,7 +50,12 @@ export default function UsersPage() {
 
   const load = async () => {
     try {
-      setUsers(await api.users());
+      const [userData, catalogData] = await Promise.all([
+        api.users(),
+        canManage ? api.inventoryCatalogs() : Promise.resolve(emptyInventoryCatalogs),
+      ]);
+      setUsers(userData);
+      setCatalogs(catalogData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar usuários");
     } finally {
@@ -80,7 +89,9 @@ export default function UsersPage() {
       password: "",
       role: item.role,
       secretariat: item.secretariat,
+      department_sector_id: item.department_sector_id ? String(item.department_sector_id) : "",
       department: item.department,
+      registration: item.registration,
       phone: item.phone,
       active: item.active,
       email_verified: Boolean(item.email_verified_at),
@@ -90,6 +101,18 @@ export default function UsersPage() {
   };
 
   const save = async () => {
+    if (!draft.secretariat) {
+      setError("Selecione uma secretaria cadastrada.");
+      return;
+    }
+    if (!draft.department_sector_id) {
+      setError("Selecione um setor cadastrado no inventário.");
+      return;
+    }
+    if (draft.active && (!editing || !editing.active) && !draft.password.trim()) {
+      setError(editing ? "Defina uma nova senha antes de ativar a conta" : "Defina uma senha antes de criar uma conta ativa");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");
@@ -100,7 +123,9 @@ export default function UsersPage() {
           full_name: draft.full_name,
           email: completeInstitutionalEmail(draft.email),
           secretariat: draft.secretariat,
+          department_sector_id: draft.department_sector_id ? Number(draft.department_sector_id) : null,
           department: draft.department,
+          registration: draft.registration,
           phone: draft.phone,
           active: draft.active,
           email_verified: draft.email_verified,
@@ -110,7 +135,11 @@ export default function UsersPage() {
         await api.updateUser(editing.id, payload);
         setMessage("Usuário atualizado com sucesso.");
       } else {
-        await api.createUser({ ...draft, email: completeInstitutionalEmail(draft.email) });
+        await api.createUser({
+          ...draft,
+          department_sector_id: draft.department_sector_id ? Number(draft.department_sector_id) : null,
+          email: completeInstitutionalEmail(draft.email),
+        });
         setMessage("Usuário local criado com sucesso.");
       }
       setDialogOpen(false);
@@ -193,6 +222,8 @@ export default function UsersPage() {
         draft={draft}
         saving={saving}
         error={error}
+        secretariatOptions={activeCatalogItems(catalogs.secretariats)}
+        sectorOptions={activeCatalogItems(catalogs.sectors)}
         onOpenChange={setDialogOpen}
         onConfirm={save}
         onDraftChange={setDraft}

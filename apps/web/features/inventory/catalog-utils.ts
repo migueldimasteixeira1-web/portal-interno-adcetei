@@ -1,10 +1,10 @@
-import { Building2, Factory, Layers3, Package, Truck } from "lucide-react";
-import type { InventoryCatalogItem, InventoryCatalogs, InventoryEquipmentModel } from "@/lib/types";
+import { Building2, Factory, FileText, Layers3, Landmark, Package, Truck } from "lucide-react";
+import type { InventoryCatalogItem, InventoryCatalogs, InventoryContract, InventoryEquipmentModel, InventorySector } from "@/lib/types";
 
 export const DEFAULT_INVENTORY_SECTOR = "ADCETEI";
 
-export type CatalogTab = "suppliers" | "equipment_types" | "manufacturers" | "models" | "sectors";
-export type DeleteTarget = { tab: CatalogTab; item: InventoryCatalogItem | InventoryEquipmentModel };
+export type CatalogTab = "secretariats" | "suppliers" | "contracts" | "equipment_types" | "manufacturers" | "models" | "sectors";
+export type DeleteTarget = { tab: CatalogTab; item: InventoryCatalogItem | InventoryEquipmentModel | InventoryContract | InventorySector };
 
 export type SimpleDraft = {
   name: string;
@@ -16,8 +16,18 @@ export type ModelDraft = SimpleDraft & {
   equipment_type_id: string;
 };
 
+export type ContractDraft = SimpleDraft & {
+  supplier_id: string;
+};
+
+export type SectorDraft = SimpleDraft & {
+  secretariat_id: string;
+};
+
 export const emptyCatalogs: InventoryCatalogs = {
+  secretariats: [],
   suppliers: [],
+  contracts: [],
   equipment_types: [],
   manufacturers: [],
   models: [],
@@ -26,13 +36,17 @@ export const emptyCatalogs: InventoryCatalogs = {
 
 export const emptySimpleDraft: SimpleDraft = { name: "", is_active: true };
 export const emptyModelDraft: ModelDraft = { name: "", is_active: true, manufacturer_id: "", equipment_type_id: "" };
+export const emptyContractDraft: ContractDraft = { name: "", is_active: true, supplier_id: "" };
+export const emptySectorDraft: SectorDraft = { name: "", is_active: true, secretariat_id: "" };
 
 export const catalogTabs: Array<{ id: CatalogTab; label: string; icon: typeof Truck }> = [
+  { id: "secretariats", label: "Secretarias", icon: Landmark },
+  { id: "sectors", label: "Setores", icon: Building2 },
   { id: "suppliers", label: "Fornecedores", icon: Truck },
+  { id: "contracts", label: "Contratos", icon: FileText },
   { id: "equipment_types", label: "Tipos de equipamento", icon: Layers3 },
   { id: "manufacturers", label: "Fabricantes", icon: Factory },
   { id: "models", label: "Modelos", icon: Package },
-  { id: "sectors", label: "Setores", icon: Building2 },
 ];
 
 export function isDefaultSector(name: string) {
@@ -60,6 +74,8 @@ export function catalogDialogTitle(
 ) {
   const tabMeta = catalogTabMeta(tab);
   if (tab === "models") return editingModel ? "Editar modelo" : "Novo modelo";
+  if (tab === "contracts") return editingSimple ? "Editar contrato" : "Novo contrato";
+  if (tab === "secretariats") return editingSimple ? "Editar secretaria" : "Nova secretaria";
   return editingSimple
     ? `Editar ${tabMeta.label.slice(0, -1).toLowerCase()}`
     : `Novo ${tabMeta.label.slice(0, -1).toLowerCase()}`;

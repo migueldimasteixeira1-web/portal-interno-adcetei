@@ -2,7 +2,7 @@ import { Boxes } from "lucide-react";
 import { Badge, Card, DetailRow, EmptyState, SectionHeader } from "@/components/ui";
 import { assetStatusTone, formatDate, inventoryAssetStatusLabels, inventoryMovementActionLabels } from "@/lib/format";
 import type { InventoryAsset, InventoryMovement } from "@/lib/types";
-import { catalogRefName, notesText, retirementReasonLabel, transitionLabel, userDisplayName } from "./inventory-utils";
+import { catalogRefName, notesText, retirementReasonLabel, sectorWithSecretariat, transitionLabel, userDisplayName } from "./inventory-utils";
 
 type SummaryProps = { asset: InventoryAsset };
 
@@ -32,7 +32,8 @@ export function InventoryAssetDetailsCard({ asset }: SummaryProps) {
         <DetailRow label="Tipo" value={catalogRefName(asset.equipment_type)} />
         <DetailRow label="Fabricante" value={catalogRefName(asset.manufacturer)} />
         <DetailRow label="Modelo" value={catalogRefName(asset.equipment_model)} />
-        <DetailRow label="Setor atual" value={catalogRefName(asset.sector)} />
+        <DetailRow label="Especificações" value={notesText(asset.specifications)} className="sm:col-span-2 xl:col-span-3" />
+        <DetailRow label="Secretaria / setor atual" value={sectorWithSecretariat(asset.sector)} />
         <DetailRow label="Responsável atual" value={asset.assigned_user?.full_name || "Não vinculado"} />
         <DetailRow label="Data de recebimento" value={formatDate(asset.received_at, false)} />
         <DetailRow label="Data de envio/entrega" value={formatDate(asset.delivered_at, false)} />
@@ -82,7 +83,7 @@ export function InventoryMovementTable({ movements }: MovementsProps) {
                     <p className="mt-0.5 text-xs text-[#8b97a8]">Registrado {formatDate(movement.created_at)}</p>
                   </td>
                   <td className="text-[#5c6b7e]">
-                    {transitionLabel(catalogRefName(movement.from_sector, "Sem setor"), catalogRefName(movement.to_sector, "Sem setor"))}
+                    {transitionLabel(sectorWithSecretariat(movement.from_sector, "Sem setor"), sectorWithSecretariat(movement.to_sector, "Sem setor"))}
                   </td>
                   <td className="text-[#5c6b7e]">
                     {transitionLabel(userDisplayName(movement.from_user), userDisplayName(movement.to_user))}

@@ -20,6 +20,7 @@ Portal Interno ADCETEI
 │   ├── cadastros base (fornecedor, tipo, fabricante, modelo, setor)
 │   ├── equipamentos e movimentações
 │   ├── entrada em lote por série
+│   ├── termos de recebimento e confirmação de entrega
 │   └── opções resumidas para chamados
 └── Administração
     ├── usuários
@@ -75,8 +76,9 @@ Imports existentes `@/lib/api` e `@/lib/types` continuam válidos após a modula
 |------|-------------------|
 | `/dashboard` | `features/dashboard/DashboardSections` |
 | `/chamados`, `/chamados/novo`, `/chamados/[id]` | `features/tickets/*` |
-| `/inventario`, `/inventario/[id]`, `/inventario/lote`, `/inventario/novo`, `/inventario/cadastros` | `features/inventory/*` |
-| `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
+| `/inventario`, `/inventario/[id]`, `/inventario/lote`, `/inventario/novo` | `features/inventory/*` |
+| `/inventario/termos` | Termos de recebimento e confirmação de entrega |
+| `/administracao/base-cadastros`, `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
 | `/administracao/perfis`, `/administracao/auditoria` | Inline (telas menores) |
 
 ## Frontend — detalhes
@@ -121,14 +123,23 @@ Padrão aceito: `usuario@secretaria.cabofrio.rj.gov.br`. Contas públicas nascem
 
 A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Rotas legadas de `/api/assets` coexistem com o contrato modular em `/api/inventory/assets`.
 
-- Cadastros base: `/api/inventory/catalogs` — `inventory.view` / `inventory.manage_catalogs`
-- Equipamentos: número de série como ID principal, vínculos opcionais aos cadastros
+- Cadastros base: `/api/inventory/catalogs` — secretarias, setores vinculados a secretaria, fornecedores, contratos vinculados a fornecedor, tipos, fabricantes e modelos (`inventory.view` / `inventory.manage_catalogs`)
+- Hierarquia conhecida: `Secretaria de Gestão e Inovação (SGI) → ADCETEI`; a ponte de compatibilidade não classifica automaticamente outros setores
+- Equipamentos: número de série como ID principal, especificações e vínculos opcionais aos cadastros
 - Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
 - Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI
-- Exportação: `GET /api/inventory/assets/export` — planilha `.xlsx` com os mesmos filtros da listagem (`inventory.view`); coluna “Última movimentação” usa a entrada mais recente por `movement_date` (desempate por `id`)
+- Termos: `/api/inventory/delivery-terms` — número sugerido, contrato cadastrado, prévia por número de série, emissão/cancelamento do DOCX oficial a partir do template e confirmação de entrega sem alterar o inventário antes da assinatura
+- Reserva de termos derivada de itens em termos `draft`/`emitted`; criação e confirmação revalidam o estoque em transação, com bloqueio de linha no PostgreSQL
+- Usuários, setores e equipamentos citados por qualquer termo não podem ser excluídos; o snapshot e as chaves estrangeiras preservam o documento oficial
+- Exportação: `GET /api/inventory/assets/export` — planilha `.xlsx` com os mesmos filtros da listagem (`inventory.view`), incluindo secretaria e setor; inclui `Secretaria` antes de `Setor`; coluna “Última movimentação” usa a entrada mais recente por `movement_date` (desempate por `id`)
 - Baixa: `POST /api/inventory/assets/{id}/retire` — status `retired` com motivo, justificativa, movimentação `retired` e auditoria `inventory_asset_retired` (`inventory.move`; correção administrativa só admin)
-- Tela `/inventario/cadastros` para CRUD dos cadastros base
+- Tela `/administracao/base-cadastros` para CRUD dos cadastros base; `/inventario/cadastros` redireciona para ela
 - Setor `ADCETEI` protegido contra renomeação/desativação via API
+- Ação única de movimentação direta define setor e, opcionalmente, responsável; a API valida que o responsável pertence ao setor de destino
+
+Termos de recebimento usam o cadastro existente de `users` como cadastro único de pessoas. Uma conta pode ficar bloqueada para login (`active=false`) e ainda ser usada como responsável recebedor do termo. A confirmação de entrega aplica a alocação em lote nos ativos e registra uma movimentação individual para cada equipamento.
+
+Quando o cadastro administrativo não informa senha, o backend gera uma credencial aleatória que não é exibida nem registrada. A conta permanece bloqueada até uma futura redefinição administrativa.
 
 Duas superfícies para equipamentos:
 

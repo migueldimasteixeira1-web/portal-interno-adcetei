@@ -18,9 +18,12 @@ from ...inventory_service import default_sector_update_error, normalize_catalog_
 from ...models import (
     Asset,
     AssetMovement,
+    InventoryContract,
+    InventoryDeliveryTerm,
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
+    InventorySecretariat,
     InventorySector,
     InventorySupplier,
     User,
@@ -31,9 +34,15 @@ from ...schemas import (
     InventoryCatalogItemOut,
     InventoryCatalogItemUpdate,
     InventoryCatalogsOut,
+    InventoryContractCreate,
+    InventoryContractOut,
+    InventoryContractUpdate,
     InventoryEquipmentModelCreate,
     InventoryEquipmentModelOut,
     InventoryEquipmentModelUpdate,
+    InventorySectorCreate,
+    InventorySectorOut,
+    InventorySectorUpdate,
 )
 
 router = APIRouter()
@@ -44,12 +53,42 @@ def list_catalogs(
     current_user: User = Depends(require_permission("inventory.view")),
 ):
     return {
+        "secretariats": list_items(db, InventorySecretariat),
         "suppliers": list_items(db, InventorySupplier),
+        "contracts": list_items(db, InventoryContract),
         "equipment_types": list_items(db, InventoryEquipmentType),
         "manufacturers": list_items(db, InventoryManufacturer),
         "models": list_items(db, InventoryEquipmentModel),
         "sectors": list_items(db, InventorySector),
     }
+
+
+@router.post("/catalogs/secretariats", response_model=InventoryCatalogItemOut, status_code=201)
+def create_secretariat(
+    payload: InventoryCatalogItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return create_item(db, InventorySecretariat, payload)
+
+
+@router.patch("/catalogs/secretariats/{item_id}", response_model=InventoryCatalogItemOut)
+def update_secretariat(
+    item_id: int,
+    payload: InventoryCatalogItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return update_item(db, InventorySecretariat, item_id, payload)
+
+
+@router.delete("/catalogs/secretariats/{item_id}")
+def delete_secretariat(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(db, InventorySecretariat, item_id, (select(InventorySector.id).where(InventorySector.secretariat_id == item_id),))
 
 
 @router.post("/catalogs/suppliers", response_model=InventoryCatalogItemOut, status_code=201)
@@ -77,7 +116,68 @@ def delete_supplier(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
-    return delete_item(db, InventorySupplier, item_id, (select(Asset.id).where(Asset.supplier_id == item_id),))
+    return delete_item(
+        db,
+        InventorySupplier,
+        item_id,
+        (
+            select(Asset.id).where(Asset.supplier_id == item_id),
+            select(InventoryContract.id).where(InventoryContract.supplier_id == item_id),
+        ),
+    )
+
+
+@router.post("/catalogs/contracts", response_model=InventoryContractOut, status_code=201)
+def create_contract(
+    payload: InventoryContractCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    if not db.get(InventorySupplier, payload.supplier_id):
+        raise HTTPException(status_code=400, detail="Fornecedor inválido")
+    name = catalog_name(payload.name)
+    contract = InventoryContract(
+        name=name,
+        normalized_name=ensure_unique_name(db, InventoryContract, name),
+        supplier_id=payload.supplier_id,
+        is_active=payload.is_active,
+    )
+    db.add(contract)
+    db.commit()
+    db.refresh(contract)
+    return contract
+
+
+@router.patch("/catalogs/contracts/{item_id}", response_model=InventoryContractOut)
+def update_contract(
+    item_id: int,
+    payload: InventoryContractUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    contract = get_item(db, InventoryContract, item_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "supplier_id" in data:
+        if not db.get(InventorySupplier, data["supplier_id"]):
+            raise HTTPException(status_code=400, detail="Fornecedor inválido")
+        contract.supplier_id = data["supplier_id"]
+    if "name" in data:
+        contract.name = catalog_name(data["name"])
+        contract.normalized_name = ensure_unique_name(db, InventoryContract, contract.name, item_id)
+    if "is_active" in data:
+        contract.is_active = data["is_active"]
+    db.commit()
+    db.refresh(contract)
+    return contract
+
+
+@router.delete("/catalogs/contracts/{item_id}")
+def delete_contract(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inventory.manage_catalogs")),
+):
+    return delete_item(db, InventoryContract, item_id, (select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.contract_id == item_id),))
 
 
 @router.post("/catalogs/equipment-types", response_model=InventoryCatalogItemOut, status_code=201)
@@ -208,19 +308,31 @@ def delete_equipment_model(
     return delete_item(db, InventoryEquipmentModel, item_id, (select(Asset.id).where(Asset.equipment_model_id == item_id),))
 
 
-@router.post("/catalogs/sectors", response_model=InventoryCatalogItemOut, status_code=201)
+@router.post("/catalogs/sectors", response_model=InventorySectorOut, status_code=201)
 def create_sector(
-    payload: InventoryCatalogItemCreate,
+    payload: InventorySectorCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
-    return create_item(db, InventorySector, payload)
+    if not db.get(InventorySecretariat, payload.secretariat_id):
+        raise HTTPException(status_code=400, detail="Secretaria inválida")
+    name = catalog_name(payload.name)
+    sector = InventorySector(
+        name=name,
+        normalized_name=ensure_unique_name(db, InventorySector, name),
+        secretariat_id=payload.secretariat_id,
+        is_active=payload.is_active,
+    )
+    db.add(sector)
+    db.commit()
+    db.refresh(sector)
+    return sector
 
 
-@router.patch("/catalogs/sectors/{item_id}", response_model=InventoryCatalogItemOut)
+@router.patch("/catalogs/sectors/{item_id}", response_model=InventorySectorOut)
 def update_sector(
     item_id: int,
-    payload: InventoryCatalogItemUpdate,
+    payload: InventorySectorUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
@@ -229,7 +341,18 @@ def update_sector(
     error = default_sector_update_error(data, current_name=sector.name)
     if error:
         raise HTTPException(status_code=400, detail=error)
-    return update_item(db, InventorySector, item_id, payload)
+    if "secretariat_id" in data:
+        if data["secretariat_id"] is not None and not db.get(InventorySecretariat, data["secretariat_id"]):
+            raise HTTPException(status_code=400, detail="Secretaria inválida")
+        sector.secretariat_id = data["secretariat_id"]
+    if "name" in data:
+        sector.name = catalog_name(data["name"])
+        sector.normalized_name = ensure_unique_name(db, InventorySector, sector.name, item_id)
+    if "is_active" in data:
+        sector.is_active = data["is_active"]
+    db.commit()
+    db.refresh(sector)
+    return sector
 
 
 @router.delete("/catalogs/sectors/{item_id}")
@@ -248,5 +371,7 @@ def delete_sector(
         (
             select(Asset.id).where(Asset.sector_id == item_id),
             select(AssetMovement.id).where(or_(AssetMovement.from_sector_id == item_id, AssetMovement.to_sector_id == item_id)),
+            select(User.id).where(User.department_sector_id == item_id),
+            select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.destination_sector_id == item_id),
         ),
     )

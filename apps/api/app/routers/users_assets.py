@@ -25,7 +25,7 @@ def list_users(
         query = query.where(User.role == role)
     if search:
         like = f"%{search}%"
-        query = query.where(or_(User.full_name.ilike(like), User.username.ilike(like), User.email.ilike(like)))
+        query = query.where(or_(User.full_name.ilike(like), User.username.ilike(like), User.email.ilike(like), User.registration.ilike(like)))
     users = list(db.scalars(query))
     return [serialize_user(user, db, include_permissions=True) for user in users]
 
