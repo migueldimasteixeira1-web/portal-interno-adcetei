@@ -148,7 +148,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_optional_password(cls, value: str) -> str:
-        if value and len(value) < 10:
+        if value.strip() and len(value) < 10:
             raise ValueError("Senha deve ter no mínimo 10 caracteres")
         return value
 
@@ -167,6 +167,13 @@ class UserUpdate(BaseModel):
     active: Optional[bool] = None
     email_verified: Optional[bool] = None
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def normalize_blank_password(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class AssetCreate(BaseModel):

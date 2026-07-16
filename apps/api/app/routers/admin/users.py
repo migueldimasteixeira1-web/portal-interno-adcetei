@@ -42,6 +42,8 @@ def create_user(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permission("users.manage")),
 ):
+    if payload.active and not payload.password.strip():
+        raise HTTPException(status_code=400, detail="Defina uma senha antes de criar uma conta ativa")
     username = payload.username.strip().lower()
     email = validate_institutional_email(str(payload.email))
     ensure_unique_user(db, username, email)

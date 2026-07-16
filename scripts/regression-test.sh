@@ -1249,6 +1249,24 @@ expect(status, 201, "administrador cria usuário local")
 status, login_result = call("POST", "/auth/login", payload={"username": "teste.admin@adcetei.cabofrio.rj.gov.br", "password": "SenhaTeste123"})
 expect(status, 200, "usuário administrativo verificado autentica")
 created_user_token = login_result["access_token"]
+for username, password in (("ativo.sem.senha", ""), ("ativo.so.espacos", "          ")):
+    status, body = call(
+        "POST",
+        "/admin/users",
+        admin,
+        {
+            "username": username,
+            "full_name": "Conta Ativa Sem Senha",
+            "email": f"{username}@adcetei.cabofrio.rj.gov.br",
+            "password": password,
+            "role": "user",
+            "secretariat": "Secretaria de Gestão e Inovação",
+            "department_sector_id": default_sector["id"],
+            "active": True,
+        },
+    )
+    expect(status, 400, f"conta ativa exige senha: {username}")
+    expect(body.get("detail"), "Defina uma senha antes de criar uma conta ativa", f"mensagem de senha obrigatória: {username}")
 status, temporary_user = call(
     "POST",
     "/admin/users",
@@ -1291,6 +1309,9 @@ status, body = call("PATCH", f"/admin/users/{temporary_user['id']}", admin, {"ac
 expect(status, 409, "ativação sem redefinir senha")
 if body.get("detail") != "Defina uma nova senha antes de ativar a conta":
     raise AssertionError("ativação sem senha deve orientar a redefinição")
+status, body = call("PATCH", f"/admin/users/{temporary_user['id']}", admin, {"active": True, "password": "          "})
+expect(status, 409, "ativação com senha composta por espaços")
+expect(body.get("detail"), "Defina uma nova senha antes de ativar a conta", "senha composta por espaços deve ser tratada como vazia")
 status, temporary_user = call("PATCH", f"/admin/users/{temporary_user['id']}", admin, {"active": True, "password": "NovaSenhaTeste123"})
 expect(status, 200, "ativação com nova senha")
 expect(temporary_user["active"], True, "recebedor ativado após redefinir senha")

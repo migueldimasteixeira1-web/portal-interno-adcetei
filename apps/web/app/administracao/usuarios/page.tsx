@@ -109,6 +109,10 @@ export default function UsersPage() {
       setError("Selecione um setor cadastrado no inventário.");
       return;
     }
+    if (draft.active && (!editing || !editing.active) && !draft.password.trim()) {
+      setError(editing ? "Defina uma nova senha antes de ativar a conta" : "Defina uma senha antes de criar uma conta ativa");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");

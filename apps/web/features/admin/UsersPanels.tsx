@@ -91,6 +91,7 @@ type FormDialogProps = {
 };
 
 export function UserFormDialog({ open, editing, draft, saving, error, secretariatOptions = [], sectorOptions = [], onOpenChange, onConfirm, onDraftChange }: FormDialogProps) {
+  const passwordRequired = draft.active && (!editing || !editing.active);
   const filteredSectors = sectorOptions.filter((sector) => {
     const selectedSecretariat = secretariatOptions.find((item) => item.name === draft.secretariat);
     return Boolean(selectedSecretariat) && sector.secretariat_id === selectedSecretariat?.id;
@@ -138,7 +139,12 @@ export function UserFormDialog({ open, editing, draft, saving, error, secretaria
         </Field>
         <Field label="Matrícula"><Input value={draft.registration} onChange={(e) => onDraftChange({ ...draft, registration: e.target.value })} /></Field>
         <Field label="Telefone"><Input value={draft.phone} onChange={(e) => onDraftChange({ ...draft, phone: e.target.value })} /></Field>
-        <Field label={editing ? "Nova senha (opcional)" : "Senha (opcional)"} help={editing ? "Mínimo de 10 caracteres." : "Em branco, deverá ser redefinida antes do primeiro acesso."}><Input type="password" value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} /></Field>
+        <Field
+          label={editing ? `Nova senha${passwordRequired ? "" : " (opcional)"}` : `Senha${passwordRequired ? "" : " (opcional)"}`}
+          help={passwordRequired ? "Mínimo de 10 caracteres." : draft.active ? "Preencha somente para alterar a senha atual." : "Pode ficar vazia; deverá ser definida ao ativar a conta."}
+        >
+          <Input type="password" required={passwordRequired} minLength={10} value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} />
+        </Field>
         <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Conta ativa</label>
         <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.email_verified} onChange={(e) => onDraftChange({ ...draft, email_verified: e.target.checked })} />E-mail verificado</label>
       </div>
