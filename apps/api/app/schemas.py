@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
 
 from .domain import TicketPriority, TicketStatus
 from .time_utils import iso_utc
@@ -144,6 +144,13 @@ class UserCreate(BaseModel):
     active: bool = True
     email_verified: bool = True
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("password")
+    @classmethod
+    def validate_optional_password(cls, value: str) -> str:
+        if value and len(value) < 10:
+            raise ValueError("Senha deve ter no mínimo 10 caracteres")
+        return value
 
 
 class UserUpdate(BaseModel):

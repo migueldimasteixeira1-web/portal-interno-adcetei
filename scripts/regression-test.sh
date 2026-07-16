@@ -1259,6 +1259,20 @@ status, temporary_user = call(
 expect(status, 201, "recebedor sem senha informada")
 expect(temporary_user["active"], False, "recebedor temporário bloqueado")
 expect(temporary_user["email_verified_at"], None, "recebedor temporário não verificado")
+status, _ = call(
+    "POST",
+    "/admin/users",
+    admin,
+    {
+        "username": "senha.fraca",
+        "full_name": "Usuário Senha Fraca",
+        "email": "senha.fraca@adcetei.cabofrio.rj.gov.br",
+        "password": "curta",
+        "role": "user",
+        "department_sector_id": default_sector["id"],
+    },
+)
+expect(status, 422, "senha administrativa curta")
 with sqlite3.connect(DB_PATH) as connection:
     temporary_hash = connection.execute("select password_hash from users where id = ?", (temporary_user["id"],)).fetchone()[0]
 assert temporary_hash and not verify_password("TermoTemporario123", temporary_hash), "senha fixa não pode ser reutilizada"
