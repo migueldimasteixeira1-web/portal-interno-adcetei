@@ -153,17 +153,22 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('requester', 'Solicitante', '', '', '[]')")
     connection.execute("CREATE TABLE inventory_secretariats (id INTEGER PRIMARY KEY, name VARCHAR(160), normalized_name VARCHAR(180) UNIQUE, is_active BOOLEAN, created_at TIMESTAMP, updated_at TIMESTAMP)")
     connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (1, 'Secretaria Existente', 'secretaria existente', 1)")
+    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (2, 'Secretaria Adjunta de Ciência e Tecnologia', 'secretaria adjunta de ciência e tecnologia', 1)")
+    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (3, 'Secretaria de Governo e Integridade', 'secretaria de governo e integridade', 1)")
     connection.execute("CREATE TABLE inventory_sectors (id INTEGER PRIMARY KEY, name VARCHAR(160), normalized_name VARCHAR(180) UNIQUE, secretariat_id INTEGER, is_active BOOLEAN, created_at TIMESTAMP, updated_at TIMESTAMP)")
-    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (1, 'ADCETEI', 'adcetei', NULL, 1)")
-    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (2, 'FAZENDA', 'fazenda', NULL, 1)")
+    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (1, 'ADCETEI', 'adcetei', 2, 1)")
+    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (2, 'FAZENDA', 'fazenda', 2, 1)")
     connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (3, 'Setor Existente', 'setor existente', 1, 1)")
+    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (4, 'Setor Governo', 'setor governo', 3, 1)")
 
 ensure_schema_compatibility()
 with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
-    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (3, 'Secretaria de Governo e Integridade', 'secretaria de governo e integridade', 1)")
-    connection.execute("UPDATE inventory_sectors SET secretariat_id = 3 WHERE normalized_name = 'adcetei'")
+    first_secretariats = connection.execute("SELECT id, name, normalized_name, is_active FROM inventory_secretariats ORDER BY id").fetchall()
+    first_sectors = connection.execute("SELECT id, name, normalized_name, secretariat_id, is_active FROM inventory_sectors ORDER BY id").fetchall()
 ensure_schema_compatibility()
-ensure_schema_compatibility()
+with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
+    assert connection.execute("SELECT id, name, normalized_name, is_active FROM inventory_secretariats ORDER BY id").fetchall() == first_secretariats, "segunda migração não deve alterar secretarias"
+    assert connection.execute("SELECT id, name, normalized_name, secretariat_id, is_active FROM inventory_sectors ORDER BY id").fetchall() == first_sectors, "segunda migração não deve alterar setores"
 columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
 expected = {"form_data", "form_schema_snapshot", "service_id"}
 assert expected <= columns, f"colunas ausentes após migração: {expected - columns}"
@@ -184,7 +189,8 @@ with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
     sectors = dict(connection.execute("select normalized_name, secretariat_id from inventory_sectors").fetchall())
     assert "secretaria de gestão e inovação" in secretariats, "SGI deve existir como secretaria"
     assert sectors["adcetei"] == secretariats["secretaria de gestão e inovação"], "ADCETEI deve pertencer à SGI"
-    assert sectors["fazenda"] is None, "FAZENDA sem classificação deve permanecer sem secretaria"
+    assert sectors["fazenda"] is None, "setor classificado automaticamente deve ficar sem secretaria"
+    assert sectors["setor governo"] is None, "setor ligado ao outro nome incorreto deve ficar sem secretaria"
     assert sectors["setor existente"] == 1, "vínculo organizacional existente deve ser preservado"
     assert "secretaria de governo e integridade" not in secretariats, "nome incorreto desta branch deve ser removido quando estiver sem uso"
     assert "secretaria adjunta de ciência e tecnologia" not in secretariats, "migração não deve criar secretaria incorreta"

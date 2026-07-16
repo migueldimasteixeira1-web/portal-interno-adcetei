@@ -103,7 +103,8 @@ def ensure_schema_compatibility() -> None:
         sector_columns = {column["name"] for column in inspector.get_columns("inventory_sectors")}
         normalized_default_sector = normalize_catalog_name(DEFAULT_INVENTORY_SECTOR)
         normalized_default_secretariat = normalize_catalog_name(DEFAULT_INVENTORY_SECRETARIAT)
-        normalized_incorrect_secretariat = normalize_catalog_name("Secretaria de Governo e Integridade")
+        normalized_incorrect_government_secretariat = normalize_catalog_name("Secretaria de Governo e Integridade")
+        normalized_incorrect_adjunct_secretariat = normalize_catalog_name("Secretaria Adjunta de Ciência e Tecnologia")
         with engine.begin() as connection:
             if "secretariat_id" not in sector_columns:
                 connection.execute(text("ALTER TABLE inventory_sectors ADD COLUMN secretariat_id INTEGER"))
@@ -135,6 +136,27 @@ def ensure_schema_compatibility() -> None:
                 text(
                     """
                     UPDATE inventory_sectors
+                    SET secretariat_id = NULL
+                    WHERE normalized_name <> CAST(:sector_name AS VARCHAR)
+                      AND secretariat_id IN (
+                        SELECT id FROM inventory_secretariats
+                        WHERE normalized_name IN (
+                            CAST(:incorrect_government_name AS VARCHAR),
+                            CAST(:incorrect_adjunct_name AS VARCHAR)
+                        )
+                      )
+                    """
+                ),
+                {
+                    "sector_name": normalized_default_sector,
+                    "incorrect_government_name": normalized_incorrect_government_secretariat,
+                    "incorrect_adjunct_name": normalized_incorrect_adjunct_secretariat,
+                },
+            )
+            connection.execute(
+                text(
+                    """
+                    UPDATE inventory_sectors
                     SET secretariat_id = (
                         SELECT id FROM inventory_secretariats
                         WHERE normalized_name = CAST(:secretariat_name AS VARCHAR)
@@ -143,10 +165,12 @@ def ensure_schema_compatibility() -> None:
                     WHERE normalized_name = CAST(:sector_name AS VARCHAR)
                       AND (
                             secretariat_id IS NULL
-                            OR secretariat_id = (
+                            OR secretariat_id IN (
                                 SELECT id FROM inventory_secretariats
-                                WHERE normalized_name = CAST(:incorrect_secretariat_name AS VARCHAR)
-                                LIMIT 1
+                                WHERE normalized_name IN (
+                                    CAST(:incorrect_government_name AS VARCHAR),
+                                    CAST(:incorrect_adjunct_name AS VARCHAR)
+                                )
                             )
                       )
                     """
@@ -154,21 +178,28 @@ def ensure_schema_compatibility() -> None:
                 {
                     "secretariat_name": normalized_default_secretariat,
                     "sector_name": normalized_default_sector,
-                    "incorrect_secretariat_name": normalized_incorrect_secretariat,
+                    "incorrect_government_name": normalized_incorrect_government_secretariat,
+                    "incorrect_adjunct_name": normalized_incorrect_adjunct_secretariat,
                 },
             )
             connection.execute(
                 text(
                     """
                     DELETE FROM inventory_secretariats
-                    WHERE normalized_name = CAST(:incorrect_secretariat_name AS VARCHAR)
+                    WHERE normalized_name IN (
+                        CAST(:incorrect_government_name AS VARCHAR),
+                        CAST(:incorrect_adjunct_name AS VARCHAR)
+                    )
                       AND NOT EXISTS (
                         SELECT 1 FROM inventory_sectors
                         WHERE secretariat_id = inventory_secretariats.id
                       )
                     """
                 ),
-                {"incorrect_secretariat_name": normalized_incorrect_secretariat},
+                {
+                    "incorrect_government_name": normalized_incorrect_government_secretariat,
+                    "incorrect_adjunct_name": normalized_incorrect_adjunct_secretariat,
+                },
             )
 
     if "assets" in table_names:
