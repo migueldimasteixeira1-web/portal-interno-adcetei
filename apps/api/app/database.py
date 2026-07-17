@@ -26,6 +26,8 @@ class Base(DeclarativeBase):
 
 
 def ensure_schema_compatibility() -> None:
+    # ponytail: fallback temporário para instalações legadas ainda não adotadas pelo Alembic.
+    # Novas mudanças de schema devem entrar em migrations; este bloco não executa stamp.
     inspector = inspect(engine)
     table_names = inspector.get_table_names()
     if "users" not in table_names:
