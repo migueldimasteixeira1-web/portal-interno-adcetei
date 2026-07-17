@@ -160,7 +160,9 @@ A rota resumida antiga poderá ser removida depois que todas as instalações us
 
 ## Compatibilidade de banco
 
-`database.ensure_schema_compatibility()` adiciona colunas ausentes (`form_data`, `form_schema_snapshot`, `service_id`, etc.) sem reset. Ponte temporária — novas evoluções devem usar Alembic.
+Alembic é o caminho oficial para novas mudanças de schema. A baseline `20260717_0001` fica em `apps/api/alembic` e cobre o schema atual completo do monólito modular.
+
+`database.ensure_schema_compatibility()` permanece como fallback temporário para bancos legados ainda não adotados. Ele corrige diferenças históricas conhecidas sem apagar dados, mas não executa `stamp` e não deve receber novas alterações de schema. Depois que os ambientes estiverem validados e marcados no Alembic, os blocos legados poderão ser removidos em uma versão dedicada.
 
 ## Implantação em VM
 
@@ -173,4 +175,6 @@ O gateway Nginx entrega o frontend e encaminha `/api` internamente. Variáveis s
 
 - `SEED_DEMO_DATA` controla criação de dados demo;
 - `SHOW_DEMO_USERS` controla atalhos no login;
-- sem seed, administrador inicial via `python -m app.create_admin`.
+- sem seed, administrador inicial via `python -m app.create_admin`;
+- a API executa `alembic upgrade head` antes de iniciar no container;
+- bancos PostgreSQL existentes precisam de backup, verificação por `python -m app.schema_adoption` e `alembic stamp 20260717_0001` antes da primeira subida com Alembic.

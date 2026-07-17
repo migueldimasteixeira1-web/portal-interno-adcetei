@@ -110,6 +110,68 @@ O seed local cobre o fluxo operacional: usuários/chamados, catálogos do invent
 
 O `iniciar-local.sh` usa a configuração de `apps/api/.env` quando esse arquivo existir. Sem arquivo, os padrões locais mantêm os dados de demonstração habilitados.
 
+## Migrações de banco
+
+O schema oficial é gerenciado por Alembic em `apps/api/alembic`. O `./iniciar-local.sh` instala as dependências e executa `alembic upgrade head` antes de iniciar a API.
+
+### Instalação limpa
+
+```bash
+cd apps/api
+alembic upgrade head
+```
+
+Depois crie o primeiro administrador quando o seed estiver desabilitado:
+
+```bash
+python -m app.create_admin \
+  --full-name "Administrador ADCETEI" \
+  --email "administrador@adcetei.cabofrio.rj.gov.br"
+```
+
+### Primeira adoção de banco existente
+
+Nunca execute `stamp` em banco desconhecido. Para uma VM já em uso:
+
+1. faça backup com `pg_dump` ou `./scripts/backup-postgres.sh`;
+2. pare a API;
+3. valide o schema:
+
+```bash
+cd apps/api
+python -m app.schema_adoption
+```
+
+4. corrija qualquer divergência indicada pelo verificador;
+5. marque a baseline manualmente:
+
+```bash
+alembic stamp 20260717_0001
+alembic upgrade head
+alembic current
+```
+
+6. inicie a API;
+7. valide login, chamados, inventário e termos.
+
+O verificador apenas lê o banco. Ele não altera dados e não executa `stamp`.
+
+### Novas migrations
+
+```bash
+cd apps/api
+alembic revision --autogenerate -m "descricao curta"
+```
+
+Revise o arquivo gerado antes de aplicar: ordem das tabelas, FKs, índices, constraints únicas e compatibilidade SQLite/PostgreSQL. Depois rode:
+
+```bash
+alembic upgrade head
+alembic check
+```
+
+Não edite migrations já aplicadas em ambiente compartilhado. Não use `stamp` para pular uma migration normal. Downgrade nunca é executado automaticamente em produção; em falha de adoção, pare a aplicação, restaure o backup e investigue a migration.
+
 ## Contas de demonstração
 
 Disponíveis somente quando `SEED_DEMO_DATA=true`:
@@ -226,15 +288,9 @@ As respostas são validadas no frontend e no backend, salvas em `tickets.form_da
 
 ## Mudança de banco
 
-Foi adicionada a coluna JSON `tickets.form_data`.
+Novas mudanças de schema devem ser feitas por Alembic. A baseline atual é `20260717_0001` e representa o schema da `main` após a unificação dos endpoints de equipamentos.
 
-Na inicialização, a aplicação detecta bancos existentes e adiciona, sem apagar registros:
-
-- `tickets.form_data`;
-- `tickets.form_schema_snapshot`;
-- `tickets.service_id`.
-
-Novos chamados preservam uma cópia do formulário usado na abertura. Assim, alterações futuras no catálogo não mudam os rótulos e campos do histórico. A compatibilidade funciona no SQLite e no PostgreSQL atual. Antes de ampliar o número de migrações, deve-se adotar Alembic.
+`database.ensure_schema_compatibility()` permanece como fallback temporário para instalações legadas durante uma versão de transição. Ele não executa `stamp` e não deve receber novas alterações de schema.
 
 ## Sessão expirada
 
@@ -256,6 +312,7 @@ apps/api/.venv/bin/python -m compileall apps/api/app
 bash -n iniciar-local.sh resetar-dados.sh scripts/*.sh
 ./scripts/regression-test.sh
 ./scripts/smoke-test.sh
+./scripts/alembic-self-check.sh
 
 cd apps/web
 npm run typecheck
@@ -266,7 +323,7 @@ docker compose config --quiet
 docker compose build
 ```
 
-Os testes de regressão e smoke usam bancos SQLite temporários e são removidos ao final. Nenhum chamado de teste é inserido no banco local.
+Os testes de Alembic, regressão e smoke usam bancos SQLite temporários e são removidos ao final. Nenhum chamado de teste é inserido no banco local.
 
 Resultados e cobertura detalhada estão em [docs/VALIDACAO.md](docs/VALIDACAO.md).
 
@@ -290,6 +347,8 @@ Antes de iniciar, substitua no `.env`:
 Use pelo menos 12 caracteres na senha do PostgreSQL e 32 caracteres na `SECRET_KEY`. O script interrompe a implantação quando encontra placeholders ou segredos fracos.
 
 O ambiente de VM usa um único endereço público. O Nginx entrega o frontend e encaminha `/api` internamente, evitando que o navegador tente acessar `localhost` da máquina do usuário. PostgreSQL e FastAPI não publicam portas diretamente.
+
+O container da API executa `alembic upgrade head` antes do Uvicorn. Na primeira implantação com um banco PostgreSQL já existente, faça a adoção manual com backup e `alembic stamp 20260717_0001` antes de subir o novo fluxo automático.
 
 Com `SEED_DEMO_DATA=false`, crie o primeiro administrador:
 
@@ -332,7 +391,6 @@ O Compose entregue é adequado para homologação em rede controlada. Antes de u
 ## Limitações atuais
 
 - AD/LDAP ficou fora do fluxo operacional atual e pode ser reavaliado apenas como integração futura;
-- ainda não há Alembic;
 - não há renovação silenciosa de JWT;
 - ainda não há teste E2E automatizado em navegador;
 - anexos reais permanecem fora do MVP;
