@@ -147,7 +147,7 @@ O setor padrão `ADCETEI` é protegido no backend: não pode ser renomeado nem d
 
 `GET /api/assets` exige a permissão `assets.view`.
 
-A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:
+A abertura de chamado usa o contrato canônico `GET /api/inventory/assets/ticket-options`, que retorna somente:
 
 - `id`;
 - `name`;
@@ -155,6 +155,8 @@ A abertura de chamado usa `GET /api/assets/ticket-options`, que retorna somente:
 - `patrimony`.
 
 Usuários comuns recebem apenas equipamentos vinculados ao próprio usuário. O backend também impede que um usuário envie manualmente o identificador de um equipamento pertencente a outra pessoa.
+
+`GET /api/assets/ticket-options` permanece temporariamente como alias deprecated e delega para a mesma consulta e serialização. Ele poderá ser removido quando todas as instalações estiverem com o frontend modular e os logs confirmarem que não existem integrações externas usando a rota antiga. A listagem completa `GET /api/assets` continua necessária para a edição de chamados por perfis com `assets.view`.
 
 Detalhes de equipamento dentro de chamados do usuário não incluem IP, serial, sistema operacional ou usuário vinculado.
 

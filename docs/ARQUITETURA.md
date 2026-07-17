@@ -146,7 +146,10 @@ Duas superfícies para equipamentos:
 | Endpoint | Uso |
 |----------|-----|
 | `GET /api/assets` | Inventário administrativo completo (`assets.view`) |
-| `GET /api/assets/ticket-options` | Seleção resumida na abertura de chamado; usuário comum só vê vínculos próprios |
+| `GET /api/inventory/assets/ticket-options` | Contrato canônico para seleção resumida na abertura de chamado; usuário comum só vê vínculos próprios |
+| `GET /api/assets/ticket-options` | Compatibilidade deprecated; delega para a mesma consulta e o mesmo payload do endpoint canônico |
+
+A rota resumida antiga poderá ser removida depois que todas as instalações usarem o frontend modular e os logs confirmarem a ausência de integrações externas. `GET /api/assets` permanece separado porque a edição administrativa de chamados ainda consome seu contrato completo.
 
 ## Chamados
 
