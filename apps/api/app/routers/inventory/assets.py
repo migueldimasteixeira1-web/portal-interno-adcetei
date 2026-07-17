@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from ...auth import get_current_user
 from ...audit import add_audit
 from ...database import get_db
 from ...delivery_terms_service import asset_has_delivery_term_history, ensure_asset_not_reserved
@@ -50,6 +51,7 @@ from ...inventory_service import (
 from ...models import Asset, AssetMovement, InventorySector, Ticket, User
 from ...permissions import require_permission
 from ...schemas import (
+    AssetTicketOptionOut,
     InventoryAllocateRequest,
     InventoryAssetCreate,
     InventoryAssetOut,
@@ -64,6 +66,7 @@ from ...schemas import (
     InventoryRetireRequest,
     InventoryReturnToStockRequest,
 )
+from ...services.assets_service import ticket_asset_options
 from ...time_utils import utc_now
 
 router = APIRouter()
@@ -138,6 +141,14 @@ def list_inventory_assets(
             "retired": aggregate_count(Asset.status == "retired"),
         },
     )
+
+
+@router.get("/assets/ticket-options", response_model=list[AssetTicketOptionOut])
+def list_inventory_asset_ticket_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ticket_asset_options(db, current_user)
 
 
 @router.get("/assets/export")

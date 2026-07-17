@@ -9,6 +9,7 @@ from ..models import Asset, ServiceCatalog, User
 from ..permissions import has_permission, require_permission
 from ..schemas import AssetOut, AssetTicketOptionOut, CatalogOut, UserOut
 from ..serializers.users import serialize_user
+from ..services.assets_service import ticket_asset_options
 
 router = APIRouter(prefix="/api", tags=["listagens"])
 
@@ -51,15 +52,17 @@ def list_assets(
     return list(db.scalars(query).unique())
 
 
-@router.get("/assets/ticket-options", response_model=list[AssetTicketOptionOut])
+@router.get(
+    "/assets/ticket-options",
+    response_model=list[AssetTicketOptionOut],
+    deprecated=True,
+    description="Compatibilidade temporária. Use GET /api/inventory/assets/ticket-options.",
+)
 def list_asset_ticket_options(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Asset).order_by(Asset.name).where(Asset.status != "retired")
-    if current_user.role == "user":
-        query = query.where(Asset.assigned_user_id == current_user.id)
-    return list(db.scalars(query))
+    return ticket_asset_options(db, current_user)
 
 
 @router.get("/catalog", response_model=list[CatalogOut])
