@@ -1,4 +1,5 @@
 import type {
+  AssetTicketOption,
   AuditLog,
   InventoryAllocatePayload,
   InventoryAsset,
@@ -32,6 +33,7 @@ import type {
 import { downloadRequest, request } from "./client";
 
 export const inventoryApi = {
+  assetTicketOptions: () => request<AssetTicketOption[]>("/inventory/assets/ticket-options"),
   inventoryCatalogs: () => request<InventoryCatalogs>("/inventory/catalogs"),
   createInventorySecretariat: (payload: InventoryCatalogCreatePayload) =>
     request<InventoryCatalogItem>("/inventory/catalogs/secretariats", { method: "POST", body: JSON.stringify(payload) }),

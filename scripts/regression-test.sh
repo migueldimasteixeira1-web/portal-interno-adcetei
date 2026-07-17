@@ -74,6 +74,10 @@ if [[ ! -x "$API_PYTHON" ]]; then
 fi
 
 "$API_PYTHON" -c "import uvicorn" >/dev/null
+if rg -q -F '"/assets/ticket-options"' "$ROOT_DIR/apps/web" || rg -q -F "'/assets/ticket-options'" "$ROOT_DIR/apps/web"; then
+  echo "Frontend ainda consome a rota legada /assets/ticket-options."
+  exit 1
+fi
 
 echo "[1/9] Validando helpers de formulário, e-mail e inventário..."
 ENVIRONMENT=test "$API_PYTHON" - <<'PY'
@@ -372,15 +376,32 @@ with sqlite3.connect(DB_PATH) as connection:
 # Inventário completo é restrito; opções de abertura são mínimas e do próprio usuário.
 status, _ = call("GET", "/assets", requester)
 expect(status, 403, "usuário sem inventário completo")
-status, options = call("GET", "/assets/ticket-options", requester)
-expect(status, 200, "opções resumidas de equipamento")
+status, legacy_options = call("GET", "/assets/ticket-options", requester)
+expect(status, 200, "opções resumidas pela rota legada")
+status, options = call("GET", "/inventory/assets/ticket-options", requester)
+expect(status, 200, "opções resumidas pela rota modular")
+expect(options, legacy_options, "rotas modular e legada retornam o mesmo conteúdo")
 if not options:
     raise AssertionError("usuário deveria possuir equipamentos vinculados")
 allowed_keys = {"id", "name", "asset_type", "patrimony"}
 for option in options:
     expect(set(option), allowed_keys, "campos expostos na opção de equipamento")
-if any(option["asset_type"] == "network" for option in options):
-    raise AssertionError("equipamento de rede de outro usuário foi exposto")
+with sqlite3.connect(DB_PATH) as connection:
+    expected_requester_asset_ids = {
+        row[0]
+        for row in connection.execute(
+            "select id from assets where assigned_user_id = ? and status != 'retired'",
+            (requester_user["id"],),
+        )
+    }
+    expected_staff_asset_ids = {row[0] for row in connection.execute("select id from assets where status != 'retired'")}
+expect({option["id"] for option in options}, expected_requester_asset_ids, "usuário comum vê somente equipamentos próprios")
+status, technician_options = call("GET", "/inventory/assets/ticket-options", operator)
+expect(status, 200, "técnico consulta opções modulares")
+expect({option["id"] for option in technician_options}, expected_staff_asset_ids, "técnico vê equipamentos disponíveis")
+status, admin_options = call("GET", "/inventory/assets/ticket-options", admin)
+expect(status, 200, "administrador consulta opções modulares")
+expect({option["id"] for option in admin_options}, expected_staff_asset_ids, "administrador vê equipamentos disponíveis")
 
 status, full_inventory = call("GET", "/assets", operator)
 expect(status, 200, "técnico consulta inventário completo")
@@ -526,6 +547,10 @@ expect(modular_asset["equipment_model"]["name"], equipment_model["name"], "model
 expect(modular_asset["sector"]["name"], "ADCETEI", "setor padrão no contrato novo")
 if "Latitude 5440" not in modular_asset["display_name"] or "SN MOD-001" not in modular_asset["display_name"]:
     raise AssertionError(f"display name incompleto: {modular_asset['display_name']}")
+status, options_before_retire = call("GET", "/inventory/assets/ticket-options", admin)
+expect(status, 200, "equipamento novo aparece nas opções de chamado")
+if not any(option["id"] == modular_asset["id"] for option in options_before_retire):
+    raise AssertionError("equipamento ativo não apareceu nas opções de chamado")
 
 status, deletable_asset = call(
     "POST",
@@ -915,6 +940,13 @@ expect(retired_asset["status"], "retired", "baixa muda status para baixado")
 expect(retired_asset["retirement_reason"], "DEFEITO_IRRECUPERAVEL", "baixa persiste motivo")
 expect(retired_asset["retirement_justification"], "Equipamento com placa-mãe queimada, sem viabilidade de reparo.", "baixa persiste justificativa")
 assert_explicit_zone(retired_asset["retired_at"], "inventário.retired_at")
+status, options_after_retire = call("GET", "/inventory/assets/ticket-options", admin)
+expect(status, 200, "opções refletem baixa no inventário")
+status, legacy_options_after_retire = call("GET", "/assets/ticket-options", admin)
+expect(status, 200, "rota legada permanece disponível durante depreciação")
+expect(options_after_retire, legacy_options_after_retire, "rotas permanecem equivalentes após mudança de status")
+if any(option["id"] == modular_asset["id"] for option in options_after_retire):
+    raise AssertionError("equipamento baixado permaneceu nas opções de chamado")
 
 status, _ = call(
     "POST",
