@@ -112,9 +112,11 @@ O `iniciar-local.sh` usa a configuração de `apps/api/.env` quando esse arquivo
 
 ## Migrações de banco
 
-O schema oficial é gerenciado por Alembic em `apps/api/alembic`. O `./iniciar-local.sh` instala as dependências e executa `alembic upgrade head` antes de iniciar a API.
+O Alembic em `apps/api/alembic` é a única autoridade para criar ou alterar o schema. A API e o comando `create_admin` nunca criam tabelas automaticamente. O `./iniciar-local.sh` instala as dependências e executa `alembic upgrade head` antes de iniciar a API.
 
 ### Instalação limpa
+
+Use um banco vazio:
 
 ```bash
 cd apps/api
@@ -129,32 +131,21 @@ python -m app.create_admin \
   --email "administrador@adcetei.cabofrio.rj.gov.br"
 ```
 
-### Primeira adoção de banco existente
+### Transição de uma instalação anterior
 
-Nunca execute `stamp` em banco desconhecido. Para uma VM já em uso:
+Esta versão não adapta bancos antigos no lugar. A primeira implantação exige um banco vazio:
 
-1. faça backup com `pg_dump` ou `./scripts/backup-postgres.sh`;
-2. pare a API;
-3. valide o schema:
+1. pare a API antiga;
+2. faça backup/exportação com `pg_dump` ou `./scripts/backup-postgres.sh`;
+3. guarde esse backup fora do volume da aplicação;
+4. configure um banco novo e vazio, sem apagar nem reutilizar o banco anterior;
+5. execute `alembic upgrade head`;
+6. crie o administrador com `python -m app.create_admin`;
+7. futuramente, importe apenas os dados selecionados com um script controlado;
+8. valide quantidades e amostras de usuários, chamados, equipamentos e termos;
+9. mantenha o backup antigo até concluir toda a validação.
 
-```bash
-cd apps/api
-python -m app.schema_adoption
-```
-
-4. corrija qualquer divergência indicada pelo verificador;
-5. marque a baseline manualmente:
-
-```bash
-alembic stamp 20260717_0001
-alembic upgrade head
-alembic current
-```
-
-6. inicie a API;
-7. valide login, chamados, inventário e termos.
-
-O verificador apenas lê o banco. Ele não altera dados e não executa `stamp`.
+O script de importação de dados não faz parte desta entrega. Se o Alembic encontrar tabelas em um banco sem controle de versão, ele interrompe a execução e orienta a criar um banco vazio, sem apagar ou alterar o banco encontrado.
 
 ### Novas migrations
 
@@ -170,7 +161,7 @@ alembic upgrade head
 alembic check
 ```
 
-Não edite migrations já aplicadas em ambiente compartilhado. Não use `stamp` para pular uma migration normal. Downgrade nunca é executado automaticamente em produção; em falha de adoção, pare a aplicação, restaure o backup e investigue a migration.
+Não edite migrations já aplicadas em ambiente compartilhado. Downgrade nunca é executado automaticamente em produção; se uma migration falhar, pare a aplicação e investigue antes de qualquer nova tentativa.
 
 ## Contas de demonstração
 
@@ -191,7 +182,7 @@ Direção planejada do módulo: fundação modular, cadastros base, evolução d
 
 Os cadastros base já existem no backend para secretarias, setores, fornecedores, contratos, tipos de equipamento, fabricantes e modelos. Setores pertencem a uma secretaria; contratos pertencem a um fornecedor; modelos pertencem a fabricante e tipo. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
 
-A hierarquia organizacional conhecida é `Secretaria de Gestão e Inovação (SGI) → ADCETEI`. A compatibilidade de bancos antigos vincula automaticamente somente o setor ADCETEI; setores sem classificação permanecem sem secretaria até revisão administrativa.
+A hierarquia organizacional conhecida é `Secretaria de Gestão e Inovação (SGI) → ADCETEI`. Bancos novos recebem essa estrutura pelos dados iniciais; setores sem classificação permanecem sem secretaria até revisão administrativa.
 
 `assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente.
 
@@ -288,9 +279,7 @@ As respostas são validadas no frontend e no backend, salvas em `tickets.form_da
 
 ## Mudança de banco
 
-Novas mudanças de schema devem ser feitas por Alembic. A baseline atual é `20260717_0001` e representa o schema da `main` após a unificação dos endpoints de equipamentos.
-
-`database.ensure_schema_compatibility()` permanece como fallback temporário para instalações legadas durante uma versão de transição. Ele não executa `stamp` e não deve receber novas alterações de schema.
+Toda mudança de schema deve ser feita por Alembic. A baseline completa `20260717_0001` cria o schema atual em um banco vazio. A aplicação não possui fallback para alterar schemas legados.
 
 ## Sessão expirada
 
@@ -348,7 +337,7 @@ Use pelo menos 12 caracteres na senha do PostgreSQL e 32 caracteres na `SECRET_K
 
 O ambiente de VM usa um único endereço público. O Nginx entrega o frontend e encaminha `/api` internamente, evitando que o navegador tente acessar `localhost` da máquina do usuário. PostgreSQL e FastAPI não publicam portas diretamente.
 
-O container da API executa `alembic upgrade head` antes do Uvicorn. Na primeira implantação com um banco PostgreSQL já existente, faça a adoção manual com backup e `alembic stamp 20260717_0001` antes de subir o novo fluxo automático.
+O container da API executa `alembic upgrade head` antes do Uvicorn. A primeira implantação desta versão exige banco PostgreSQL vazio. Antes dela, faça backup/exportação do banco de testes atual, configure um banco novo e preserve o backup antigo até validar a futura importação controlada.
 
 Com `SEED_DEMO_DATA=false`, crie o primeiro administrador:
 

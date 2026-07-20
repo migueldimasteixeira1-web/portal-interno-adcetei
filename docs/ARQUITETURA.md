@@ -36,7 +36,7 @@ Portal Interno ADCETEI
 
 | Caminho | Papel |
 |---------|--------|
-| `main.py` | Factory FastAPI, CORS, `include_router`, startup (schema, seed) |
+| `main.py` | Factory FastAPI, CORS, `include_router` e startup dos dados iniciais |
 | `routers/auth.py` | Login, cadastro, verificação de e-mail |
 | `routers/tickets.py` | Chamados e dashboard |
 | `routers/users_assets.py` | Usuários, assets legados, opções para chamados |
@@ -49,7 +49,8 @@ Portal Interno ADCETEI
 | `inventory_service.py` | Regras de inventário e movimentações |
 | `inventory_helpers.py`, `admin_helpers.py` | Helpers compartilhados dos routers |
 | `schemas.py` | Schemas Pydantic (monolítico de propósito — evita imports circulares) |
-| `models.py`, `database.py`, `permissions.py` | Persistência, migração compatível e RBAC |
+| `models.py`, `database.py`, `permissions.py` | Persistência e RBAC |
+| `alembic/` | Baseline e migrations — única autoridade do schema |
 
 Rotas públicas principais:
 
@@ -124,7 +125,7 @@ Padrão aceito: `usuario@secretaria.cabofrio.rj.gov.br`. Contas públicas nascem
 A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Rotas legadas de `/api/assets` coexistem com o contrato modular em `/api/inventory/assets`.
 
 - Cadastros base: `/api/inventory/catalogs` — secretarias, setores vinculados a secretaria, fornecedores, contratos vinculados a fornecedor, tipos, fabricantes e modelos (`inventory.view` / `inventory.manage_catalogs`)
-- Hierarquia conhecida: `Secretaria de Gestão e Inovação (SGI) → ADCETEI`; a ponte de compatibilidade não classifica automaticamente outros setores
+- Hierarquia conhecida: `Secretaria de Gestão e Inovação (SGI) → ADCETEI`; outros setores dependem de classificação administrativa
 - Equipamentos: número de série como ID principal, especificações e vínculos opcionais aos cadastros
 - Movimentações em `asset_movements`: alocação, responsável, estoque, manutenção
 - Lote: `/api/inventory/assets/bulk-scan` — pré-validação e criação em estoque ADCETEI
@@ -158,11 +159,11 @@ A rota resumida antiga poderá ser removida depois que todas as instalações us
 - `form_schema` legado (lista de strings) e configurável (objetos com `key`, `type`, `required`);
 - respostas em `tickets.form_data`, snapshot em `form_schema_snapshot`.
 
-## Compatibilidade de banco
+## Schema do banco
 
-Alembic é o caminho oficial para novas mudanças de schema. A baseline `20260717_0001` fica em `apps/api/alembic` e cobre o schema atual completo do monólito modular.
+Alembic é a única autoridade do schema. A baseline completa `20260717_0001` fica em `apps/api/alembic` e cria o schema do monólito modular em um banco vazio. A API não cria tabelas nem altera bancos silenciosamente durante o startup.
 
-`database.ensure_schema_compatibility()` permanece como fallback temporário para bancos legados ainda não adotados. Ele corrige diferenças históricas conhecidas sem apagar dados, mas não executa `stamp` e não deve receber novas alterações de schema. Depois que os ambientes estiverem validados e marcados no Alembic, os blocos legados poderão ser removidos em uma versão dedicada.
+Bancos anteriores não são adaptados no lugar. O fluxo oficial é preservar um backup/exportação, criar um banco vazio, aplicar as migrations e criar o administrador. A importação futura de dados selecionados será feita por um script separado, fora desta entrega.
 
 ## Implantação em VM
 
@@ -177,4 +178,4 @@ O gateway Nginx entrega o frontend e encaminha `/api` internamente. Variáveis s
 - `SHOW_DEMO_USERS` controla atalhos no login;
 - sem seed, administrador inicial via `python -m app.create_admin`;
 - a API executa `alembic upgrade head` antes de iniciar no container;
-- bancos PostgreSQL existentes precisam de backup, verificação por `python -m app.schema_adoption` e `alembic stamp 20260717_0001` antes da primeira subida com Alembic.
+- a primeira implantação desta versão exige banco PostgreSQL vazio; o banco de testes anterior deve ser exportado e preservado até a validação da futura importação.

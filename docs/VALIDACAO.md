@@ -2,7 +2,7 @@
 
 ## Última rodada
 
-**Data:** 17 de julho de 2026
+**Data:** 20 de julho de 2026
 **Branch:** `chore/alembic-baseline`
 **Resultado:** todos os checks abaixo aprovados.
 
@@ -43,12 +43,13 @@ Os testes `alembic-self-check.sh`, `regression-test.sh` e `smoke-test.sh` usam S
 |-------|--------|
 | `./scripts/alembic-self-check.sh` | OK |
 | SQLite vazio com `alembic upgrade head` repetido | OK |
-| Adoção de banco existente compatível com `stamp` manual | OK |
-| Recusa de banco incompleto sem `alembic_version` | OK |
+| Recusa segura de banco antigo sem `alembic_version` | OK |
+| Criação de administrador após migrations | OK |
+| API iniciada após migrations | OK |
 | `alembic check` em banco temporário atualizado | OK |
 | `compileall` Python | OK |
 | Sintaxe dos scripts (`bash -n`) | OK |
-| `./scripts/regression-test.sh` (9 etapas) | OK |
+| `./scripts/regression-test.sh` (8 etapas) | OK |
 | `./scripts/smoke-test.sh` | OK |
 | `./scripts/delivery-term-self-check.sh` | OK |
 | `npm run typecheck` | OK |
@@ -84,7 +85,7 @@ O `scripts/regression-test.sh` valida, entre outros:
 10. inventário modular (cadastros, equipamentos, movimentações, lote, exportação `.xlsx` filtrada, baixa com motivo e auditoria);
 11. integridade dos termos (hierarquia SGI → ADCETEI, reserva, atomicidade, datas, lotação e guards de exclusão);
 12. datas serializadas com `Z` ou offset explícito;
-13. migração não destrutiva de schema legado.
+13. inicialização dos bancos temporários exclusivamente pelas migrations.
 
 Lista completa e numerada permanece alinhada ao script — consulte `scripts/regression-test.sh` para o detalhe de cada assert.
 
@@ -102,15 +103,18 @@ Contextos protegidos por `apps/web/.dockerignore` e `apps/api/.dockerignore`.
 
 O Compose publica somente o gateway; API e PostgreSQL ficam na rede interna. Senhas e `SECRET_KEY` vêm do `.env`. O container da API roda `alembic upgrade head` antes do Uvicorn; se a migration falhar, a API não inicia.
 
-Para banco existente:
+Esta versão exige banco vazio na primeira implantação:
 
-1. faça backup;
-2. pare a API;
-3. rode `python -m app.schema_adoption`;
-4. execute `alembic stamp 20260717_0001`;
+1. pare a API anterior;
+2. faça backup/exportação do banco de testes;
+3. preserve o backup fora do volume da aplicação;
+4. configure um banco novo e vazio, sem apagar o anterior;
 5. execute `alembic upgrade head`;
-6. confirme com `alembic current`;
-7. suba a API.
+6. crie o administrador;
+7. futuramente, importe os dados selecionados com um script separado;
+8. valide quantidades e amostras e mantenha o backup até concluir a validação.
+
+O script de importação não faz parte desta entrega. Nenhum script de inicialização remove volumes ou substitui bancos existentes automaticamente.
 
 Se o executável Docker não estiver disponível no ambiente de desenvolvimento, valide estrutura com `docker compose config` na máquina de implantação.
 
