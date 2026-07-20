@@ -6,12 +6,26 @@ API_DIR="$ROOT_DIR/apps/api"
 API_PYTHON="$API_DIR/.venv/bin/python"
 BASELINE_REVISION="20260717_0001"
 TEST_ROOT="$(mktemp -d)"
-EMPTY_DB="$TEST_ROOT/empty.db"
-EXISTING_DB="$TEST_ROOT/existing.db"
-INCOMPLETE_DB="$TEST_ROOT/incomplete.db"
+SQLITE_DB="$TEST_ROOT/empty.db"
+OLD_DB="$TEST_ROOT/old.db"
+ADMIN_DB="$TEST_ROOT/admin-without-schema.db"
+API_PID=""
+PG_CONTAINER="portal-alembic-check-$$"
+
+stop_api() {
+  if [[ -n "$API_PID" ]]; then
+    kill "$API_PID" 2>/dev/null || true
+    wait "$API_PID" 2>/dev/null || true
+    API_PID=""
+  fi
+}
 
 cleanup() {
+  local exit_code=$?
+  stop_api
+  docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
   rm -rf "$TEST_ROOT"
+  exit "$exit_code"
 }
 trap cleanup EXIT INT TERM
 
@@ -19,36 +33,60 @@ if [[ ! -x "$API_PYTHON" ]]; then
   echo "Ambiente Python não encontrado. Execute ./iniciar-local.sh uma vez."
   exit 1
 fi
+command -v docker >/dev/null 2>&1 || {
+  echo "Docker é obrigatório para validar o baseline no PostgreSQL temporário."
+  exit 1
+}
 
 run_alembic() {
-  local database="$1"
+  local database_url="$1"
   shift
   (
     cd "$API_DIR"
-    DATABASE_URL="sqlite:///$database" \
+    DATABASE_URL="$database_url" \
       ENVIRONMENT=test \
       SEED_DEMO_DATA=false \
       "$API_PYTHON" -m alembic "$@"
   )
 }
 
-run_adoption_check() {
-  local database="$1"
+start_api() {
+  local database_url="$1"
+  local port="$2"
+  local log_file="$TEST_ROOT/api-$port.log"
+
+  stop_api
   (
     cd "$ROOT_DIR"
-    DATABASE_URL="sqlite:///$database" \
+    DATABASE_URL="$database_url" \
       ENVIRONMENT=test \
       SEED_DEMO_DATA=false \
-      "$API_PYTHON" -m apps.api.app.schema_adoption
-  )
+      SECRET_KEY="chave-temporaria-alembic-self-check" \
+      "$API_PYTHON" -m uvicorn apps.api.app.main:app \
+        --host 127.0.0.1 --port "$port" --log-level warning
+  ) >"$log_file" 2>&1 &
+  API_PID=$!
+
+  for _ in {1..120}; do
+    if curl -fsS "http://127.0.0.1:$port/api/health" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 0.25
+  done
+
+  cat "$log_file"
+  echo "A API não iniciou após as migrations."
+  exit 1
 }
 
-echo "[1/4] Alembic em SQLite vazio..."
-run_alembic "$EMPTY_DB" upgrade head
-run_alembic "$EMPTY_DB" current | rg -q "$BASELINE_REVISION"
-run_alembic "$EMPTY_DB" upgrade head
-run_alembic "$EMPTY_DB" check
-DATABASE_URL="sqlite:///$EMPTY_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
+SQLITE_URL="sqlite:///$SQLITE_DB"
+
+echo "[1/6] Baseline e idempotência em SQLite vazio..."
+run_alembic "$SQLITE_URL" upgrade head
+run_alembic "$SQLITE_URL" upgrade head
+run_alembic "$SQLITE_URL" current | rg -q "$BASELINE_REVISION"
+run_alembic "$SQLITE_URL" check
+DATABASE_URL="$SQLITE_URL" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
 from sqlalchemy import inspect
 
 from apps.api.app.database import engine
@@ -74,93 +112,118 @@ assert not missing, f"tabelas ausentes após upgrade: {sorted(missing)}"
 print("SQLite vazio: OK")
 PY
 
-echo "[2/4] Adoção de banco existente compatível..."
-DATABASE_URL="sqlite:///$EXISTING_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
-from apps.api.app.database import Base, SessionLocal, engine
-import apps.api.app.models  # noqa: F401
-from apps.api.app.models import User
-
-Base.metadata.create_all(bind=engine)
-with SessionLocal() as db:
-    db.add(
-        User(
-            username="admin",
-            full_name="Admin Compatível",
-            email="admin@adcetei.cabofrio.rj.gov.br",
-            password_hash="hash-temporario",
-            role="admin",
-            secretariat="Secretaria de Gestão e Inovação",
-            department="ADCETEI",
-            source="local",
-            active=True,
-        )
-    )
-    db.commit()
-PY
-run_adoption_check "$EXISTING_DB"
-run_alembic "$EXISTING_DB" stamp "$BASELINE_REVISION"
-run_alembic "$EXISTING_DB" upgrade head
-DATABASE_URL="sqlite:///$EXISTING_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
+echo "[2/6] Criação de administrador após migrations..."
+(
+  cd "$ROOT_DIR"
+  DATABASE_URL="$SQLITE_URL" \
+    ENVIRONMENT=test \
+    SEED_DEMO_DATA=false \
+    PORTAL_ADMIN_PASSWORD="SenhaAdminTeste123" \
+    "$API_PYTHON" -m apps.api.app.create_admin \
+      --full-name "Administrador Teste" \
+      --email "administrador@adcetei.cabofrio.rj.gov.br"
+)
+DATABASE_URL="$SQLITE_URL" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
 from sqlalchemy import text
 
 from apps.api.app.database import engine
 
 with engine.connect() as connection:
-    users = connection.execute(text("select username from users")).scalars().all()
-    revision = connection.execute(text("select version_num from alembic_version")).scalar_one()
-assert users == ["admin"], f"dados alterados após adoção: {users}"
-assert revision == "20260717_0001", revision
-print("Adoção compatível: OK")
+    role = connection.execute(
+        text("select role from users where email = 'administrador@adcetei.cabofrio.rj.gov.br'")
+    ).scalar_one()
+assert role == "admin"
+print("Criação de administrador: OK")
 PY
 
-echo "[3/4] Recusa de banco incompleto..."
-INCOMPLETE_DB="$INCOMPLETE_DB" "$API_PYTHON" - <<'PY'
+echo "[3/6] API iniciando após migrations..."
+start_api "$SQLITE_URL" 18030
+stop_api
+echo "API com SQLite migrado: OK"
+
+echo "[4/6] Falha segura para bancos sem versão..."
+OLD_DB="$OLD_DB" "$API_PYTHON" - <<'PY'
 import os
 import sqlite3
 
-with sqlite3.connect(os.environ["INCOMPLETE_DB"]) as connection:
+with sqlite3.connect(os.environ["OLD_DB"]) as connection:
     connection.execute("create table users (id integer primary key, username varchar(120))")
-    connection.execute("insert into users (id, username) values (1, 'parcial')")
+    connection.execute("insert into users (id, username) values (1, 'legado')")
 PY
 set +e
-ADOPTION_OUTPUT="$(run_adoption_check "$INCOMPLETE_DB" 2>&1)"
-ADOPTION_STATUS=$?
+OLD_OUTPUT="$(run_alembic "sqlite:///$OLD_DB" upgrade head 2>&1)"
+OLD_STATUS=$?
 set -e
-if [[ "$ADOPTION_STATUS" == "0" ]]; then
-  echo "$ADOPTION_OUTPUT"
-  echo "Verificador aceitou banco incompleto."
+if [[ "$OLD_STATUS" == "0" ]]; then
+  echo "$OLD_OUTPUT"
+  echo "Alembic aceitou banco antigo sem versão."
   exit 1
 fi
-[[ "$ADOPTION_OUTPUT" == *"Tabela ausente"* || "$ADOPTION_OUTPUT" == *"Coluna ausente"* ]]
-INCOMPLETE_DB="$INCOMPLETE_DB" "$API_PYTHON" - <<'PY'
+[[ "$OLD_OUTPUT" == *"Faça backup/exportação dos dados"* ]]
+[[ "$OLD_OUTPUT" == *"configure um banco vazio"* ]]
+OLD_DB="$OLD_DB" "$API_PYTHON" - <<'PY'
 import os
 import sqlite3
 
-with sqlite3.connect(os.environ["INCOMPLETE_DB"]) as connection:
+with sqlite3.connect(os.environ["OLD_DB"]) as connection:
     tables = {
         row[0]
-        for row in connection.execute("select name from sqlite_master where type = 'table'").fetchall()
+        for row in connection.execute("select name from sqlite_master where type = 'table'")
     }
-assert "alembic_version" not in tables, "banco incompleto recebeu stamp indevido"
-print("Banco incompleto: OK")
+    users = connection.execute("select username from users").fetchall()
+assert tables == {"users"}, tables
+assert users == [("legado",)]
+print("Banco antigo permaneceu intacto: OK")
 PY
 
-echo "[4/4] Compatibilidade dos models após baseline..."
-DATABASE_URL="sqlite:///$EMPTY_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
-from sqlalchemy import inspect, select
+set +e
+ADMIN_OUTPUT="$(
+  cd "$ROOT_DIR" &&
+  DATABASE_URL="sqlite:///$ADMIN_DB" \
+    ENVIRONMENT=test \
+    SEED_DEMO_DATA=false \
+    PORTAL_ADMIN_PASSWORD="SenhaAdminTeste123" \
+    "$API_PYTHON" -m apps.api.app.create_admin \
+      --full-name "Administrador Teste" \
+      --email "administrador@adcetei.cabofrio.rj.gov.br" 2>&1
+)"
+ADMIN_STATUS=$?
+set -e
+[[ "$ADMIN_STATUS" != "0" ]]
+[[ "$ADMIN_OUTPUT" == *'Execute `alembic upgrade head`'* ]]
+echo "Create admin sem schema: OK"
 
-from apps.api.app.database import SessionLocal, engine
-from apps.api.app.main import app
-from apps.api.app.models import Asset, InventoryDeliveryTerm, Ticket, User
+echo "[5/6] Baseline e idempotência em PostgreSQL temporário..."
+docker run -d --rm \
+  --name "$PG_CONTAINER" \
+  -e POSTGRES_DB=portal_test \
+  -e POSTGRES_USER=portal_test \
+  -e POSTGRES_PASSWORD=portal_test_password \
+  -p 127.0.0.1::5432 \
+  postgres:16-alpine >/dev/null
+for _ in {1..60}; do
+  if docker exec "$PG_CONTAINER" pg_isready -U portal_test -d portal_test >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
+docker exec "$PG_CONTAINER" pg_isready -U portal_test -d portal_test >/dev/null
+PG_PORT="$(docker port "$PG_CONTAINER" 5432/tcp | awk -F: 'NR == 1 {print $NF}')"
+PG_URL="postgresql+psycopg://portal_test:portal_test_password@127.0.0.1:$PG_PORT/portal_test"
+run_alembic "$PG_URL" upgrade head
+run_alembic "$PG_URL" upgrade head
+run_alembic "$PG_URL" current | rg -q "$BASELINE_REVISION"
+run_alembic "$PG_URL" check
+start_api "$PG_URL" 18031
+stop_api
+echo "PostgreSQL temporário e API: OK"
 
-assert app.title == "Portal Interno ADCETEI"
-assert {"users", "tickets", "assets", "inventory_delivery_terms"} <= set(inspect(engine).get_table_names())
-with SessionLocal() as db:
-    db.execute(select(User).limit(1)).all()
-    db.execute(select(Ticket).limit(1)).all()
-    db.execute(select(Asset).limit(1)).all()
-    db.execute(select(InventoryDeliveryTerm).limit(1)).all()
-print("Models compatíveis: OK")
-PY
+echo "[6/6] Ausência de criação silenciosa fora das migrations..."
+if rg -n "Base\\.metadata\\.create_all|ensure_schema_compatibility|schema_adoption|alembic[[:space:]]+stamp" \
+  -g '!alembic-self-check.sh' \
+  "$ROOT_DIR/apps" "$ROOT_DIR/scripts" "$ROOT_DIR/iniciar-local.sh"; then
+  echo "Foi encontrada criação ou adoção de schema fora do Alembic."
+  exit 1
+fi
 
 echo "Alembic self-check: OK"

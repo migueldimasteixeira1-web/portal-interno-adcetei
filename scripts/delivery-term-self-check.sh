@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+API_DIR="$ROOT_DIR/apps/api"
 API_PYTHON="$ROOT_DIR/apps/api/.venv/bin/python"
 TEST_DB="$(mktemp /tmp/portal-delivery-term-XXXX.db)"
 
@@ -16,6 +17,7 @@ if [[ ! -x "$API_PYTHON" ]]; then
 fi
 
 cd "$ROOT_DIR"
+(cd "$API_DIR" && DATABASE_URL="sqlite:///$TEST_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" -m alembic upgrade head)
 DATABASE_URL="sqlite:///$TEST_DB" ENVIRONMENT=test SECRET_KEY="chave-local-para-termos" "$API_PYTHON" - <<'PY'
 from datetime import date, datetime, timezone
 from io import BytesIO
@@ -26,7 +28,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from apps.api.app.auth import hash_password
-from apps.api.app.database import Base, SessionLocal, engine, ensure_schema_compatibility
+from apps.api.app.database import SessionLocal
 from apps.api.app.delivery_terms_docx import render_delivery_term_docx, term_filename
 from apps.api.app.models import Asset, InventoryContract, InventoryDeliveryTerm, InventoryDeliveryTermItem, InventoryEquipmentModel, InventoryEquipmentType, InventoryManufacturer, InventorySecretariat, InventorySector, InventorySupplier, User
 from apps.api.app.permissions import ensure_role_configs
@@ -37,10 +39,6 @@ from apps.api.app.routers.inventory.catalogs import delete_sector
 from apps.api.app.routers.inventory.terms import cancel_delivery_term, confirm_delivery_term, create_delivery_term, next_term_number, preview_delivery_term
 from apps.api.app.schemas import InventoryAllocateRequest, InventoryDeliveryTermCreate, InventoryDeliveryTermDeliver, InventoryDeliveryTermPreview, InventoryRetireRequest
 from apps.api.app.time_utils import utc_now
-
-Base.metadata.create_all(bind=engine)
-ensure_schema_compatibility()
-
 
 def expect_conflict(action, message: str) -> None:
     try:
@@ -89,12 +87,15 @@ with SessionLocal() as db:
     supplier = InventorySupplier(name="Fornecedor", normalized_name="fornecedor")
     equipment_type = InventoryEquipmentType(name="Monitor", normalized_name="monitor")
     manufacturer = InventoryManufacturer(name="Samsung", normalized_name="samsung")
-    secretariat = db.scalar(select(InventorySecretariat).where(InventorySecretariat.normalized_name == "secretaria de gestão e inovação"))
-    db.add_all([admin, recipient, empty_recipient, supplier, equipment_type, manufacturer])
+    secretariat = InventorySecretariat(
+        name="Secretaria de Gestão e Inovação",
+        normalized_name="secretaria de gestão e inovação",
+    )
+    db.add_all([admin, recipient, empty_recipient, supplier, equipment_type, manufacturer, secretariat])
     db.flush()
-    sector = db.scalar(select(InventorySector).where(InventorySector.normalized_name == "adcetei"))
+    sector = InventorySector(name="ADCETEI", normalized_name="adcetei", secretariat_id=secretariat.id)
     alternate_sector = InventorySector(name="Destino Alternativo", normalized_name="destino alternativo", secretariat_id=secretariat.id)
-    db.add(alternate_sector)
+    db.add_all([sector, alternate_sector])
     db.flush()
     recipient.department_sector_id = sector.id
     empty_recipient.department_sector_id = sector.id

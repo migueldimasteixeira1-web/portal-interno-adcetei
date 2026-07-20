@@ -2,11 +2,11 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+API_DIR="$ROOT_DIR/apps/api"
 API_PYTHON="$ROOT_DIR/apps/api/.venv/bin/python"
 TEST_ROOT="$(mktemp -d)"
 AUTH_DB="$TEST_ROOT/auth.db"
 EMPTY_DB="$TEST_ROOT/empty.db"
-MIGRATION_DB="$TEST_ROOT/migration.db"
 BASE_PORT="${TEST_PORT:-18010}"
 API_PID=""
 
@@ -26,6 +26,17 @@ stop_api() {
   fi
 }
 
+migrate_database() {
+  local database="$1"
+  (
+    cd "$API_DIR"
+    DATABASE_URL="sqlite:///$database" \
+      ENVIRONMENT=test \
+      SEED_DEMO_DATA=false \
+      "$API_PYTHON" -m alembic upgrade head
+  )
+}
+
 start_api() {
   local mode="$1"
   local seed="$2"
@@ -34,6 +45,7 @@ start_api() {
   local log_file="$TEST_ROOT/api-$port.log"
 
   stop_api
+  migrate_database "$database"
   (
     cd "$ROOT_DIR"
     ENVIRONMENT=test \
@@ -79,7 +91,7 @@ if rg -q -F '"/assets/ticket-options"' "$ROOT_DIR/apps/web" || rg -q -F "'/asset
   exit 1
 fi
 
-echo "[1/9] Validando helpers de formulário, e-mail e inventário..."
+echo "[1/8] Validando helpers de formulário, e-mail e inventário..."
 ENVIRONMENT=test "$API_PYTHON" - <<'PY'
 from apps.api.app.catalog_forms import normalize_form_schema, validate_form_data
 from apps.api.app.auth import validate_institutional_email
@@ -137,87 +149,20 @@ assert default_sector_update_error({"is_active": False}, current_name="Escola Mu
 print("Helpers: OK")
 PY
 
-echo "[2/9] Validando migração não destrutiva do schema legado..."
-MIGRATION_DB="$MIGRATION_DB" DATABASE_URL="sqlite:///$MIGRATION_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
-import os
-import sqlite3
-
-from sqlalchemy import inspect
-
-from apps.api.app.database import engine, ensure_schema_compatibility
-
-with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
-    connection.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(120), email VARCHAR(180), role VARCHAR(40), created_at TIMESTAMP)")
-    connection.execute("INSERT INTO users (id, username, email, role, created_at) VALUES (1, 'admin', 'admin@adcetei.cabofrio.rj.gov.br', 'admin', CURRENT_TIMESTAMP)")
-    connection.execute("INSERT INTO users (id, username, email, role, created_at) VALUES (2, 'legado', 'legado@cabofrio.rj.gov.br', 'requester', CURRENT_TIMESTAMP)")
-    connection.execute("INSERT INTO users (id, username, email, role, created_at) VALUES (3, 'suporte', 'suporte@adcetei.cabofrio.rj.gov.br', 'helpdesk', CURRENT_TIMESTAMP)")
-    connection.execute("CREATE TABLE tickets (id INTEGER PRIMARY KEY, title VARCHAR(220) NOT NULL)")
-    connection.execute("CREATE TABLE role_configs (role VARCHAR(40) PRIMARY KEY, label VARCHAR(80), description VARCHAR(300), ldap_group VARCHAR(180), permissions JSON, updated_at TIMESTAMP)")
-    connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('helpdesk', 'Helpdesk', '', '', '[]')")
-    connection.execute("INSERT INTO role_configs (role, label, description, ldap_group, permissions) VALUES ('requester', 'Solicitante', '', '', '[]')")
-    connection.execute("CREATE TABLE inventory_secretariats (id INTEGER PRIMARY KEY, name VARCHAR(160), normalized_name VARCHAR(180) UNIQUE, is_active BOOLEAN, created_at TIMESTAMP, updated_at TIMESTAMP)")
-    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (1, 'Secretaria Existente', 'secretaria existente', 1)")
-    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (2, 'Secretaria Adjunta de Ciência e Tecnologia', 'secretaria adjunta de ciência e tecnologia', 1)")
-    connection.execute("INSERT INTO inventory_secretariats (id, name, normalized_name, is_active) VALUES (3, 'Secretaria de Governo e Integridade', 'secretaria de governo e integridade', 1)")
-    connection.execute("CREATE TABLE inventory_sectors (id INTEGER PRIMARY KEY, name VARCHAR(160), normalized_name VARCHAR(180) UNIQUE, secretariat_id INTEGER, is_active BOOLEAN, created_at TIMESTAMP, updated_at TIMESTAMP)")
-    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (1, 'ADCETEI', 'adcetei', 2, 1)")
-    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (2, 'FAZENDA', 'fazenda', 2, 1)")
-    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (3, 'Setor Existente', 'setor existente', 1, 1)")
-    connection.execute("INSERT INTO inventory_sectors (id, name, normalized_name, secretariat_id, is_active) VALUES (4, 'Setor Governo', 'setor governo', 3, 1)")
-
-ensure_schema_compatibility()
-with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
-    first_secretariats = connection.execute("SELECT id, name, normalized_name, is_active FROM inventory_secretariats ORDER BY id").fetchall()
-    first_sectors = connection.execute("SELECT id, name, normalized_name, secretariat_id, is_active FROM inventory_sectors ORDER BY id").fetchall()
-ensure_schema_compatibility()
-with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
-    assert connection.execute("SELECT id, name, normalized_name, is_active FROM inventory_secretariats ORDER BY id").fetchall() == first_secretariats, "segunda migração não deve alterar secretarias"
-    assert connection.execute("SELECT id, name, normalized_name, secretariat_id, is_active FROM inventory_sectors ORDER BY id").fetchall() == first_sectors, "segunda migração não deve alterar setores"
-columns = {column["name"] for column in inspect(engine).get_columns("tickets")}
-expected = {"form_data", "form_schema_snapshot", "service_id"}
-assert expected <= columns, f"colunas ausentes após migração: {expected - columns}"
-user_columns = {column["name"] for column in inspect(engine).get_columns("users")}
-expected_user_columns = {"email_verified_at", "email_verification_token_hash", "email_verification_expires_at", "password_reset_token_hash", "password_reset_expires_at"}
-assert expected_user_columns <= user_columns, f"colunas de usuário ausentes: {expected_user_columns - user_columns}"
-with sqlite3.connect(os.environ["MIGRATION_DB"]) as connection:
-    rows = dict(connection.execute("select username, email_verified_at from users").fetchall())
-    assert rows["admin"], "e-mail institucional legado deveria ser preservado como verificado"
-    assert rows["legado"] is None, "e-mail legado fora do padrão não deve ser verificado automaticamente"
-    user_roles = dict(connection.execute("select username, role from users").fetchall())
-    assert user_roles["legado"] == "user", "perfil requester legado deve virar user"
-    assert user_roles["suporte"] == "technician", "perfil helpdesk legado deve virar technician"
-    roles = {row[0] for row in connection.execute("select role from role_configs").fetchall()}
-    assert "helpdesk" not in roles, "perfil helpdesk legado não deve permanecer ativo"
-    assert "requester" not in roles, "perfil requester legado não deve permanecer ativo"
-    secretariats = dict(connection.execute("select normalized_name, id from inventory_secretariats").fetchall())
-    sectors = dict(connection.execute("select normalized_name, secretariat_id from inventory_sectors").fetchall())
-    assert "secretaria de gestão e inovação" in secretariats, "SGI deve existir como secretaria"
-    assert sectors["adcetei"] == secretariats["secretaria de gestão e inovação"], "ADCETEI deve pertencer à SGI"
-    assert sectors["fazenda"] is None, "setor classificado automaticamente deve ficar sem secretaria"
-    assert sectors["setor governo"] is None, "setor ligado ao outro nome incorreto deve ficar sem secretaria"
-    assert sectors["setor existente"] == 1, "vínculo organizacional existente deve ser preservado"
-    assert "secretaria de governo e integridade" not in secretariats, "nome incorreto desta branch deve ser removido quando estiver sem uso"
-    assert "secretaria adjunta de ciência e tecnologia" not in secretariats, "migração não deve criar secretaria incorreta"
-    assert len([name for name in secretariats if name == "secretaria de gestão e inovação"]) == 1, "migração deve ser idempotente"
-with engine.connect() as connection:
-    assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1, "SQLite deve validar chaves estrangeiras"
-print("Migração legada: OK")
-PY
-
-echo "[3/9] Validando autenticação por e-mail e criação explícita do seed..."
+echo "[2/8] Validando autenticação por e-mail e criação explícita do seed..."
 start_api email true "$AUTH_DB" "$BASE_PORT"
 [[ "$(login_status "$BASE_PORT" servidor 123456)" == "422" ]]
 [[ "$(login_status "$BASE_PORT" kathlelyn.abreu@sedec.cabofrio.rj.gov.br 123456)" == "200" ]]
 [[ "$(login_status "$BASE_PORT" usuario@cabofrio.rj.gov.br 123456)" == "422" ]]
 
-echo "[4/9] Confirmando rejeição de cadastro fora do padrão institucional..."
+echo "[3/8] Confirmando rejeição de cadastro fora do padrão institucional..."
 status=$(curl -sS -o "$TEST_ROOT/register-body.json" -w '%{http_code}' \
   -X POST "http://127.0.0.1:$BASE_PORT/api/auth/register" \
   -H 'Content-Type: application/json' \
   -d '{"full_name":"Usuário Teste","email":"usuario@cabofrio.rj.gov.br","password":"senha-segura-123"}')
 [[ "$status" == "422" ]]
 
-echo "[5/9] Confirmando que conta não verificada não entra..."
+echo "[4/8] Confirmando que conta não verificada não entra..."
 DATABASE_URL="sqlite:///$AUTH_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
 import os
 from apps.api.app.auth import hash_password
@@ -242,7 +187,7 @@ with SessionLocal() as db:
 PY
 [[ "$(login_status "$BASE_PORT" conta.pendente@adcetei.cabofrio.rj.gov.br senha-segura-123)" == "403" ]]
 
-echo "[6/9] Confirmando conta legada com e-mail fora do padrão bloqueada..."
+echo "[5/8] Confirmando conta legada com e-mail fora do padrão bloqueada..."
 DATABASE_URL="sqlite:///$AUTH_DB" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
 from apps.api.app.auth import hash_password
 from apps.api.app.database import SessionLocal
@@ -268,7 +213,7 @@ with SessionLocal() as db:
 PY
 [[ "$(login_status "$BASE_PORT" legado@cabofrio.rj.gov.br senha-segura-123)" == "422" ]]
 
-echo "[7/9] Confirmando seed desabilitado em banco vazio..."
+echo "[6/8] Confirmando seed desabilitado em banco vazio..."
 start_api email false "$EMPTY_DB" "$((BASE_PORT + 3))"
 [[ "$(login_status "$((BASE_PORT + 3))" kathlelyn.abreu@sedec.cabofrio.rj.gov.br 123456)" == "401" ]]
 stop_api
@@ -281,8 +226,9 @@ with sqlite3.connect(os.environ["EMPTY_DB"]) as connection:
     assert count == 0, f"seed desabilitado criou {count} usuário(s)"
 PY
 
-echo "[8/9] Confirmando que create_admin recusa e-mail inválido..."
+echo "[7/8] Confirmando que create_admin recusa e-mail inválido..."
 CREATE_ADMIN_DB="$TEST_ROOT/create-admin.db"
+migrate_database "$CREATE_ADMIN_DB"
 set +e
 CREATE_OUTPUT=$(cd "$ROOT_DIR" && ENVIRONMENT=test SEED_DEMO_DATA=false DATABASE_URL="sqlite:///$CREATE_ADMIN_DB" PORTAL_ADMIN_PASSWORD="SenhaAdmin123" "$API_PYTHON" -m apps.api.app.create_admin --full-name "Admin Teste" --email "admin@cabofrio.rj.gov.br" 2>&1)
 CREATE_STATUS=$?
@@ -290,7 +236,7 @@ set -e
 [[ "$CREATE_STATUS" != "0" ]]
 [[ "$CREATE_OUTPUT" == *"Use seu e-mail institucional"* ]]
 
-echo "[9/9] Executando regressão funcional completa..."
+echo "[8/8] Executando regressão funcional completa..."
 start_api email false "$AUTH_DB" "$((BASE_PORT + 2))"
 API_URL="http://127.0.0.1:$((BASE_PORT + 2))/api" TEST_DB="$AUTH_DB" "$API_PYTHON" - <<'PY'
 import json
