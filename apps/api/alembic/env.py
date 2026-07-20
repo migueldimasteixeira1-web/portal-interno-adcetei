@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 from alembic import context
-from sqlalchemy import create_engine, event, pool
+from sqlalchemy import create_engine, event, inspect, pool
 
 APP_DIR = Path(__file__).resolve().parents[1]
 if str(APP_DIR) not in sys.path:
@@ -29,6 +29,16 @@ def _database_url() -> str:
 
 def _sqlite_connect_args(url: str) -> dict[str, bool]:
     return {"check_same_thread": False} if url.startswith("sqlite") else {}
+
+
+def _reject_unversioned_schema(connection) -> None:
+    tables = set(inspect(connection).get_table_names())
+    if tables and "alembic_version" not in tables:
+        raise RuntimeError(
+            "Banco existente sem controle de versão do Alembic. "
+            "Faça backup/exportação dos dados e configure um banco vazio; "
+            "este comando não altera nem adota bancos antigos."
+        )
 
 
 def run_migrations_offline() -> None:
@@ -61,7 +71,8 @@ def run_migrations_online() -> None:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
-    with connectable.connect() as connection:
+    with connectable.begin() as connection:
+        _reject_unversioned_schema(connection)
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

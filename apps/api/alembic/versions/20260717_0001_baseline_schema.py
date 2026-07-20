@@ -1,7 +1,7 @@
 """baseline schema
 
 Revision ID: 20260717_0001
-Revises: 
+Revises:
 Create Date: 2026-07-17 17:14:40.789959+00:00
 """
 from typing import Sequence, Union

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .admin_api import router as admin_router
 from .config import settings
-from .database import Base, SessionLocal, engine, ensure_schema_compatibility
+from .database import SessionLocal
 from .inventory_api import router as inventory_router
 from .permissions import ensure_role_configs
 from .routers.auth import router as auth_router
@@ -37,8 +37,6 @@ app.include_router(inventory_router)
 
 @app.on_event("startup")
 def startup() -> None:
-    Base.metadata.create_all(bind=engine)
-    ensure_schema_compatibility()
     with SessionLocal() as db:
         ensure_role_configs(db)
         if settings.demo_seed_enabled:
