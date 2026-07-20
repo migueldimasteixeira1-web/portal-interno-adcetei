@@ -110,6 +110,59 @@ O seed local cobre o fluxo operacional: usuários/chamados, catálogos do invent
 
 O `iniciar-local.sh` usa a configuração de `apps/api/.env` quando esse arquivo existir. Sem arquivo, os padrões locais mantêm os dados de demonstração habilitados.
 
+## Migrações de banco
+
+O Alembic em `apps/api/alembic` é a única autoridade para criar ou alterar o schema. A API e o comando `create_admin` nunca criam tabelas automaticamente. O `./iniciar-local.sh` instala as dependências e executa `alembic upgrade head` antes de iniciar a API.
+
+### Instalação limpa
+
+Use um banco vazio:
+
+```bash
+cd apps/api
+alembic upgrade head
+```
+
+Depois crie o primeiro administrador quando o seed estiver desabilitado:
+
+```bash
+python -m app.create_admin \
+  --full-name "Administrador ADCETEI" \
+  --email "administrador@adcetei.cabofrio.rj.gov.br"
+```
+
+### Transição de uma instalação anterior
+
+Esta versão não adapta bancos antigos no lugar. A primeira implantação exige um banco vazio:
+
+1. pare a API antiga;
+2. faça backup/exportação com `pg_dump` ou `./scripts/backup-postgres.sh`;
+3. guarde esse backup fora do volume da aplicação;
+4. configure um banco novo e vazio, sem apagar nem reutilizar o banco anterior;
+5. execute `alembic upgrade head`;
+6. crie o administrador com `python -m app.create_admin`;
+7. futuramente, importe apenas os dados selecionados com um script controlado;
+8. valide quantidades e amostras de usuários, chamados, equipamentos e termos;
+9. mantenha o backup antigo até concluir toda a validação.
+
+O script de importação de dados não faz parte desta entrega. Se o Alembic encontrar tabelas em um banco sem controle de versão, ele interrompe a execução e orienta a criar um banco vazio, sem apagar ou alterar o banco encontrado.
+
+### Novas migrations
+
+```bash
+cd apps/api
+alembic revision --autogenerate -m "descricao curta"
+```
+
+Revise o arquivo gerado antes de aplicar: ordem das tabelas, FKs, índices, constraints únicas e compatibilidade SQLite/PostgreSQL. Depois rode:
+
+```bash
+alembic upgrade head
+alembic check
+```
+
+Não edite migrations já aplicadas em ambiente compartilhado. Downgrade nunca é executado automaticamente em produção; se uma migration falhar, pare a aplicação e investigue antes de qualquer nova tentativa.
+
 ## Contas de demonstração
 
 Disponíveis somente quando `SEED_DEMO_DATA=true`:
@@ -129,7 +182,7 @@ Direção planejada do módulo: fundação modular, cadastros base, evolução d
 
 Os cadastros base já existem no backend para secretarias, setores, fornecedores, contratos, tipos de equipamento, fabricantes e modelos. Setores pertencem a uma secretaria; contratos pertencem a um fornecedor; modelos pertencem a fabricante e tipo. Eles usam `inventory.view` para consulta e `inventory.manage_catalogs` para criação/edição.
 
-A hierarquia organizacional conhecida é `Secretaria de Gestão e Inovação (SGI) → ADCETEI`. A compatibilidade de bancos antigos vincula automaticamente somente o setor ADCETEI; setores sem classificação permanecem sem secretaria até revisão administrativa.
+A hierarquia organizacional conhecida é `Secretaria de Gestão e Inovação (SGI) → ADCETEI`. Bancos novos recebem essa estrutura pelos dados iniciais; setores sem classificação permanecem sem secretaria até revisão administrativa.
 
 `assets` também foi evoluído para o contrato modular em `/api/inventory/assets`, com número de série como identificação principal, vínculos opcionais aos cadastros base, datas de recebimento/entrega e observações. Os campos e rotas legadas de assets continuam preservados temporariamente.
 
@@ -226,15 +279,7 @@ As respostas são validadas no frontend e no backend, salvas em `tickets.form_da
 
 ## Mudança de banco
 
-Foi adicionada a coluna JSON `tickets.form_data`.
-
-Na inicialização, a aplicação detecta bancos existentes e adiciona, sem apagar registros:
-
-- `tickets.form_data`;
-- `tickets.form_schema_snapshot`;
-- `tickets.service_id`.
-
-Novos chamados preservam uma cópia do formulário usado na abertura. Assim, alterações futuras no catálogo não mudam os rótulos e campos do histórico. A compatibilidade funciona no SQLite e no PostgreSQL atual. Antes de ampliar o número de migrações, deve-se adotar Alembic.
+Toda mudança de schema deve ser feita por Alembic. A baseline completa `20260717_0001` cria o schema atual em um banco vazio. A aplicação não possui fallback para alterar schemas legados.
 
 ## Sessão expirada
 
@@ -256,6 +301,7 @@ apps/api/.venv/bin/python -m compileall apps/api/app
 bash -n iniciar-local.sh resetar-dados.sh scripts/*.sh
 ./scripts/regression-test.sh
 ./scripts/smoke-test.sh
+./scripts/alembic-self-check.sh
 
 cd apps/web
 npm run typecheck
@@ -266,7 +312,7 @@ docker compose config --quiet
 docker compose build
 ```
 
-Os testes de regressão e smoke usam bancos SQLite temporários e são removidos ao final. Nenhum chamado de teste é inserido no banco local.
+Os testes de Alembic, regressão e smoke usam bancos SQLite temporários e são removidos ao final. Nenhum chamado de teste é inserido no banco local.
 
 Resultados e cobertura detalhada estão em [docs/VALIDACAO.md](docs/VALIDACAO.md).
 
@@ -290,6 +336,8 @@ Antes de iniciar, substitua no `.env`:
 Use pelo menos 12 caracteres na senha do PostgreSQL e 32 caracteres na `SECRET_KEY`. O script interrompe a implantação quando encontra placeholders ou segredos fracos.
 
 O ambiente de VM usa um único endereço público. O Nginx entrega o frontend e encaminha `/api` internamente, evitando que o navegador tente acessar `localhost` da máquina do usuário. PostgreSQL e FastAPI não publicam portas diretamente.
+
+O container da API executa `alembic upgrade head` antes do Uvicorn. A primeira implantação desta versão exige banco PostgreSQL vazio. Antes dela, faça backup/exportação do banco de testes atual, configure um banco novo e preserve o backup antigo até validar a futura importação controlada.
 
 Com `SEED_DEMO_DATA=false`, crie o primeiro administrador:
 
@@ -332,7 +380,6 @@ O Compose entregue é adequado para homologação em rede controlada. Antes de u
 ## Limitações atuais
 
 - AD/LDAP ficou fora do fluxo operacional atual e pode ser reavaliado apenas como integração futura;
-- ainda não há Alembic;
 - não há renovação silenciosa de JWT;
 - ainda não há teste E2E automatizado em navegador;
 - anexos reais permanecem fora do MVP;

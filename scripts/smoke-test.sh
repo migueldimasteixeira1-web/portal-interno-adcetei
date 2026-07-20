@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+API_DIR="$ROOT_DIR/apps/api"
 API_PYTHON="$ROOT_DIR/apps/api/.venv/bin/python"
 TEST_ROOT="$(mktemp -d)"
 TEST_DB="$TEST_ROOT/smoke.db"
@@ -22,6 +23,14 @@ if [[ ! -x "$API_PYTHON" ]]; then
   echo "Ambiente Python não encontrado. Execute ./iniciar-local.sh uma vez."
   exit 1
 fi
+
+(
+  cd "$API_DIR"
+  DATABASE_URL="sqlite:///$TEST_DB" \
+    ENVIRONMENT=test \
+    SEED_DEMO_DATA=false \
+    "$API_PYTHON" -m alembic upgrade head
+)
 
 (
   cd "$ROOT_DIR"

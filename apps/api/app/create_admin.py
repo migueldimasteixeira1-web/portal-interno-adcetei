@@ -3,10 +3,10 @@ import getpass
 import os
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, inspect, or_, select
 
 from .auth import hash_password, validate_institutional_email
-from .database import Base, SessionLocal, engine, ensure_schema_compatibility
+from .database import SessionLocal, engine
 from .models import User
 from .time_utils import utc_now
 
@@ -17,6 +17,10 @@ def main() -> None:
     parser.add_argument("--full-name", required=True)
     parser.add_argument("--email", required=True)
     args = parser.parse_args()
+
+    tables = set(inspect(engine).get_table_names())
+    if not {"alembic_version", "users"} <= tables:
+        raise SystemExit("Schema não encontrado. Execute `alembic upgrade head` antes de criar o administrador.")
 
     password = os.environ.get("PORTAL_ADMIN_PASSWORD") or getpass.getpass("Senha do administrador: ")
     confirmation = os.environ.get("PORTAL_ADMIN_PASSWORD") or getpass.getpass("Confirme a senha: ")
@@ -30,8 +34,6 @@ def main() -> None:
         raise SystemExit(exc.detail) from None
     username = args.username.strip().lower()
 
-    Base.metadata.create_all(bind=engine)
-    ensure_schema_compatibility()
     with SessionLocal() as db:
         existing = db.scalar(
             select(User).where(

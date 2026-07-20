@@ -37,16 +37,16 @@ fi
 echo "Ambiente detectado: Python $(python3 --version | awk '{print $2}'), Node $(node -v), npm $(npm -v)"
 
 if [[ ! -d "$API_DIR/.venv" ]]; then
-  echo "[1/4] Criando ambiente Python..."
+  echo "[1/5] Criando ambiente Python..."
   python3 -m venv "$API_DIR/.venv"
 else
-  echo "[1/4] Ambiente Python já existe."
+  echo "[1/5] Ambiente Python já existe."
 fi
 
-echo "[2/4] Instalando dependências da API..."
+echo "[2/5] Instalando dependências da API..."
 "$API_PYTHON" -m pip install --quiet --disable-pip-version-check -r "$API_DIR/requirements.txt"
 
-echo "[3/4] Instalando dependências do frontend..."
+echo "[3/5] Instalando dependências do frontend..."
 cd "$WEB_DIR"
 
 if [[ ! -d node_modules ]] || ! npm ls --depth=0 >/dev/null 2>&1; then
@@ -58,7 +58,10 @@ else
 fi
 
 cd "$ROOT_DIR"
-echo "[4/4] Iniciando serviços..."
+echo "[4/5] Aplicando migrations da API..."
+(cd "$API_DIR" && "$API_PYTHON" -m alembic upgrade head)
+
+echo "[5/5] Iniciando serviços..."
 (cd "$API_DIR" && "$API_PYTHON" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) &
 API_PID=$!
 (cd "$WEB_DIR" && \
