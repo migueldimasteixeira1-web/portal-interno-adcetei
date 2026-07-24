@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     seed_demo_data: bool | None = None
 
+    remote_access_enabled: bool = False
+    mesh_bridge_url: str = "http://mesh-bridge:8080"
+    mesh_bridge_shared_secret: str = ""
+    mesh_session_ttl_seconds: int = 3600
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
@@ -63,6 +68,11 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY deve ter pelo menos 32 caracteres fora do ambiente local.")
             if self.postgres_host and not self.postgres_password:
                 raise ValueError("POSTGRES_PASSWORD é obrigatório para o PostgreSQL.")
+            if self.remote_access_enabled:
+                if not self.mesh_bridge_url.strip():
+                    raise ValueError("MESH_BRIDGE_URL é obrigatório quando REMOTE_ACCESS_ENABLED=true.")
+                if not self.mesh_bridge_shared_secret.strip():
+                    raise ValueError("MESH_BRIDGE_SHARED_SECRET é obrigatório fora do ambiente local quando o acesso remoto estiver habilitado.")
         return self
 
 

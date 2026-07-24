@@ -47,3 +47,11 @@ certificates/
 *.zip
 *.tar
 *.gz
+
+# MeshCentral real data must never be committed
+meshcentral-data/
+meshcentral-files/
+meshcentral-backup/
+apps/mesh-bridge/data/
+apps/mesh-bridge/user_files/
+apps/mesh-bridge/backup/

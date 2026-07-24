@@ -746,3 +746,98 @@ class DashboardOut(BaseModel):
     by_status: list[dict[str, Any]]
     recent: list[TicketListOut]
     team_load: list[dict[str, Any]]
+
+
+RemoteAccessMode = Literal["desktop"]
+RemoteAccessSessionStatus = Literal["authorized", "open", "ended", "failed"]
+
+
+class RemoteAccessAssetRefOut(BaseModel):
+    id: int
+    display_name: str
+    serial_number: str = ""
+
+
+class RemoteAccessDeviceOut(BaseModel):
+    node_id: str
+    name: str
+    group_id: str = ""
+    group_name: str = ""
+    online: bool = False
+    operating_system: str = ""
+    ip_address: str = ""
+    last_seen_at: Optional[datetime] = None
+    agent_version: str = ""
+    asset: Optional[RemoteAccessAssetRefOut] = None
+
+    @field_serializer("last_seen_at")
+    def serialize_remote_device_last_seen(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class RemoteAccessSummaryOut(BaseModel):
+    total: int
+    online: int
+    offline: int
+
+
+class RemoteAccessDevicePageOut(BaseModel):
+    items: list[RemoteAccessDeviceOut]
+    total: int
+    page: int
+    page_size: int
+    summary: RemoteAccessSummaryOut
+    enabled: bool
+
+
+class RemoteAccessSessionCreate(BaseModel):
+    node_id: str = Field(min_length=3, max_length=160)
+    reason: str = Field(min_length=10, max_length=1000)
+    ticket_id: Optional[int] = None
+    asset_id: Optional[int] = None
+    access_mode: RemoteAccessMode = "desktop"
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("node_id", "reason")
+    @classmethod
+    def strip_remote_access_strings(cls, value: str) -> str:
+        return value.strip()
+
+
+class RemoteAccessSessionOut(BaseModel):
+    id: str
+    portal_user_id: int
+    mesh_user_id: str
+    mesh_node_id: str
+    mesh_group_id: str
+    asset_id: Optional[int] = None
+    ticket_id: Optional[int] = None
+    device_name_snapshot: str
+    reason: str
+    access_mode: RemoteAccessMode
+    status: RemoteAccessSessionStatus
+    requested_at: datetime
+    authorized_at: Optional[datetime] = None
+    opened_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    source_ip: str
+    failure_reason: str = ""
+    portal_user: Optional[UserOut] = None
+    asset: Optional[RemoteAccessAssetRefOut] = None
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("requested_at", "authorized_at", "opened_at", "ended_at")
+    def serialize_remote_session_datetimes(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class RemoteAccessLaunchOut(BaseModel):
+    session: RemoteAccessSessionOut
+    embed_url: str
+    expires_in_seconds: int
+
+
+class RemoteAccessHealthOut(BaseModel):
+    enabled: bool
+    bridge_online: bool
+    message: str

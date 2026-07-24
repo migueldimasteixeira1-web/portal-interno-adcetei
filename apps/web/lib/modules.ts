@@ -5,6 +5,7 @@ import {
   FileText,
   History,
   Home,
+  MonitorCog,
   Network,
   Printer,
   ServerCog,
@@ -69,6 +70,15 @@ export const portalModules: PortalNavItem[] = [
     area: "modules",
     status: "available",
     permission: "inventory.move",
+  },
+  {
+    href: "/acesso-remoto",
+    label: "Acesso Remoto",
+    description: "Conecte em computadores gerenciados pelo MeshCentral com autorização e auditoria.",
+    icon: MonitorCog,
+    area: "modules",
+    status: "available",
+    permission: "remote_access.view",
   },
   {
     href: "/memorandos",
@@ -139,6 +149,7 @@ export function isNavItemActive(pathname: string, item: PortalNavItem): boolean 
   if (item.href === "/chamados") {
     return pathname === "/chamados" || pathname === "/chamados/novo" || /^\/chamados\/\d+/.test(pathname);
   }
+  if (item.href === "/acesso-remoto") return pathname === item.href || pathname.startsWith(`${item.href}/`);
   if (item.href === "/inventario") {
     return pathname === "/inventario" || ["/inventario/novo", "/inventario/lote"].includes(pathname) || /^\/inventario\/\d+/.test(pathname);
   }
@@ -153,6 +164,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/inventario/termos": "Termos de Recebimento",
   "/inventario/novo": "Inventário · Novo equipamento",
   "/inventario/lote": "Inventário · Entrada em lote",
+  "/acesso-remoto": "Acesso Remoto",
   "/inventario/cadastros": "Administração · Base de cadastros",
   "/memorandos": "Memorandos",
   "/impressoras": "Impressoras",
@@ -167,6 +179,9 @@ const PAGE_TITLES: Record<string, string> = {
 export function pageLabelForPath(pathname: string): string {
   if (pathname.startsWith("/chamados/") && pathname !== "/chamados/novo") {
     return "Detalhes do chamado";
+  }
+  if (pathname.startsWith("/acesso-remoto/sessoes/")) {
+    return "Sessão de acesso remoto";
   }
   if (pathname.startsWith("/inventario/") && pathname !== "/inventario/novo" && pathname !== "/inventario/lote" && pathname !== "/inventario/cadastros" && pathname !== "/inventario/termos") {
     return "Detalhes do equipamento";

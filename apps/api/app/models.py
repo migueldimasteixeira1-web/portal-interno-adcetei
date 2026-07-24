@@ -253,6 +253,49 @@ class InventoryDeliveryTermItem(Base):
     asset: Mapped[Asset] = relationship()
 
 
+class RemoteDeviceLink(Base):
+    __tablename__ = "remote_device_links"
+    __table_args__ = (UniqueConstraint("mesh_node_id", name="uq_remote_device_links_mesh_node_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assets.id"), nullable=True, index=True)
+    mesh_node_id: Mapped[str] = mapped_column(String(160), index=True)
+    mesh_group_id: Mapped[str] = mapped_column(String(160), default="", index=True)
+    device_name_snapshot: Mapped[str] = mapped_column(String(180), default="")
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    asset: Mapped[Optional[Asset]] = relationship(foreign_keys=[asset_id])
+    created_by: Mapped[Optional[User]] = relationship(foreign_keys=[created_by_user_id])
+
+
+class RemoteAccessSession(Base):
+    __tablename__ = "remote_access_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    portal_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    mesh_user_id: Mapped[str] = mapped_column(String(180), default="")
+    mesh_node_id: Mapped[str] = mapped_column(String(160), index=True)
+    mesh_group_id: Mapped[str] = mapped_column(String(160), default="", index=True)
+    asset_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assets.id"), nullable=True, index=True)
+    ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
+    device_name_snapshot: Mapped[str] = mapped_column(String(180), default="")
+    reason: Mapped[str] = mapped_column(Text)
+    access_mode: Mapped[str] = mapped_column(String(30), default="desktop")
+    status: Mapped[str] = mapped_column(String(30), default="authorized", index=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    authorized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_ip: Mapped[str] = mapped_column(String(80), default="")
+    failure_reason: Mapped[str] = mapped_column(Text, default="")
+
+    portal_user: Mapped[User] = relationship(foreign_keys=[portal_user_id])
+    asset: Mapped[Optional[Asset]] = relationship(foreign_keys=[asset_id])
+    ticket: Mapped[Optional[Ticket]] = relationship(foreign_keys=[ticket_id])
+
+
 class ServiceCatalog(Base):
     __tablename__ = "service_catalog"
 

@@ -384,3 +384,17 @@ O Compose entregue é adequado para homologação em rede controlada. Antes de u
 - ainda não há teste E2E automatizado em navegador;
 - anexos reais permanecem fora do MVP;
 - inventário automático depende de GLPI Agent, outra ferramenta de inventário ou agente futuro.
+
+
+## Acesso remoto / MeshCentral
+
+Esta versão inclui a primeira etapa do módulo de acesso remoto:
+
+- tela própria no Portal em `/acesso-remoto`;
+- permissões `remote_access.view`, `remote_access.connect` e `remote_access.manage`;
+- auditoria de solicitação, abertura e encerramento de sessão;
+- integração isolada via `apps/mesh-bridge`;
+- visualizador remoto incorporado por `iframe`;
+- documentação em `docs/acesso-remoto/`.
+
+O MeshCentral continua sendo o motor do acesso remoto. O Portal controla autorização, justificativa e histórico. Não copie bancos, certificados ou chaves reais do MeshCentral para este repositório.
