@@ -18,7 +18,7 @@ const MESHCENTRAL_LOGIN_TOKEN_KEY = process.env.MESHCENTRAL_LOGIN_TOKEN_KEY || "
 const MESHCENTRAL_LOGIN_USER_ID = process.env.MESHCENTRAL_LOGIN_USER_ID || "";
 const MESH_SESSION_URL_TEMPLATE =
   process.env.MESH_SESSION_URL_TEMPLATE ||
-  "{publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15";
+  "{publicUrl}/?login={loginToken}&node={nodeId}&gotonode={nodeId}&viewmode=11&hide=31";
 const MESH_SESSION_TTL_SECONDS = Number(process.env.MESH_SESSION_TTL_SECONDS || 3600);
 const MESHCTRL_PATH = "/usr/local/lib/node_modules/meshcentral/meshctrl.js";
 
@@ -404,13 +404,24 @@ function filterAndPaginate(devices, url) {
   };
 }
 
+function extractMeshNodeHash(nodeId) {
+  const raw = String(nodeId || "").trim();
+  if (!raw.startsWith("node/")) return raw;
+  const parts = raw.split("/");
+  if (parts.length >= 3 && parts[0] === "node") {
+    return parts.slice(2).join("/");
+  }
+  return raw;
+}
+
 function applyTemplate(template, context) {
   return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => context[key] ?? "");
 }
 
 function buildSessionUrl(nodeId) {
   const publicUrl = MESHCENTRAL_PUBLIC_URL.replace(/\/$/, "");
-  const encodedNodeId = encodeURIComponent(String(nodeId));
+  const nodeHash = extractMeshNodeHash(nodeId);
+  const encodedNodeId = encodeURIComponent(nodeHash);
   const expireMinutes = Math.max(1, Math.ceil(MESH_SESSION_TTL_SECONDS / 60));
 
   if (MOCK) {

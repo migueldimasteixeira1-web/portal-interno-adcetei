@@ -14,7 +14,7 @@ Técnico -> Portal Web -> API FastAPI -> Mesh Bridge interno -> MeshCentral -> A
 
 Responsabilidades:
 
-- **Portal Web**: tela, filtros, justificativa e visualizador incorporado.
+- **Portal Web**: tela, filtros, justificativa e abertura do visualizador em nova aba.
 - **API FastAPI**: autenticação, permissões, auditoria, sessão e vínculo opcional com inventário/chamado.
 - **Mesh Bridge**: serviço Node.js interno que chama o MeshCentral via `meshctrl` e gera a URL de visualização.
 - **MeshCentral**: motor de acesso remoto.
@@ -79,17 +79,20 @@ O administrador recebe todas por padrão. O perfil técnico deve receber `view` 
 - `remote_device_links`: vínculo opcional entre dispositivo MeshCentral e equipamento do inventário.
 - `remote_access_sessions`: histórico de sessões autorizadas, abertas, encerradas ou com falha.
 
-## URL de sessão e autenticação no iframe
+## URL de sessão e abertura em nova aba
 
 O bridge gera um **login token** temporário e monta a URL com `MESH_SESSION_URL_TEMPLATE`:
 
 ```text
-{publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
+{publicUrl}/?login={loginToken}&node={nodeId}&gotonode={nodeId}&viewmode=11&hide=31
 ```
 
 - `viewmode=11`: área de trabalho remota
-- `hide=15`: oculta cabeçalho, abas e rodapé do MeshCentral no iframe
+- `node` / `gotonode`: identificador do dispositivo no MeshCentral
+- `hide=31`: interface reduzida no MeshCentral
 - `{loginToken}`: token AES-GCM gerado com `MESHCENTRAL_LOGIN_TOKEN_KEY`
+
+O Portal abre essa URL em **nova aba** no navegador do técnico. O técnico clica em **Conectar** no MeshCentral para iniciar o desktop remoto.
 
 ### Configuração no MeshCentral
 
@@ -99,11 +102,12 @@ No `config.json` da VM do MeshCentral:
 {
   "settings": {
     "allowLoginToken": true,
-    "allowFraming": true,
-    "sessionSameSite": "none"
+    "CookieEncoding": "hex"
   }
 }
 ```
+
+O certificado HTTPS do MeshCentral deve ser confiável no navegador do técnico.
 
 Obter a chave de integração (na VM do MeshCentral, com o serviço parado ou em manutenção):
 

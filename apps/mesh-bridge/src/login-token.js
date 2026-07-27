@@ -25,12 +25,13 @@ function encodeLoginToken(userId, keyHex, expireMinutes = 60) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key.subarray(0, 32), iv);
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
-  const token = Buffer.concat([iv, cipher.getAuthTag(), encrypted])
-    .toString("base64")
-    .replace(/\+/g, "@")
-    .replace(/\//g, "$");
+  const encoding = String(process.env.MESHCENTRAL_COOKIE_ENCODING || "base64").toLowerCase();
+  const raw =
+    encoding === "hex"
+      ? Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("hex")
+      : Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
 
-  return token;
+  return encoding === "hex" ? raw : raw.replace(/\+/g, "@").replace(/\//g, "$");
 }
 
 function resolveMeshUserId(adminUser, domain = "") {

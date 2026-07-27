@@ -24,7 +24,7 @@ MESHCENTRAL_ADMIN_PASS=senha-forte
 MESHCENTRAL_DOMAIN=
 MESHCENTRAL_LOGIN_TOKEN_KEY=hex-da-vm-meshcentral
 MESHCENTRAL_LOGIN_USER_ID=
-MESH_SESSION_URL_TEMPLATE={publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
+MESH_SESSION_URL_TEMPLATE={publicUrl}/?login={loginToken}&node={nodeId}&gotonode={nodeId}&viewmode=11&hide=31
 MESH_SESSION_TTL_SECONDS=3600
 NODE_TLS_REJECT_UNAUTHORIZED=0
 ```
@@ -125,14 +125,15 @@ Causa usual: saída truncada do `meshctrl` ao capturar stdout via pipe. A versã
 docker compose up -d --build mesh-bridge
 ```
 
-### Erro de autenticação no iframe
+### Erro de autenticação ou tela preta no visualizador
 
 Confirme no MeshCentral:
 
-1. `allowLoginToken: true` e `allowFraming: true` no `config.json`
+1. `allowLoginToken: true` no `config.json`
 2. `MESHCENTRAL_LOGIN_TOKEN_KEY` preenchida no `.env` do Portal (obtida com `node node_modules/meshcentral --loginTokenKey` na VM do MeshCentral)
 3. `MESHCENTRAL_ADMIN_USER` corresponde a uma conta MeshCentral válida
-4. Se Portal e MeshCentral estão em IPs diferentes, use `sessionSameSite: "none"` no MeshCentral e HTTPS confiável no navegador
+4. Certificado HTTPS do MeshCentral instalado como confiável no navegador do técnico
+5. Na aba do MeshCentral, clique em **Conectar** após a URL abrir
 
 Testar geração de URL:
 

@@ -394,7 +394,7 @@ Esta versão inclui a primeira etapa do módulo de acesso remoto:
 - permissões `remote_access.view`, `remote_access.connect` e `remote_access.manage`;
 - auditoria de solicitação, abertura e encerramento de sessão;
 - integração isolada via `apps/mesh-bridge`;
-- visualizador remoto incorporado por `iframe`;
+- visualizador remoto em nova aba do MeshCentral;
 - documentação em `docs/acesso-remoto/`.
 
 O MeshCentral continua sendo o motor do acesso remoto. O Portal controla autorização, justificativa e histórico. A listagem consulta o MeshCentral via `meshctrl listdevices`; o visualizador usa login token gerado pelo bridge. Não copie bancos, certificados ou chaves reais do MeshCentral para este repositório.
