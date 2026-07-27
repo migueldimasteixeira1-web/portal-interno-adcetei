@@ -22,6 +22,10 @@ Portal Interno ADCETEI
 │   ├── entrada em lote por série
 │   ├── termos de recebimento e confirmação de entrega
 │   └── opções resumidas para chamados
+├── Acesso Remoto
+│   ├── listagem de computadores MeshCentral
+│   ├── sessões com motivo e auditoria
+│   └── visualizador em nova aba (login token)
 └── Administração
     ├── usuários
     ├── catálogo de serviços
@@ -42,6 +46,8 @@ Portal Interno ADCETEI
 | `routers/users_assets.py` | Usuários, assets legados, opções para chamados |
 | `routers/admin/` | Usuários admin, assets, catálogo, perfis, auditoria |
 | `routers/inventory/` | Meta, equipamentos modulares, cadastros base |
+| `routers/remote_access.py` | Dispositivos remotos, sessões e auditoria |
+| `integrations/meshcentral_client.py` | Cliente HTTP do mesh-bridge |
 | `serializers/` | Serialização de users, assets e tickets |
 | `services/tickets_service.py` | Regras de negócio de chamados |
 | `admin_api.py` | Reexport: `from .routers.admin import router` |
@@ -63,7 +69,7 @@ Rotas públicas principais:
 | Caminho | Papel |
 |---------|--------|
 | `app/` | Rotas Next.js — páginas **orquestradoras** (estado, fetch, permissões) |
-| `features/<domínio>/` | Composição de UI por módulo (`admin`, `dashboard`, `inventory`, `tickets`) |
+| `features/<domínio>/` | Composição de UI por módulo (`admin`, `dashboard`, `inventory`, `remote-access`, `tickets`) |
 | `components/` | UI compartilhada (`ui.tsx`, layout, chips, paginação, etc.) |
 | `lib/api/` | Cliente HTTP por domínio; `lib/api.ts` reexporta objeto `api` unificado |
 | `lib/types/` | Tipos TypeScript por domínio; `lib/types.ts` reexporta tudo |
@@ -81,6 +87,7 @@ Imports existentes `@/lib/api` e `@/lib/types` continuam válidos após a modula
 | `/inventario/termos` | Termos de recebimento e confirmação de entrega |
 | `/administracao/base-cadastros`, `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
 | `/administracao/perfis`, `/administracao/auditoria` | Inline (telas menores) |
+| `/acesso-remoto`, `/acesso-remoto/sessoes/[id]` | `features/remote-access/*` |
 
 ## Frontend — detalhes
 
@@ -152,6 +159,41 @@ Duas superfícies para equipamentos:
 
 A rota resumida antiga poderá ser removida depois que todas as instalações usarem o frontend modular e os logs confirmarem a ausência de integrações externas. `GET /api/assets` permanece separado porque a edição administrativa de chamados ainda consome seu contrato completo.
 
+## Acesso remoto
+
+Integração com MeshCentral via serviço interno `apps/mesh-bridge`. O Portal controla autorização, motivo e histórico; o MeshCentral continua sendo o motor do desktop remoto.
+
+```text
+Técnico -> Portal Web -> API FastAPI -> Mesh Bridge -> MeshCentral -> Agente
+```
+
+| Componente | Papel |
+|------------|-------|
+| Portal Web (`/acesso-remoto`) | Listagem, filtros, motivo e abertura do visualizador em nova aba |
+| API (`/api/remote-access/*`) | Autenticação, permissões, auditoria, sessões e vínculo opcional com inventário/chamado |
+| Mesh Bridge (`apps/mesh-bridge`) | `meshctrl`, cache de dispositivos e geração de login token |
+| MeshCentral | Relay desktop e consentimento na máquina alvo |
+
+Rotas da API:
+
+- `GET /api/remote-access/devices` — listagem paginada (via bridge)
+- `POST /api/remote-access/sessions` — cria sessão autorizada
+- `POST /api/remote-access/sessions/connect` — cria sessão e gera URL em uma chamada
+- `POST /api/remote-access/sessions/{id}/launch` — gera URL para sessão existente
+- `POST /api/remote-access/sessions/{id}/close` — encerra sessão
+
+Permissões: `remote_access.view`, `remote_access.connect`, `remote_access.manage`. O administrador recebe todas por padrão; o perfil técnico precisa de `view` e `connect` atribuídos manualmente.
+
+Tabelas: `remote_device_links` (vínculo opcional com inventário) e `remote_access_sessions` (histórico de sessões).
+
+O bridge consulta dispositivos com `meshctrl listdevices --json`, grava a saída em arquivo temporário (evita truncamento por pipe) e mantém cache em memória (`MESH_DEVICES_CACHE_TTL_MS`, padrão 30s). A URL de sessão usa login token AES-GCM:
+
+```text
+{publicUrl}/?login={loginToken}&node={nodeId}&gotonode={nodeId}&viewmode=11&hide=31
+```
+
+Operação, variáveis de ambiente, validação e troubleshooting: [ACESSO-REMOTO.md](./ACESSO-REMOTO.md).
+
 ## Chamados
 
 - Paginação e resumo agregado calculados no banco (`GET /api/tickets`);
@@ -170,7 +212,10 @@ Bancos anteriores não são adaptados no lugar. O fluxo oficial é preservar um 
 ```text
 navegador -> gateway:80 -> web:3000
                        -> api:8000 -> database:5432
+                                    -> mesh-bridge:8080 -> MeshCentral (HTTPS/WSS)
 ```
+
+Com acesso remoto habilitado (`REMOTE_ACCESS_ENABLED=true`), a API conversa com o mesh-bridge na rede interna do Compose. O bridge não deve ser exposto na internet.
 
 O gateway Nginx entrega o frontend e encaminha `/api` internamente. Variáveis sensíveis vêm do `.env` da VM (`POSTGRES_PASSWORD`, `SECRET_KEY`, SMTP, `PUBLIC_APP_URL`).
 
