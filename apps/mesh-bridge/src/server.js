@@ -1,269 +1,469 @@
 const http = require("http");
-const { execFile } = require("child_process");
-const { URL } = require("url");
-const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { spawn } = require("child_process");
 
 const PORT = Number(process.env.PORT || 8080);
+const MOCK = String(process.env.MESH_BRIDGE_MOCK || "false").toLowerCase() === "true";
 const SHARED_SECRET = process.env.MESH_BRIDGE_SHARED_SECRET || "";
-const MOCK = ["1", "true", "yes"].includes(String(process.env.MESH_BRIDGE_MOCK || "").toLowerCase());
-const MESHCENTRAL_URL = stripTrailingSlash(process.env.MESHCENTRAL_URL || "");
-const MESHCENTRAL_PUBLIC_URL = stripTrailingSlash(process.env.MESHCENTRAL_PUBLIC_URL || MESHCENTRAL_URL);
+const MESHCENTRAL_URL = process.env.MESHCENTRAL_URL || "";
+const MESHCENTRAL_PUBLIC_URL =
+  process.env.MESHCENTRAL_PUBLIC_URL || MESHCENTRAL_URL.replace(/^wss:/i, "https:");
 const MESHCENTRAL_ADMIN_USER = process.env.MESHCENTRAL_ADMIN_USER || "";
 const MESHCENTRAL_ADMIN_PASS = process.env.MESHCENTRAL_ADMIN_PASS || "";
 const MESHCENTRAL_DOMAIN = process.env.MESHCENTRAL_DOMAIN || "";
+const MESH_SESSION_URL_TEMPLATE =
+  process.env.MESH_SESSION_URL_TEMPLATE || "{publicUrl}/?node={nodeId}&viewmode=10";
 const MESH_SESSION_TTL_SECONDS = Number(process.env.MESH_SESSION_TTL_SECONDS || 3600);
-const MESH_SESSION_URL_TEMPLATE = process.env.MESH_SESSION_URL_TEMPLATE || "";
+const MESHCTRL_PATH = "/usr/local/lib/node_modules/meshcentral/meshctrl.js";
 
-const mockDevices = [
-  {
-    node_id: "node/mock-adcetei-001",
-    name: "ADCETEI-NOTEBOOK-01",
-    group_id: "mesh/mock-adcetei",
-    group_name: "ADCETEI",
-    online: true,
-    operating_system: "Windows 11 Pro",
-    ip_address: "192.168.10.41",
-    last_seen_at: new Date().toISOString(),
-    agent_version: "mock",
-  },
-  {
-    node_id: "node/mock-adcetei-002",
-    name: "RECEPCAO-PC-02",
-    group_id: "mesh/mock-adcetei",
-    group_name: "ADCETEI",
-    online: false,
-    operating_system: "Windows 10 Pro",
-    ip_address: "192.168.10.52",
-    last_seen_at: new Date(Date.now() - 86400000).toISOString(),
-    agent_version: "mock",
-  },
-  {
-    node_id: "node/mock-segov-003",
-    name: "SEGOV-ATENDIMENTO-03",
-    group_id: "mesh/mock-segov",
-    group_name: "SEGOV",
-    online: true,
-    operating_system: "Windows 11 Pro",
-    ip_address: "192.168.20.33",
-    last_seen_at: new Date().toISOString(),
-    agent_version: "mock",
-  },
-];
-
-function stripTrailingSlash(value) {
-  return value.replace(/\/+$/, "");
-}
-
-function sendJson(response, statusCode, payload) {
-  response.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-  });
+function sendJson(response, status, payload) {
+  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
 }
 
-function readJson(request) {
+function authorize(request) {
+  if (!SHARED_SECRET) return true;
+  return request.headers["x-bridge-token"] === SHARED_SECRET;
+}
+
+function readBody(request) {
   return new Promise((resolve, reject) => {
     let body = "";
     request.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1024 * 1024) {
-        request.destroy();
-        reject(new Error("Payload muito grande."));
-      }
+      if (body.length > 1024 * 1024) request.destroy();
     });
     request.on("end", () => {
-      if (!body) return resolve({});
+      if (!body.trim()) return resolve({});
       try {
         resolve(JSON.parse(body));
-      } catch (error) {
-        reject(new Error("JSON inválido."));
+      } catch {
+        reject(new Error("JSON inválido no corpo da requisição."));
       }
     });
     request.on("error", reject);
   });
 }
 
-function timingSafeEquals(a, b) {
-  const left = Buffer.from(String(a || ""));
-  const right = Buffer.from(String(b || ""));
-  if (left.length !== right.length) return false;
-  return crypto.timingSafeEqual(left, right);
+function asNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
-function authorize(request) {
-  if (!SHARED_SECRET) return true;
-  return timingSafeEquals(request.headers["x-bridge-token"], SHARED_SECRET);
+function asString(value) {
+  if (value === null || value === undefined) return "";
+  return String(value);
 }
 
-function resolveMeshCtrlPath() {
-  if (process.env.MESHCTRL_BIN) return process.env.MESHCTRL_BIN;
+function mapNode(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const nodeId = asString(raw._id || raw.id).trim();
+  if (!nodeId.startsWith("node/")) return null;
+
+  const conn = asNumber(raw.conn) || 0;
+  const pwr = asNumber(raw.pwr) || 0;
+  const agent = raw.agent && typeof raw.agent === "object" ? raw.agent : {};
+  const agentVersion = agent.ver === null || agent.ver === undefined ? "" : String(agent.ver);
+  const lastSeen = asNumber(raw.lastconnect) ?? asNumber(raw.agct);
+
+  return {
+    node_id: nodeId,
+    name: asString(raw.name || raw.rname || "Sem nome").trim() || "Sem nome",
+    group_id: asString(raw.meshid || raw.group_id).trim(),
+    group_name: asString(raw.groupname || raw.group_name).trim(),
+    online: conn > 0 || pwr > 0,
+    operating_system: asString(raw.osdesc || raw.operating_system).trim(),
+    ip_address: asString(raw.ip || raw.host || raw.ip_address).trim(),
+    last_seen_at: lastSeen,
+    agent_version: agentVersion,
+  };
+}
+
+function decodeMeshString(value) {
+  if (!value) return "";
   try {
-    return require.resolve("meshcentral/meshctrl.js", { paths: ["/usr/local/lib/node_modules", process.cwd()] });
-  } catch (_) {
-    return "meshctrl";
+    return JSON.parse(`"${value}"`);
+  } catch {
+    return String(value).replace(/\\\\/g, "\\");
   }
 }
 
-function meshCtrlInvocation(command, extraArgs = []) {
-  const bin = resolveMeshCtrlPath();
-  const args = [command, "--url", MESHCENTRAL_URL, "--loginuser", MESHCENTRAL_ADMIN_USER, "--loginpass", MESHCENTRAL_ADMIN_PASS];
-  if (MESHCENTRAL_DOMAIN) args.push("--domain", MESHCENTRAL_DOMAIN);
-  const finalArgs = args.concat(extraArgs);
-  if (bin.endsWith(".js")) return { command: "node", args: [bin, ...finalArgs] };
-  return { command: bin, args: finalArgs };
+function getStringField(block, field) {
+  const pattern = new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`);
+  const match = block.match(pattern);
+  return match ? decodeMeshString(match[1]) : "";
 }
 
-function runMeshCtrl(command, extraArgs = []) {
-  if (!MESHCENTRAL_URL || !MESHCENTRAL_ADMIN_USER || !MESHCENTRAL_ADMIN_PASS) {
-    return Promise.reject(new Error("Credenciais do MeshCentral não configuradas no Mesh Bridge."));
+function getNumberField(block, field) {
+  const pattern = new RegExp(`"${field}"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)`);
+  const match = block.match(pattern);
+  return match ? Number(match[1]) : null;
+}
+
+function getAgentVersionFromBlock(block) {
+  const agentMatch = block.match(/"agent"\s*:\s*\{([\s\S]*?)\}/);
+  if (!agentMatch) return "";
+  const ver = getNumberField(agentMatch[1], "ver");
+  return ver === null ? "" : String(ver);
+}
+
+function extractNodeBlocks(payload) {
+  const raw = String(payload || "");
+  const blocks = [];
+  const starter = /\{\s*"type"\s*:\s*"node"/g;
+  let match;
+
+  while ((match = starter.exec(raw)) !== null) {
+    const start = match.index;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < raw.length; index += 1) {
+      const char = raw[index];
+
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (char === "{") depth += 1;
+      else if (char === "}") depth -= 1;
+
+      if (depth === 0) {
+        blocks.push(raw.slice(start, index + 1));
+        starter.lastIndex = index + 1;
+        break;
+      }
+    }
   }
+
+  return blocks;
+}
+
+function mapNodeFromBlock(block) {
+  const nodeId = getStringField(block, "_id");
+  if (!nodeId.startsWith("node/")) return null;
+
+  const conn = getNumberField(block, "conn") || 0;
+  const pwr = getNumberField(block, "pwr") || 0;
+  const lastSeen = getNumberField(block, "lastconnect") ?? getNumberField(block, "agct");
+
+  return {
+    node_id: nodeId,
+    name: getStringField(block, "name") || getStringField(block, "rname") || "Sem nome",
+    group_id: getStringField(block, "meshid"),
+    group_name: getStringField(block, "groupname"),
+    online: conn > 0 || pwr > 0,
+    operating_system: getStringField(block, "osdesc"),
+    ip_address: getStringField(block, "ip") || getStringField(block, "host"),
+    last_seen_at: lastSeen,
+    agent_version: getAgentVersionFromBlock(block),
+  };
+}
+
+function collectNodes(nodes) {
+  const unique = new Map();
+
+  for (const device of nodes) {
+    if (!device || !device.node_id) continue;
+    const previous = unique.get(device.node_id);
+    if (!previous) {
+      unique.set(device.node_id, device);
+      continue;
+    }
+
+    unique.set(device.node_id, {
+      ...previous,
+      ...Object.fromEntries(
+        Object.entries(device).filter(([, value]) => value !== "" && value !== null && value !== undefined)
+      ),
+      online: Boolean(previous.online || device.online),
+    });
+  }
+
+  return [...unique.values()];
+}
+
+function collectNodesFromParsedJson(parsed) {
+  const candidates = [];
+
+  if (Array.isArray(parsed)) {
+    candidates.push(...parsed);
+  } else if (parsed && typeof parsed === "object") {
+    for (const key of ["nodes", "devices", "items", "result"]) {
+      if (Array.isArray(parsed[key])) candidates.push(...parsed[key]);
+    }
+    if (parsed.type === "node" || parsed._id) candidates.push(parsed);
+  }
+
+  return collectNodes(candidates.map(mapNode).filter(Boolean));
+}
+
+function collectNodesFromRawText(payload) {
+  return collectNodes(extractNodeBlocks(payload).map(mapNodeFromBlock).filter(Boolean));
+}
+
+function parseDevicesFromMeshCtrl(payload) {
+  const raw = String(payload || "").trim();
+  if (!raw) return [];
+
+  try {
+    return collectNodesFromParsedJson(JSON.parse(raw));
+  } catch {
+    return collectNodesFromRawText(raw);
+  }
+}
+
+function mockDevices() {
+  return [
+    {
+      node_id: "node//mock-adcetei-01",
+      name: "ADCETEI-NOTEBOOK-01",
+      group_id: "mesh//mock",
+      group_name: "ADCETEI",
+      online: true,
+      operating_system: "Windows 11 Pro",
+      ip_address: "192.168.10.50",
+      last_seen_at: Date.now(),
+      agent_version: "mock",
+    },
+    {
+      node_id: "node//mock-recepcao-02",
+      name: "RECEPCAO-PC-02",
+      group_id: "mesh//mock",
+      group_name: "ADCETEI",
+      online: false,
+      operating_system: "Windows 10 Pro",
+      ip_address: "192.168.10.60",
+      last_seen_at: null,
+      agent_version: "mock",
+    },
+  ];
+}
+
+function cleanupTempFiles(...files) {
+  for (const file of files) {
+    try {
+      if (file) fs.unlinkSync(file);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
+function runMeshCtrl(command, args = []) {
   return new Promise((resolve, reject) => {
-    const invocation = meshCtrlInvocation(command, extraArgs);
-    execFile(invocation.command, invocation.args, { timeout: 20000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) return reject(new Error(stderr || stdout || error.message));
-      resolve(stdout.trim());
+    if (!MESHCENTRAL_URL || !MESHCENTRAL_ADMIN_USER || !MESHCENTRAL_ADMIN_PASS) {
+      return reject(new Error("MeshCentral não configurado no mesh-bridge."));
+    }
+
+    const stamp = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const stdoutPath = path.join(os.tmpdir(), `meshctrl-out-${stamp}.json`);
+    const stderrPath = path.join(os.tmpdir(), `meshctrl-err-${stamp}.log`);
+    let stdoutFd;
+    let stderrFd;
+
+    try {
+      stdoutFd = fs.openSync(stdoutPath, "w");
+      stderrFd = fs.openSync(stderrPath, "w");
+    } catch (error) {
+      cleanupTempFiles(stdoutPath, stderrPath);
+      return reject(error);
+    }
+
+    const meshArgs = [
+      MESHCTRL_PATH,
+      command,
+      "--url",
+      MESHCENTRAL_URL,
+      "--loginuser",
+      MESHCENTRAL_ADMIN_USER,
+      "--loginpass",
+      MESHCENTRAL_ADMIN_PASS,
+    ];
+    if (MESHCENTRAL_DOMAIN) meshArgs.push("--domain", MESHCENTRAL_DOMAIN);
+    meshArgs.push(...args);
+
+    const child = spawn(
+      "node",
+      meshArgs,
+      {
+        stdio: ["ignore", stdoutFd, stderrFd],
+        env: {
+          ...process.env,
+          NODE_TLS_REJECT_UNAUTHORIZED: process.env.NODE_TLS_REJECT_UNAUTHORIZED || "0",
+        },
+      }
+    );
+
+    const closeFd = (fd) => {
+      if (fd === undefined) return;
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // already closed
+      }
+    };
+
+    child.on("error", (error) => {
+      closeFd(stdoutFd);
+      closeFd(stderrFd);
+      cleanupTempFiles(stdoutPath, stderrPath);
+      reject(error);
+    });
+
+    child.on("close", (code) => {
+      closeFd(stdoutFd);
+      closeFd(stderrFd);
+
+      let stdout = "";
+      let stderr = "";
+      try {
+        stdout = fs.readFileSync(stdoutPath, "utf8");
+        stderr = fs.readFileSync(stderrPath, "utf8");
+      } catch (error) {
+        cleanupTempFiles(stdoutPath, stderrPath);
+        return reject(error);
+      }
+
+      cleanupTempFiles(stdoutPath, stderrPath);
+
+      if (code !== 0) {
+        return reject(new Error((stderr || stdout || `meshctrl saiu com código ${code}`).trim()));
+      }
+      resolve(stdout);
     });
   });
 }
 
-function normalizeDevice(raw) {
-  const nodeId = raw.node_id || raw.nodeId || raw._id || raw.id || raw.nodeid || "";
-  const name = raw.name || raw.rname || raw.host || raw.computerName || "Sem nome";
-  const online = Boolean(raw.online || raw.connected || raw.conn || raw.conn === 1 || raw.pwr === 1);
-  return {
-    node_id: String(nodeId),
-    name: String(name),
-    group_id: String(raw.group_id || raw.groupId || raw.meshid || raw.meshId || ""),
-    group_name: String(raw.group_name || raw.groupName || raw.meshname || raw.meshName || ""),
-    online,
-    operating_system: String(raw.operating_system || raw.operatingSystem || raw.osdesc || raw.os || ""),
-    ip_address: String(raw.ip_address || raw.ipAddress || raw.ip || raw.publicip || ""),
-    last_seen_at: raw.last_seen_at || raw.lastSeenAt || raw.lastconnect || raw.lastseen || null,
-    agent_version: String(raw.agent_version || raw.agentVersion || raw.agent || raw.agentversion || ""),
-  };
-}
-
-function flattenMeshCtrlDevices(payload) {
-  const parsed = JSON.parse(payload || "[]");
-  if (Array.isArray(parsed)) return parsed.map(normalizeDevice).filter((item) => item.node_id);
-  if (Array.isArray(parsed.devices)) return parsed.devices.map(normalizeDevice).filter((item) => item.node_id);
-  const result = [];
-  for (const value of Object.values(parsed)) {
-    if (Array.isArray(value)) result.push(...value.map(normalizeDevice));
-    else if (value && typeof value === "object" && Array.isArray(value.nodes)) result.push(...value.nodes.map(normalizeDevice));
-  }
-  return result.filter((item) => item.node_id);
-}
-
 async function listDevicesFromMeshCentral() {
-  const output = await runMeshCtrl("ListDevices", ["--json"]);
-  return flattenMeshCtrlDevices(output);
+  if (MOCK) return mockDevices();
+  const output = await runMeshCtrl("listdevices", ["--json"]);
+  return parseDevicesFromMeshCtrl(output);
 }
 
-function filterAndPage(devices, searchParams) {
-  const search = String(searchParams.get("search") || "").trim().toLowerCase();
-  const status = String(searchParams.get("status") || "");
-  const page = Math.max(1, Number(searchParams.get("page") || 1));
-  const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("page_size") || 20)));
+function filterAndPaginate(devices, url) {
+  const search = (url.searchParams.get("q") || url.searchParams.get("search") || "").toLowerCase().trim();
+  const onlineParam = (url.searchParams.get("online") || "").toLowerCase();
+  const statusParam = (url.searchParams.get("status") || "").toLowerCase();
+  const page = Math.max(Number(url.searchParams.get("page") || 1), 1);
+  const pageSize = Math.min(Math.max(Number(url.searchParams.get("page_size") || 25), 1), 100);
+
   let filtered = devices;
-  if (status === "online") filtered = filtered.filter((item) => item.online);
-  if (status === "offline") filtered = filtered.filter((item) => !item.online);
+
   if (search) {
-    filtered = filtered.filter((item) => [item.name, item.group_name, item.group_id, item.ip_address, item.operating_system, item.node_id]
-      .join(" ").toLowerCase().includes(search));
+    filtered = filtered.filter((device) =>
+      [device.name, device.group_name, device.ip_address, device.operating_system]
+        .join(" ")
+        .toLowerCase()
+        .includes(search)
+    );
   }
+
+  const onlineFilter =
+    onlineParam === "true" || statusParam === "online"
+      ? true
+      : onlineParam === "false" || statusParam === "offline"
+        ? false
+        : null;
+
+  if (onlineFilter === true) filtered = filtered.filter((device) => device.online);
+  if (onlineFilter === false) filtered = filtered.filter((device) => !device.online);
+
   const total = filtered.length;
-  const online = filtered.filter((item) => item.online).length;
-  const offset = (page - 1) * pageSize;
+  const start = (page - 1) * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+  const onlineCount = devices.filter((device) => device.online).length;
+
   return {
-    items: filtered.slice(offset, offset + pageSize),
+    items,
     total,
     page,
     page_size: pageSize,
-    summary: { total, online, offline: total - online },
+    summary: {
+      total: devices.length,
+      online: onlineCount,
+      offline: devices.length - onlineCount,
+    },
   };
 }
 
-function buildTemplateUrl(template, context) {
-  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => context[key] || "");
-}
-
-async function sessionUrl(payload) {
-  const nodeId = String(payload.node_id || "").trim();
-  if (!nodeId) throw new Error("node_id é obrigatório.");
-  const meshUserId = `portal_${String(payload.user_id || "0")}`;
-  if (MESH_SESSION_URL_TEMPLATE) {
-    return {
-      embed_url: buildTemplateUrl(MESH_SESSION_URL_TEMPLATE, {
-        publicUrl: MESHCENTRAL_PUBLIC_URL,
-        nodeId: encodeURIComponent(nodeId),
-        node_id: encodeURIComponent(nodeId),
-        sessionId: encodeURIComponent(payload.session_id || ""),
-        session_id: encodeURIComponent(payload.session_id || ""),
-        userId: encodeURIComponent(payload.user_id || ""),
-        user_id: encodeURIComponent(payload.user_id || ""),
-        mode: encodeURIComponent(payload.access_mode || "desktop"),
-      }),
-      expires_in_seconds: MESH_SESSION_TTL_SECONDS,
-      mesh_user_id: meshUserId,
-    };
-  }
-  if (MOCK) {
-    const html = encodeURIComponent(`<html><body style="margin:0;background:#0a1f33;color:white;font-family:Arial;display:grid;place-items:center;height:100vh"><div><h2>Sessão MeshCentral simulada</h2><p>${nodeId}</p><p>${payload.reason || ""}</p></div></body></html>`);
-    return {
-      embed_url: `data:text/html;charset=utf-8,${html}`,
-      expires_in_seconds: MESH_SESSION_TTL_SECONDS,
-      mesh_user_id: meshUserId,
-    };
-  }
-  // Fallback conservador: abre a página do nó. Para SSO completo, configure MESH_SESSION_URL_TEMPLATE
-  // após habilitar login por token/link temporário no MeshCentral da VM.
-  return {
-    embed_url: `${MESHCENTRAL_PUBLIC_URL}/?node=${encodeURIComponent(nodeId)}&viewmode=10`,
-    expires_in_seconds: MESH_SESSION_TTL_SECONDS,
-    mesh_user_id: meshUserId,
-  };
+function buildSessionUrl(nodeId) {
+  const encodedNodeId = encodeURIComponent(nodeId);
+  return MESH_SESSION_URL_TEMPLATE.replaceAll("{publicUrl}", MESHCENTRAL_PUBLIC_URL.replace(/\/$/, "")).replaceAll(
+    "{nodeId}",
+    encodedNodeId
+  );
 }
 
 async function route(request, response) {
-  if (!authorize(request)) return sendJson(response, 401, { detail: "Mesh Bridge token inválido." });
   const currentUrl = new URL(request.url, `http://${request.headers.host}`);
 
   if (request.method === "GET" && currentUrl.pathname === "/health") {
     return sendJson(response, 200, {
       status: "ok",
       mock: MOCK,
-      meshcentral_configured: Boolean(MESHCENTRAL_URL || MOCK),
+      meshcentral_configured: Boolean(MOCK || MESHCENTRAL_URL),
     });
   }
 
+  if (!authorize(request)) {
+    return sendJson(response, 401, { detail: "Mesh Bridge token inválido." });
+  }
+
   if (request.method === "GET" && currentUrl.pathname === "/devices") {
-    const devices = MOCK ? mockDevices : await listDevicesFromMeshCentral();
-    return sendJson(response, 200, filterAndPage(devices, currentUrl.searchParams));
+    const devices = await listDevicesFromMeshCentral();
+    return sendJson(response, 200, filterAndPaginate(devices, currentUrl));
   }
 
   if (request.method === "GET" && currentUrl.pathname.startsWith("/devices/")) {
-    const nodeId = decodeURIComponent(currentUrl.pathname.slice("/devices/".length));
-    const devices = MOCK ? mockDevices : await listDevicesFromMeshCentral();
+    const nodeId = decodeURIComponent(currentUrl.pathname.replace("/devices/", ""));
+    const devices = await listDevicesFromMeshCentral();
     const device = devices.find((item) => item.node_id === nodeId);
-    if (!device) return sendJson(response, 404, { detail: "Dispositivo remoto não encontrado." });
+    if (!device) return sendJson(response, 404, { detail: "Dispositivo não encontrado." });
     return sendJson(response, 200, device);
   }
 
   if (request.method === "POST" && currentUrl.pathname === "/session-url") {
-    const payload = await readJson(request);
-    const launch = await sessionUrl(payload);
-    return sendJson(response, 200, launch);
+    const body = await readBody(request);
+    const nodeId = body.node_id || body.nodeId;
+    if (!nodeId) return sendJson(response, 422, { detail: "node_id é obrigatório." });
+
+    const url = buildSessionUrl(String(nodeId));
+    return sendJson(response, 200, {
+      url,
+      session_url: url,
+      expires_in: MESH_SESSION_TTL_SECONDS,
+      expires_in_seconds: MESH_SESSION_TTL_SECONDS,
+    });
+  }
+
+  if (request.method === "POST" && currentUrl.pathname === "/users/sync") {
+    return sendJson(response, 200, { status: "ok", synced: false });
   }
 
   return sendJson(response, 404, { detail: "Rota não encontrada." });
 }
 
 const server = http.createServer((request, response) => {
-  route(request, response).catch((error) => sendJson(response, 500, { detail: error.message || "Erro interno no Mesh Bridge." }));
+  route(request, response).catch((error) => {
+    console.error(error);
+    sendJson(response, 500, { detail: error.message || "Erro interno no Mesh Bridge." });
+  });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Mesh Bridge ouvindo na porta ${PORT}. Mock=${MOCK ? "sim" : "não"}`);
 });
