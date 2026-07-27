@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { encodeLoginToken, resolveMeshUserId } = require("./login-token");
 
 const PORT = Number(process.env.PORT || 8080);
 const MOCK = String(process.env.MESH_BRIDGE_MOCK || "false").toLowerCase() === "true";
@@ -13,8 +14,11 @@ const MESHCENTRAL_PUBLIC_URL =
 const MESHCENTRAL_ADMIN_USER = process.env.MESHCENTRAL_ADMIN_USER || "";
 const MESHCENTRAL_ADMIN_PASS = process.env.MESHCENTRAL_ADMIN_PASS || "";
 const MESHCENTRAL_DOMAIN = process.env.MESHCENTRAL_DOMAIN || "";
+const MESHCENTRAL_LOGIN_TOKEN_KEY = process.env.MESHCENTRAL_LOGIN_TOKEN_KEY || "";
+const MESHCENTRAL_LOGIN_USER_ID = process.env.MESHCENTRAL_LOGIN_USER_ID || "";
 const MESH_SESSION_URL_TEMPLATE =
-  process.env.MESH_SESSION_URL_TEMPLATE || "{publicUrl}/?node={nodeId}&viewmode=10";
+  process.env.MESH_SESSION_URL_TEMPLATE ||
+  "{publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15";
 const MESH_SESSION_TTL_SECONDS = Number(process.env.MESH_SESSION_TTL_SECONDS || 3600);
 const MESHCTRL_PATH = "/usr/local/lib/node_modules/meshcentral/meshctrl.js";
 
@@ -400,12 +404,35 @@ function filterAndPaginate(devices, url) {
   };
 }
 
+function applyTemplate(template, context) {
+  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => context[key] ?? "");
+}
+
 function buildSessionUrl(nodeId) {
-  const encodedNodeId = encodeURIComponent(nodeId);
-  return MESH_SESSION_URL_TEMPLATE.replaceAll("{publicUrl}", MESHCENTRAL_PUBLIC_URL.replace(/\/$/, "")).replaceAll(
-    "{nodeId}",
-    encodedNodeId
-  );
+  const publicUrl = MESHCENTRAL_PUBLIC_URL.replace(/\/$/, "");
+  const encodedNodeId = encodeURIComponent(String(nodeId));
+  const expireMinutes = Math.max(1, Math.ceil(MESH_SESSION_TTL_SECONDS / 60));
+
+  if (MOCK) {
+    const html = `<html><body style="margin:0;background:#0a1f33;color:#fff;font-family:Arial,sans-serif;display:grid;place-items:center;height:100vh"><div style="text-align:center"><h2>Sessão remota simulada</h2><p>${encodedNodeId}</p></div></body></html>`;
+    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  }
+
+  if (!MESHCENTRAL_LOGIN_TOKEN_KEY) {
+    throw new Error(
+      "MESHCENTRAL_LOGIN_TOKEN_KEY não configurada. Na VM do MeshCentral execute: node node_modules/meshcentral --loginTokenKey"
+    );
+  }
+
+  const meshUserId =
+    MESHCENTRAL_LOGIN_USER_ID || resolveMeshUserId(MESHCENTRAL_ADMIN_USER, MESHCENTRAL_DOMAIN);
+  const loginToken = encodeLoginToken(meshUserId, MESHCENTRAL_LOGIN_TOKEN_KEY, expireMinutes);
+
+  return applyTemplate(MESH_SESSION_URL_TEMPLATE, {
+    publicUrl,
+    nodeId: encodedNodeId,
+    loginToken,
+  });
 }
 
 async function route(request, response) {
@@ -445,6 +472,7 @@ async function route(request, response) {
     return sendJson(response, 200, {
       url,
       session_url: url,
+      embed_url: url,
       expires_in: MESH_SESSION_TTL_SECONDS,
       expires_in_seconds: MESH_SESSION_TTL_SECONDS,
     });
