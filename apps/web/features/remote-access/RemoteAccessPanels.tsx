@@ -7,6 +7,7 @@ import ListPagination from "@/components/ListPagination";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Textarea, Toolbar } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { openRemoteViewerTabFromGesture, storeRemoteSessionLaunch } from "@/lib/remote-session-storage";
 import type { RemoteAccessDevice } from "@/lib/types";
 
 type FilterState = {
@@ -73,20 +74,24 @@ export default function RemoteAccessPanels({
 
   const createSession = async () => {
     if (!selectedDevice) return;
+    const viewerTab = window.open("about:blank", "_blank");
     setCreating(true);
     onError("");
     try {
-      const session = await api.createRemoteSession({
+      const result = await api.connectRemoteSession({
         node_id: selectedDevice.node_id,
         reason: reason.trim(),
         ticket_id: ticketId ? Number(ticketId) : null,
         asset_id: assetId ? Number(assetId) : null,
         access_mode: "desktop",
       });
+      storeRemoteSessionLaunch(result.session.id, result.embed_url, result.expires_in_seconds);
+      openRemoteViewerTabFromGesture(result.embed_url, viewerTab);
       setSelectedDevice(null);
-      router.push(`/acesso-remoto/sessoes/${session.id}`);
+      router.push(`/acesso-remoto/sessoes/${result.session.id}`);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Não foi possível criar a sessão remota.");
+      viewerTab?.close();
+      onError(err instanceof Error ? err.message : "Não foi possível iniciar a sessão remota.");
     } finally {
       setCreating(false);
     }
@@ -192,7 +197,7 @@ export default function RemoteAccessPanels({
         open={Boolean(selectedDevice)}
         title="Autorizar acesso remoto"
         description={selectedDevice ? `A sessão será registrada para ${selectedDevice.name}.` : undefined}
-        confirmLabel="Criar sessão"
+        confirmLabel="Conectar"
         loading={creating}
         confirmDisabled={confirmDisabled}
         onOpenChange={(open) => !open && setSelectedDevice(null)}

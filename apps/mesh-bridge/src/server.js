@@ -20,7 +20,14 @@ const MESH_SESSION_URL_TEMPLATE =
   process.env.MESH_SESSION_URL_TEMPLATE ||
   "{publicUrl}/?login={loginToken}&node={nodeId}&gotonode={nodeId}&viewmode=11&hide=31";
 const MESH_SESSION_TTL_SECONDS = Number(process.env.MESH_SESSION_TTL_SECONDS || 3600);
+const MESH_DEVICES_CACHE_TTL_MS = Number(process.env.MESH_DEVICES_CACHE_TTL_MS || 30000);
 const MESHCTRL_PATH = "/usr/local/lib/node_modules/meshcentral/meshctrl.js";
+
+let deviceCache = {
+  devices: [],
+  fetchedAt: 0,
+};
+let inflightDeviceList = null;
 
 function sendJson(response, status, payload) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -352,10 +359,39 @@ function runMeshCtrl(command, args = []) {
   });
 }
 
-async function listDevicesFromMeshCentral() {
+async function listDevicesFromMeshCentral(options = {}) {
+  const force = Boolean(options.force);
   if (MOCK) return mockDevices();
-  const output = await runMeshCtrl("listdevices", ["--json"]);
-  return parseDevicesFromMeshCtrl(output);
+
+  const now = Date.now();
+  const cacheValid =
+    !force && deviceCache.devices.length > 0 && now - deviceCache.fetchedAt < MESH_DEVICES_CACHE_TTL_MS;
+  if (cacheValid) return deviceCache.devices;
+
+  if (inflightDeviceList) return inflightDeviceList;
+
+  inflightDeviceList = runMeshCtrl("listdevices", ["--json"])
+    .then((output) => {
+      const devices = parseDevicesFromMeshCtrl(output);
+      deviceCache = { devices, fetchedAt: Date.now() };
+      return devices;
+    })
+    .finally(() => {
+      inflightDeviceList = null;
+    });
+
+  return inflightDeviceList;
+}
+
+async function getDeviceFromMeshCentral(nodeId, options = {}) {
+  const normalized = String(nodeId || "").trim();
+  if (!normalized) return null;
+
+  let device = (await listDevicesFromMeshCentral(options)).find((item) => item.node_id === normalized);
+  if (!device && !options.force) {
+    device = (await listDevicesFromMeshCentral({ force: true })).find((item) => item.node_id === normalized);
+  }
+  return device || null;
 }
 
 function filterAndPaginate(devices, url) {
@@ -462,14 +498,15 @@ async function route(request, response) {
   }
 
   if (request.method === "GET" && currentUrl.pathname === "/devices") {
-    const devices = await listDevicesFromMeshCentral();
+    const force = ["1", "true", "yes"].includes((currentUrl.searchParams.get("refresh") || "").toLowerCase());
+    const devices = await listDevicesFromMeshCentral({ force });
     return sendJson(response, 200, filterAndPaginate(devices, currentUrl));
   }
 
   if (request.method === "GET" && currentUrl.pathname.startsWith("/devices/")) {
     const nodeId = decodeURIComponent(currentUrl.pathname.replace("/devices/", ""));
-    const devices = await listDevicesFromMeshCentral();
-    const device = devices.find((item) => item.node_id === nodeId);
+    const force = ["1", "true", "yes"].includes((currentUrl.searchParams.get("refresh") || "").toLowerCase());
+    const device = await getDeviceFromMeshCentral(nodeId, { force });
     if (!device) return sendJson(response, 404, { detail: "Dispositivo não encontrado." });
     return sendJson(response, 200, device);
   }

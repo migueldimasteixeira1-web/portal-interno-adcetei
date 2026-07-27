@@ -12,6 +12,7 @@ import { Alert, Badge, Button, Card, DetailRow, buttonStyles } from "@/component
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { hasPermission } from "@/lib/permissions";
+import { openRemoteViewerTab, readRemoteSessionLaunch } from "@/lib/remote-session-storage";
 import type { RemoteAccessSession } from "@/lib/types";
 
 const statusLabel: Record<string, string> = {
@@ -28,10 +29,6 @@ const statusTone: Record<string, string> = {
   failed: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[#991b1b]",
 };
 
-function openViewerTab(url: string) {
-  window.open(url, "_blank", "noopener,noreferrer");
-}
-
 export default function RemoteAccessSessionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -44,7 +41,7 @@ export default function RemoteAccessSessionPage() {
   const [launching, setLaunching] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
-  const launched = useRef(false);
+  const initialized = useRef(false);
 
   const sessionId = params.id;
 
@@ -71,7 +68,7 @@ export default function RemoteAccessSessionPage() {
         setSession(result.session);
         setSessionUrl(result.embed_url);
         setExpiresIn(result.expires_in_seconds);
-        if (openTab && result.embed_url) openViewerTab(result.embed_url);
+        if (openTab && result.embed_url) openRemoteViewerTab(result.embed_url);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Não foi possível gerar a URL do visualizador remoto.");
       } finally {
@@ -105,10 +102,19 @@ export default function RemoteAccessSessionPage() {
   }, [canConnect, sessionId, user]);
 
   useEffect(() => {
-    if (!session || launched.current || session.status === "ended") return;
-    launched.current = true;
+    if (!session || initialized.current || session.status === "ended") return;
+    initialized.current = true;
+
+    const stored = readRemoteSessionLaunch(sessionId);
+    if (stored) {
+      setSessionUrl(stored.embedUrl);
+      setExpiresIn(stored.expiresInSeconds);
+      return;
+    }
+
+    if (session.status === "open") return;
     void launch(true);
-  }, [session, launch]);
+  }, [session, sessionId, launch]);
 
   if (loading) return <LoadingScreen label="Preparando sessão remota..." />;
   if (!canConnect) return <AccessDenied />;
@@ -145,7 +151,7 @@ export default function RemoteAccessSessionPage() {
                   variant="primary"
                   size="sm"
                   disabled={launching || session.status === "ended"}
-                  onClick={() => (sessionUrl ? openViewerTab(sessionUrl) : void launch(true))}
+                  onClick={() => (sessionUrl ? openRemoteViewerTab(sessionUrl) : void launch(true))}
                 >
                   {launching ? <LoaderCircle className="animate-spin" size={15} /> : <ExternalLink size={15} />}
                   Abrir visualizador

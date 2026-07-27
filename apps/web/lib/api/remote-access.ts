@@ -16,6 +16,8 @@ export const remoteAccessApi = {
     request<RemoteAccessDevicePage>(`/remote-access/devices${query(params)}`),
   createRemoteSession: (payload: RemoteAccessSessionPayload) =>
     request<RemoteAccessSession>("/remote-access/sessions", { method: "POST", body: JSON.stringify(payload) }),
+  connectRemoteSession: (payload: RemoteAccessSessionPayload) =>
+    request<RemoteAccessLaunch>("/remote-access/sessions/connect", { method: "POST", body: JSON.stringify(payload) }),
   remoteSession: (id: string) => request<RemoteAccessSession>(`/remote-access/sessions/${id}`),
   launchRemoteSession: (id: string) =>
     request<RemoteAccessLaunch>(`/remote-access/sessions/${id}/launch`, { method: "POST" }),

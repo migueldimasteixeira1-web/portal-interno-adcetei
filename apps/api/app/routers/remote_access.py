@@ -158,21 +158,24 @@ def list_remote_devices(
     )
 
 
-@router.post("/sessions", response_model=RemoteAccessSessionOut, status_code=201)
-def create_remote_access_session(
-    payload: RemoteAccessSessionCreate,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("remote_access.connect")),
-):
-    _feature_enabled()
+def _resolve_remote_device(node_id: str) -> MeshDevice:
     try:
-        device = _bridge().get_device(payload.node_id)
+        device = _bridge().get_device(node_id)
     except MeshBridgeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if not device.online:
         raise HTTPException(status_code=409, detail="Este computador está offline no MeshCentral.")
+    return device
 
+
+def _create_remote_session_record(
+    *,
+    payload: RemoteAccessSessionCreate,
+    device: MeshDevice,
+    request: Request,
+    db: Session,
+    current_user: User,
+) -> RemoteAccessSession:
     asset = db.get(Asset, payload.asset_id) if payload.asset_id else None
     if payload.asset_id and not asset:
         raise HTTPException(status_code=404, detail="Equipamento do inventário não encontrado.")
@@ -213,9 +216,101 @@ def create_remote_access_session(
             "asset_id": payload.asset_id,
         },
     )
+    return session
+
+
+def _launch_remote_session_record(
+    *,
+    session: RemoteAccessSession,
+    db: Session,
+    current_user: User,
+) -> dict:
+    try:
+        launch = _bridge().create_session_url(
+            session_id=session.id,
+            node_id=session.mesh_node_id,
+            user_id=str(current_user.id),
+            user_name=current_user.full_name,
+            user_email=current_user.email,
+            reason=session.reason,
+            access_mode=session.access_mode,
+        )
+    except MeshBridgeError as exc:
+        session.status = "failed"
+        session.failure_reason = str(exc)
+        db.commit()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    session.status = "open"
+    session.opened_at = session.opened_at or utc_now()
+    if launch.get("mesh_user_id"):
+        session.mesh_user_id = launch["mesh_user_id"]
+    add_audit(
+        db,
+        actor=current_user,
+        action="open_remote_access",
+        entity_type="remote_access_session",
+        entity_id=session.id,
+        summary=f"{current_user.full_name} abriu sessão remota em {session.device_name_snapshot}.",
+        changes={"node_id": session.mesh_node_id, "access_mode": session.access_mode},
+    )
     db.commit()
-    session = db.scalar(select(RemoteAccessSession).options(joinedload(RemoteAccessSession.portal_user), joinedload(RemoteAccessSession.asset)).where(RemoteAccessSession.id == session.id))
+    db.refresh(session)
+    return launch
+
+
+@router.post("/sessions", response_model=RemoteAccessSessionOut, status_code=201)
+def create_remote_access_session(
+    payload: RemoteAccessSessionCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("remote_access.connect")),
+):
+    _feature_enabled()
+    device = _resolve_remote_device(payload.node_id)
+    session = _create_remote_session_record(
+        payload=payload,
+        device=device,
+        request=request,
+        db=db,
+        current_user=current_user,
+    )
+    db.commit()
+    session = db.scalar(
+        select(RemoteAccessSession)
+        .options(joinedload(RemoteAccessSession.portal_user), joinedload(RemoteAccessSession.asset))
+        .where(RemoteAccessSession.id == session.id)
+    )
     return _session_out(session)
+
+
+@router.post("/sessions/connect", response_model=RemoteAccessLaunchOut, status_code=201)
+def connect_remote_access_session(
+    payload: RemoteAccessSessionCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("remote_access.connect")),
+):
+    _feature_enabled()
+    device = _resolve_remote_device(payload.node_id)
+    session = _create_remote_session_record(
+        payload=payload,
+        device=device,
+        request=request,
+        db=db,
+        current_user=current_user,
+    )
+    launch = _launch_remote_session_record(session=session, db=db, current_user=current_user)
+    session = db.scalar(
+        select(RemoteAccessSession)
+        .options(joinedload(RemoteAccessSession.portal_user), joinedload(RemoteAccessSession.asset))
+        .where(RemoteAccessSession.id == session.id)
+    )
+    return RemoteAccessLaunchOut(
+        session=_session_out(session),
+        embed_url=launch["embed_url"],
+        expires_in_seconds=launch["expires_in_seconds"],
+    )
 
 
 @router.get("/sessions/{session_id}", response_model=RemoteAccessSessionOut)
@@ -250,36 +345,12 @@ def launch_remote_access_session(
         raise HTTPException(status_code=404, detail="Sessão de acesso remoto não encontrada.")
     if session.status == "ended":
         raise HTTPException(status_code=409, detail="Esta sessão já foi encerrada.")
-    try:
-        launch = _bridge().create_session_url(
-            session_id=session.id,
-            node_id=session.mesh_node_id,
-            user_id=str(current_user.id),
-            user_name=current_user.full_name,
-            user_email=current_user.email,
-            reason=session.reason,
-            access_mode=session.access_mode,
-        )
-    except MeshBridgeError as exc:
-        session.status = "failed"
-        session.failure_reason = str(exc)
-        db.commit()
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    session.status = "open"
-    session.opened_at = session.opened_at or utc_now()
-    if launch.get("mesh_user_id"):
-        session.mesh_user_id = launch["mesh_user_id"]
-    add_audit(
-        db,
-        actor=current_user,
-        action="open_remote_access",
-        entity_type="remote_access_session",
-        entity_id=session.id,
-        summary=f"{current_user.full_name} abriu sessão remota em {session.device_name_snapshot}.",
-        changes={"node_id": session.mesh_node_id, "access_mode": session.access_mode},
+    launch = _launch_remote_session_record(session=session, db=db, current_user=current_user)
+    session = db.scalar(
+        select(RemoteAccessSession)
+        .options(joinedload(RemoteAccessSession.portal_user), joinedload(RemoteAccessSession.asset))
+        .where(RemoteAccessSession.id == session.id)
     )
-    db.commit()
-    db.refresh(session)
     return RemoteAccessLaunchOut(
         session=_session_out(session),
         embed_url=launch["embed_url"],
