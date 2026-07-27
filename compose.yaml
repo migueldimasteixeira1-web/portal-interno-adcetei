@@ -14,6 +14,33 @@ services:
       retries: 10
     restart: unless-stopped
 
+  mesh-bridge:
+    build: ./apps/mesh-bridge
+    environment:
+      PORT: 8080
+      MESH_BRIDGE_SHARED_SECRET: ${MESH_BRIDGE_SHARED_SECRET:-}
+      MESH_BRIDGE_MOCK: ${MESH_BRIDGE_MOCK:-false}
+      MESHCENTRAL_URL: ${MESHCENTRAL_URL:-}
+      MESHCENTRAL_PUBLIC_URL: ${MESHCENTRAL_PUBLIC_URL:-}
+      MESHCENTRAL_ADMIN_USER: ${MESHCENTRAL_ADMIN_USER:-}
+      MESHCENTRAL_ADMIN_PASS: ${MESHCENTRAL_ADMIN_PASS:-}
+      MESHCENTRAL_DOMAIN: ${MESHCENTRAL_DOMAIN:-}
+      MESHCENTRAL_LOGIN_TOKEN_KEY: ${MESHCENTRAL_LOGIN_TOKEN_KEY:-}
+      MESHCENTRAL_LOGIN_USER_ID: ${MESHCENTRAL_LOGIN_USER_ID:-}
+      MESHCENTRAL_COOKIE_ENCODING: ${MESHCENTRAL_COOKIE_ENCODING:-base64}
+      MESH_SESSION_URL_TEMPLATE: ${MESH_SESSION_URL_TEMPLATE:-}
+      MESH_SESSION_TTL_SECONDS: ${MESH_SESSION_TTL_SECONDS:-3600}
+      MESH_DEVICES_CACHE_TTL_MS: ${MESH_DEVICES_CACHE_TTL_MS:-30000}
+      NODE_TLS_REJECT_UNAUTHORIZED: ${NODE_TLS_REJECT_UNAUTHORIZED:-0}
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build: ./apps/api
     environment:
@@ -37,10 +64,16 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      REMOTE_ACCESS_ENABLED: ${REMOTE_ACCESS_ENABLED:-false}
+      MESH_BRIDGE_URL: ${MESH_BRIDGE_URL:-http://mesh-bridge:8080}
+      MESH_BRIDGE_SHARED_SECRET: ${MESH_BRIDGE_SHARED_SECRET:-}
+      MESH_SESSION_TTL_SECONDS: ${MESH_SESSION_TTL_SECONDS:-3600}
     expose:
       - "8000"
     depends_on:
       database:
+        condition: service_healthy
+      mesh-bridge:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]

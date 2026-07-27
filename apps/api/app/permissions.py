@@ -26,6 +26,9 @@ PERMISSION_DEFINITIONS = [
     {"key": "inventory.audit", "label": "Consultar histórico do inventário", "group": "Inventário"},
     {"key": "roles.manage", "label": "Configurar perfis e permissões", "group": "Segurança"},
     {"key": "audit.view", "label": "Consultar auditoria administrativa", "group": "Segurança"},
+    {"key": "remote_access.view", "label": "Consultar computadores remotos", "group": "Acesso remoto"},
+    {"key": "remote_access.connect", "label": "Abrir sessões de acesso remoto", "group": "Acesso remoto"},
+    {"key": "remote_access.manage", "label": "Gerenciar integração MeshCentral", "group": "Acesso remoto"},
 ]
 
 ALL_PERMISSIONS = {item["key"] for item in PERMISSION_DEFINITIONS}
@@ -36,6 +39,8 @@ PERMISSION_DEPENDENCIES = {
     "assets.manage": {"assets.view"},
     **{permission: {"inventory.view"} for permission in INVENTORY_PERMISSIONS if permission != "inventory.view"},
     "inventory.move": {"inventory.view", "users.view"},
+    "remote_access.connect": {"remote_access.view"},
+    "remote_access.manage": {"remote_access.view", "remote_access.connect"},
 }
 
 DEFAULT_ROLE_CONFIGS = {
