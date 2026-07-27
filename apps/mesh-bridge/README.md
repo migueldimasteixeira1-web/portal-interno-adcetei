@@ -53,13 +53,14 @@ Exemplo atual (sem autenticação automática):
 MESH_SESSION_URL_TEMPLATE={publicUrl}/?node={nodeId}&viewmode=10
 ```
 
-Próxima etapa prevista (login token):
+Próxima etapa prevista (login token — já implementado no bridge):
 
 ```env
 MESH_SESSION_URL_TEMPLATE={publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
+MESHCENTRAL_LOGIN_TOKEN_KEY=<hex da VM MeshCentral>
 ```
 
-Placeholders suportados hoje: `{publicUrl}`, `{nodeId}`.
+Placeholders suportados: `{publicUrl}`, `{nodeId}`, `{loginToken}`.
 
 ## Variáveis
 
@@ -73,6 +74,8 @@ Placeholders suportados hoje: `{publicUrl}`, `{nodeId}`.
 | `MESHCENTRAL_ADMIN_USER` | Usuário de integração |
 | `MESHCENTRAL_ADMIN_PASS` | Senha de integração |
 | `MESHCENTRAL_DOMAIN` | Domínio MeshCentral, se multi-tenant |
+| `MESHCENTRAL_LOGIN_TOKEN_KEY` | Chave hex de `node meshcentral --loginTokenKey` |
+| `MESHCENTRAL_LOGIN_USER_ID` | Opcional: `user//admin` ou `user/domínio/usuário` |
 | `MESH_SESSION_URL_TEMPLATE` | Template da URL do visualizador |
 | `MESH_SESSION_TTL_SECONDS` | TTL informado na resposta de sessão |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | `0` apenas em homologação com cert self-signed |

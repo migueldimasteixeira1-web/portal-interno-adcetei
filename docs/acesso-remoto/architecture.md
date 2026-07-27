@@ -81,17 +81,19 @@ O administrador recebe todas por padrão. O perfil técnico deve receber `view` 
 
 ## URL de sessão e autenticação no iframe
 
-Hoje o bridge monta a URL com `MESH_SESSION_URL_TEMPLATE`. Exemplo atual:
+O bridge gera um **login token** temporário e monta a URL com `MESH_SESSION_URL_TEMPLATE`:
 
 ```text
-{publicUrl}/?node={nodeId}&viewmode=10
+{publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
 ```
 
-Isso abre a página do nó no MeshCentral, mas **não autentica** o técnico no MeshCentral. Por isso o iframe pode exibir erro de autenticação mesmo com a listagem funcionando.
+- `viewmode=11`: área de trabalho remota
+- `hide=15`: oculta cabeçalho, abas e rodapé do MeshCentral no iframe
+- `{loginToken}`: token AES-GCM gerado com `MESHCENTRAL_LOGIN_TOKEN_KEY`
 
-### Próxima etapa: login token (Solução A)
+### Configuração no MeshCentral
 
-Para o fluxo “clicou em Acessar e já vê a área de trabalho”, o MeshCentral precisa aceitar **login token** na URL e permitir embed:
+No `config.json` da VM do MeshCentral:
 
 ```json
 {
@@ -103,17 +105,17 @@ Para o fluxo “clicou em Acessar e já vê a área de trabalho”, o MeshCentra
 }
 ```
 
-Template previsto após essa configuração:
+Obter a chave de integração (na VM do MeshCentral, com o serviço parado ou em manutenção):
 
-```text
-{publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
+```bash
+node node_modules/meshcentral --loginTokenKey
 ```
 
-- `viewmode=11`: área de trabalho remota
-- `hide=15`: oculta cabeçalho, abas e rodapé do MeshCentral no iframe
-- `{loginToken}`: token temporário gerado pelo bridge no momento da sessão
+Copie o valor hex para `MESHCENTRAL_LOGIN_TOKEN_KEY` no `.env` do Portal. **Não commite essa chave no Git.**
 
-O frontend e a API não precisam mudar quando o template for ajustado; apenas o `mesh-bridge` e a configuração da VM do MeshCentral.
+O usuário Mesh usado no token deriva de `MESHCENTRAL_ADMIN_USER` (`user//admin` no domínio padrão) ou de `MESHCENTRAL_LOGIN_USER_ID` quando informado explicitamente (`user//admin`, `user/domínio/usuário`).
+
+A auditoria de quem acessou e o motivo ficam no Portal (`remote_access_sessions` + `audit_logs`). O MeshCentral registra a sessão técnica da conta de integração.
 
 ## TLS entre bridge e MeshCentral
 

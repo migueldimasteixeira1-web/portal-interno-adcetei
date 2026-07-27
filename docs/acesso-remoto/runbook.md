@@ -22,7 +22,9 @@ MESHCENTRAL_PUBLIC_URL=https://192.168.10.222
 MESHCENTRAL_ADMIN_USER=portal-integracao
 MESHCENTRAL_ADMIN_PASS=senha-forte
 MESHCENTRAL_DOMAIN=
-MESH_SESSION_URL_TEMPLATE={publicUrl}/?node={nodeId}&viewmode=10
+MESHCENTRAL_LOGIN_TOKEN_KEY=hex-da-vm-meshcentral
+MESHCENTRAL_LOGIN_USER_ID=
+MESH_SESSION_URL_TEMPLATE={publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
 MESH_SESSION_TTL_SECONDS=3600
 NODE_TLS_REJECT_UNAUTHORIZED=0
 ```
@@ -31,6 +33,7 @@ Observações:
 
 - `MESHCENTRAL_URL`: URL usada pelo `meshctrl` dentro do container (pode ser `wss://`).
 - `MESHCENTRAL_PUBLIC_URL`: URL aberta no navegador do técnico (HTTPS).
+- `MESHCENTRAL_LOGIN_TOKEN_KEY`: chave obtida na VM do MeshCentral com `node node_modules/meshcentral --loginTokenKey`.
 - `NODE_TLS_REJECT_UNAUTHORIZED=0`: apenas para homologação com certificado self-signed.
 
 ## Validação do mesh-bridge
@@ -124,13 +127,34 @@ docker compose up -d --build mesh-bridge
 
 ### Erro de autenticação no iframe
 
-A listagem funciona, mas o visualizador mostra “Não foi possível realizar autenticação”.
+Confirme no MeshCentral:
 
-Causa: a URL atual abre o MeshCentral sem login token. O técnico está autenticado no Portal, não no MeshCentral.
+1. `allowLoginToken: true` e `allowFraming: true` no `config.json`
+2. `MESHCENTRAL_LOGIN_TOKEN_KEY` preenchida no `.env` do Portal (obtida com `node node_modules/meshcentral --loginTokenKey` na VM do MeshCentral)
+3. `MESHCENTRAL_ADMIN_USER` corresponde a uma conta MeshCentral válida
+4. Se Portal e MeshCentral estão em IPs diferentes, use `sessionSameSite: "none"` no MeshCentral e HTTPS confiável no navegador
 
-Próximo passo: habilitar `allowLoginToken` no MeshCentral e implementar geração de token no `mesh-bridge`. Ver `docs/acesso-remoto/architecture.md`.
+Testar geração de URL:
 
-Workaround temporário: abrir `MESHCENTRAL_PUBLIC_URL` em outra aba, autenticar manualmente e tentar novamente (pode falhar entre IPs/domínios diferentes por causa de cookies).
+```bash
+docker compose exec -T api python - <<'PY'
+import os, json, urllib.request
+url = os.environ["MESH_BRIDGE_URL"] + "/session-url"
+body = json.dumps({"node_id": "node//mock-test"}).encode()
+req = urllib.request.Request(
+    url,
+    data=body,
+    headers={
+        "Content-Type": "application/json",
+        "X-Bridge-Token": os.environ["MESH_BRIDGE_SHARED_SECRET"],
+    },
+    method="POST",
+)
+print(urllib.request.urlopen(req, timeout=30).read().decode())
+PY
+```
+
+A resposta deve conter `embed_url` com `?login=` na query string.
 
 ### mesh-bridge unhealthy
 
@@ -154,10 +178,15 @@ No `config.json` da VM do MeshCentral:
 }
 ```
 
-Depois ajustar o template:
+Obter a chave e configurar no Portal:
 
-```env
-MESH_SESSION_URL_TEMPLATE={publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
+```bash
+# Na VM do MeshCentral
+node node_modules/meshcentral --loginTokenKey
 ```
 
-A implementação da geração de `{loginToken}` no bridge será feita na próxima entrega desta branch.
+```env
+MESHCENTRAL_LOGIN_TOKEN_KEY=<valor-hex-retornado>
+```
+
+O bridge já gera `{loginToken}` automaticamente em `POST /session-url`.
