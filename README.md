@@ -397,4 +397,4 @@ Esta versão inclui a primeira etapa do módulo de acesso remoto:
 - visualizador remoto incorporado por `iframe`;
 - documentação em `docs/acesso-remoto/`.
 
-O MeshCentral continua sendo o motor do acesso remoto. O Portal controla autorização, justificativa e histórico. Não copie bancos, certificados ou chaves reais do MeshCentral para este repositório.
+O MeshCentral continua sendo o motor do acesso remoto. O Portal controla autorização, justificativa e histórico. A listagem de dispositivos já consulta o MeshCentral real via `meshctrl listdevices`; a autenticação automática no visualizador (login token) é a próxima etapa desta branch. Não copie bancos, certificados ou chaves reais do MeshCentral para este repositório.

@@ -16,8 +16,44 @@ Responsabilidades:
 
 - **Portal Web**: tela, filtros, justificativa e visualizador incorporado.
 - **API FastAPI**: autenticação, permissões, auditoria, sessão e vínculo opcional com inventário/chamado.
-- **Mesh Bridge**: serviço Node.js interno que chama o MeshCentral/meshctrl e gera a URL de visualização.
+- **Mesh Bridge**: serviço Node.js interno que chama o MeshCentral via `meshctrl` e gera a URL de visualização.
 - **MeshCentral**: motor de acesso remoto.
+
+## Mesh Bridge
+
+Serviço interno em `apps/mesh-bridge`. Não deve ser exposto na internet; apenas a API FastAPI o acessa.
+
+### Rotas
+
+| Rota | Autenticação | Descrição |
+|------|--------------|-----------|
+| `GET /health` | pública | Healthcheck do container |
+| `GET /devices` | `X-Bridge-Token` | Lista dispositivos com paginação e filtros |
+| `GET /devices/:nodeId` | `X-Bridge-Token` | Detalhe de um dispositivo |
+| `POST /session-url` | `X-Bridge-Token` | Gera URL do visualizador |
+| `POST /users/sync` | `X-Bridge-Token` | Stub reservado para provisionamento futuro |
+
+Quando `MESH_BRIDGE_SHARED_SECRET` estiver definido, todas as rotas exceto `/health` exigem o header `X-Bridge-Token`.
+
+### Listagem de dispositivos
+
+O bridge consulta o MeshCentral com:
+
+```bash
+meshctrl listdevices --json
+```
+
+Pontos importantes da implementação:
+
+1. **Comando em minúsculo**: nesta versão do MeshCentral, o comando correto é `listdevices`, não `ListDevices` nem `listnodes`.
+2. **Saída completa**: o retorno JSON pode passar de 1 MB. Capturar stdout via pipe truncava a resposta e fazia todos os dispositivos aparecerem offline. O bridge grava a saída do `meshctrl` em arquivo temporário e só então lê o conteúdo.
+3. **Parser robusto**: tenta `JSON.parse` no retorno inteiro; se falhar, extrai blocos `"type": "node"` com balanceamento de chaves, respeitando strings e escapes.
+4. **Status online**: um dispositivo é considerado online quando `conn > 0` ou `pwr > 0`.
+5. **Deduplicação**: dispositivos repetidos são consolidados por `node_id`, preservando `online=true` se alguma ocorrência estiver online.
+
+### Modo mock
+
+Com `MESH_BRIDGE_MOCK=true`, o bridge retorna dispositivos simulados sem chamar o MeshCentral. Útil para desenvolvimento local.
 
 ## Segurança
 
@@ -43,14 +79,48 @@ O administrador recebe todas por padrão. O perfil técnico deve receber `view` 
 - `remote_device_links`: vínculo opcional entre dispositivo MeshCentral e equipamento do inventário.
 - `remote_access_sessions`: histórico de sessões autorizadas, abertas, encerradas ou com falha.
 
-## Observação sobre URL de sessão
+## URL de sessão e autenticação no iframe
 
-A URL final de sessão depende da política ativada no MeshCentral da VM. Por isso, o `mesh-bridge` suporta `MESH_SESSION_URL_TEMPLATE`.
-
-Exemplo de template:
+Hoje o bridge monta a URL com `MESH_SESSION_URL_TEMPLATE`. Exemplo atual:
 
 ```text
 {publicUrl}/?node={nodeId}&viewmode=10
 ```
 
-Quando a VM tiver login por token/link temporário configurado, esse template deve ser ajustado sem alterar o frontend ou a API.
+Isso abre a página do nó no MeshCentral, mas **não autentica** o técnico no MeshCentral. Por isso o iframe pode exibir erro de autenticação mesmo com a listagem funcionando.
+
+### Próxima etapa: login token (Solução A)
+
+Para o fluxo “clicou em Acessar e já vê a área de trabalho”, o MeshCentral precisa aceitar **login token** na URL e permitir embed:
+
+```json
+{
+  "settings": {
+    "allowLoginToken": true,
+    "allowFraming": true,
+    "sessionSameSite": "none"
+  }
+}
+```
+
+Template previsto após essa configuração:
+
+```text
+{publicUrl}/?login={loginToken}&node={nodeId}&viewmode=11&hide=15
+```
+
+- `viewmode=11`: área de trabalho remota
+- `hide=15`: oculta cabeçalho, abas e rodapé do MeshCentral no iframe
+- `{loginToken}`: token temporário gerado pelo bridge no momento da sessão
+
+O frontend e a API não precisam mudar quando o template for ajustado; apenas o `mesh-bridge` e a configuração da VM do MeshCentral.
+
+## TLS entre bridge e MeshCentral
+
+Em homologação com certificado self-signed, o container do bridge pode usar:
+
+```env
+NODE_TLS_REJECT_UNAUTHORIZED=0
+```
+
+Isso afeta apenas a comunicação servidor-a-servidor (`mesh-bridge` → MeshCentral). Não substitui certificado confiável para o navegador do técnico.
