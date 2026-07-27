@@ -138,15 +138,22 @@ def list_remote_devices(
         links = {link.mesh_node_id: link for link in rows}
 
     summary_payload = result.get("summary") or {}
-    total = int(result["total"])
-    online = int(summary_payload.get("online") or sum(1 for item in result["items"] if item.online))
-    offline = int(summary_payload.get("offline") or max(0, total - online))
+    filtered_total = int(result["total"])
+    summary_total = int(summary_payload["total"]) if "total" in summary_payload else filtered_total
+    if "online" in summary_payload:
+        online = int(summary_payload["online"])
+    else:
+        online = sum(1 for item in result["items"] if item.online)
+    if "offline" in summary_payload:
+        offline = int(summary_payload["offline"])
+    else:
+        offline = max(0, summary_total - online)
     return RemoteAccessDevicePageOut(
         items=[_device_out(item, links) for item in result["items"]],
-        total=total,
+        total=filtered_total,
         page=int(result["page"]),
         page_size=int(result["page_size"]),
-        summary=RemoteAccessSummaryOut(total=total, online=online, offline=offline),
+        summary=RemoteAccessSummaryOut(total=summary_total, online=online, offline=offline),
         enabled=settings.remote_access_enabled,
     )
 

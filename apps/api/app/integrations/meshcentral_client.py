@@ -68,7 +68,7 @@ def _device_from_payload(payload: dict[str, Any]) -> MeshDevice:
 
 
 class MeshBridgeClient:
-    def __init__(self, base_url: str | None = None, shared_secret: str | None = None, timeout_seconds: int = 8) -> None:
+    def __init__(self, base_url: str | None = None, shared_secret: str | None = None, timeout_seconds: int = 30) -> None:
         self.base_url = (base_url or settings.mesh_bridge_url).rstrip("/")
         self.shared_secret = settings.mesh_bridge_shared_secret if shared_secret is None else shared_secret
         self.timeout_seconds = timeout_seconds
@@ -77,7 +77,13 @@ class MeshBridgeClient:
         return self._request("GET", "/health")
 
     def list_devices(self, *, page: int, page_size: int, search: str = "", status: str = "") -> dict[str, Any]:
-        query = urlencode({"page": page, "page_size": page_size, "search": search, "status": status})
+        params: dict[str, Any] = {"page": page, "page_size": page_size, "search": search, "status": status}
+        normalized = status.strip().lower()
+        if normalized == "online":
+            params["online"] = "true"
+        elif normalized == "offline":
+            params["online"] = "false"
+        query = urlencode({key: value for key, value in params.items() if value not in ("", None)})
         payload = self._request("GET", f"/devices?{query}")
         items = [_device_from_payload(item) for item in payload.get("items", []) if isinstance(item, dict)]
         return {
