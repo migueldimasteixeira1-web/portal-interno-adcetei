@@ -5,6 +5,7 @@ import {
   FileText,
   History,
   Home,
+  MessageCircle,
   MonitorCog,
   Network,
   Printer,
@@ -49,6 +50,15 @@ export const portalModules: PortalNavItem[] = [
     userLabel: "Meus chamados",
     description: "Solicitações de suporte, triagem e acompanhamento técnico.",
     icon: ClipboardList,
+    area: "modules",
+    status: "available",
+    roles: ["admin", "technician", "user"],
+  },
+  {
+    href: "/mensagens",
+    label: "Mensagens",
+    description: "Converse diretamente com outros servidores do portal.",
+    icon: MessageCircle,
     area: "modules",
     status: "available",
     roles: ["admin", "technician", "user"],
@@ -158,6 +168,7 @@ export function isNavItemActive(pathname: string, item: PortalNavItem): boolean 
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Início",
+  "/mensagens": "Mensagens",
   "/chamados": "Chamados",
   "/chamados/novo": "Abrir chamado",
   "/inventario": "Inventário",

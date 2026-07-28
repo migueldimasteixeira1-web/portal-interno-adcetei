@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { useAuth } from "./AuthProvider";
+import ChatUnreadBadge from "./ChatUnreadBadge";
 import CommandPalette from "./CommandPalette";
 import LoadingScreen from "./LoadingScreen";
 import ThemeToggle from "./ThemeToggle";
@@ -75,6 +76,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                       >
                         <Icon size={17} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-white" : "text-white/55"} />
                         <span className="min-w-0 flex-1 truncate">{moduleLabelForUser(item, user)}</span>
+                        {item.href === "/mensagens" && <ChatUnreadBadge />}
                       </Link>
                     </li>
                   );

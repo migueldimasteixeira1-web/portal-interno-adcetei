@@ -43,4 +43,5 @@ export type {
 export type { CatalogFormField, CatalogIconOption, CatalogOptions, CatalogService } from "./types/catalog";
 export type { TicketComment, Ticket, TicketPage, DashboardData } from "./types/tickets";
 export type { RoleConfig, PermissionDefinition, AuditLog } from "./types/admin";
+export type { ChatContact, ChatMessage, ChatConversation } from "./types/chat";
 export type { RemoteAccessMode, RemoteAccessSessionStatus, RemoteAccessAssetRef, RemoteAccessDevice, RemoteAccessSummary, RemoteAccessDevicePage, RemoteAccessSessionPayload, RemoteAccessSession, RemoteAccessLaunch, RemoteAccessHealth } from "./types/remote-access";

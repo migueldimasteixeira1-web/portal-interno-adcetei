@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-O sistema é um **hub operacional modular** da ADCETEI — monólito em execução, separado por domínio no código. Chamados e inventário são módulos maduros; impressoras, memorandos e catálogo de VMs permanecem planejados.
+O sistema é um **hub operacional modular** da ADCETEI — monólito em execução, separado por domínio no código. Chamados, inventário e mensagens são módulos maduros; impressoras, memorandos e catálogo de VMs permanecem planejados.
 
 ```text
 Portal Interno ADCETEI
@@ -16,6 +16,10 @@ Portal Interno ADCETEI
 │   ├── abertura com campos dinâmicos
 │   ├── triagem e histórico
 │   └── notas internas
+├── Mensagens
+│   ├── conversas diretas entre servidores (1:1)
+│   ├── diretório de contatos (qualquer usuário ativo)
+│   └── contagem de não lidas
 ├── Inventário
 │   ├── cadastros base (fornecedor, tipo, fabricante, modelo, setor)
 │   ├── equipamentos e movimentações
@@ -43,6 +47,7 @@ Portal Interno ADCETEI
 | `main.py` | Factory FastAPI, CORS, `include_router` e startup dos dados iniciais |
 | `routers/auth.py` | Login, cadastro, verificação de e-mail |
 | `routers/tickets.py` | Chamados e dashboard |
+| `routers/chat.py` | Conversas diretas, contatos e contagem de não lidas |
 | `routers/users_assets.py` | Usuários, assets legados, opções para chamados |
 | `routers/admin/` | Usuários admin, assets, catálogo, perfis, auditoria |
 | `routers/inventory/` | Meta, equipamentos modulares, cadastros base |
@@ -50,6 +55,7 @@ Portal Interno ADCETEI
 | `integrations/meshcentral_client.py` | Cliente HTTP do mesh-bridge |
 | `serializers/` | Serialização de users, assets e tickets |
 | `services/tickets_service.py` | Regras de negócio de chamados |
+| `services/chat_service.py` | Conversas, mensagens, leitura e busca de contatos |
 | `admin_api.py` | Reexport: `from .routers.admin import router` |
 | `inventory_api.py` | Reexport: `from .routers.inventory import router` |
 | `inventory_service.py` | Regras de inventário e movimentações |
@@ -61,6 +67,7 @@ Portal Interno ADCETEI
 Rotas públicas principais:
 
 - `/api/auth/*`, `/api/tickets/*`, `/api/users`, `/api/assets/*`
+- `/api/chat/*`
 - `/api/admin/*`
 - `/api/inventory/*`
 
@@ -69,7 +76,7 @@ Rotas públicas principais:
 | Caminho | Papel |
 |---------|--------|
 | `app/` | Rotas Next.js — páginas **orquestradoras** (estado, fetch, permissões) |
-| `features/<domínio>/` | Composição de UI por módulo (`admin`, `dashboard`, `inventory`, `remote-access`, `tickets`) |
+| `features/<domínio>/` | Composição de UI por módulo (`admin`, `chat`, `dashboard`, `inventory`, `remote-access`, `tickets`) |
 | `components/` | UI compartilhada (`ui.tsx`, layout, chips, paginação, etc.) |
 | `lib/api/` | Cliente HTTP por domínio; `lib/api.ts` reexporta objeto `api` unificado |
 | `lib/types/` | Tipos TypeScript por domínio; `lib/types.ts` reexporta tudo |
@@ -83,6 +90,7 @@ Imports existentes `@/lib/api` e `@/lib/types` continuam válidos após a modula
 |------|-------------------|
 | `/dashboard` | `features/dashboard/DashboardSections` |
 | `/chamados`, `/chamados/novo`, `/chamados/[id]` | `features/tickets/*` |
+| `/mensagens` | `features/chat/*` |
 | `/inventario`, `/inventario/[id]`, `/inventario/lote`, `/inventario/novo` | `features/inventory/*` |
 | `/inventario/termos` | Termos de recebimento e confirmação de entrega |
 | `/administracao/base-cadastros`, `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
@@ -200,6 +208,21 @@ Operação, variáveis de ambiente, validação e troubleshooting: [ACESSO-REMOT
 - datas em UTC na API, exibição em `America/Sao_Paulo` no frontend;
 - `form_schema` legado (lista de strings) e configurável (objetos com `key`, `type`, `required`);
 - respostas em `tickets.form_data`, snapshot em `form_schema_snapshot`.
+
+## Mensagens
+
+Conversas diretas (1:1) entre qualquer par de usuários ativos do portal, sem exigir permissão além de estar autenticado — é um canal de comunicação geral da equipe, não vinculado a chamados.
+
+- `GET /api/chat/contacts` — diretório de usuários ativos (exceto o próprio), com busca por nome/setor/secretaria; não depende de `users.view`, propositalmente aberto a todos os perfis
+- `GET /api/chat/conversations` — uma linha por contato com quem já houve troca de mensagens, com última mensagem e contagem de não lidas, ordenado pela mais recente
+- `GET /api/chat/messages/{contact_id}` — histórico da conversa; aceita `after_id` para buscar apenas mensagens novas (usado no polling do frontend)
+- `POST /api/chat/messages` — envia mensagem para outro usuário ativo
+- `POST /api/chat/messages/{contact_id}/read` — marca como lida toda a conversa com aquele contato
+- `GET /api/chat/unread-count` — total de mensagens não lidas do usuário, usado no selo do item de navegação
+
+Sem WebSocket: o frontend busca mensagens novas por polling (a cada 4s na conversa aberta, a cada 10s na lista de conversas; o selo de não lidas no menu lateral verifica a cada 15s). Optou-se por esse caminho por ser consistente com o restante do portal (que já é 100% REST/polling) e por não introduzir gerenciamento de conexão persistente para um volume de uso interno pequeno; migrar pontos específicos para WebSocket depois é incremental caso o uso justifique.
+
+Tabela: `chat_messages` (`sender_id`, `recipient_id`, `body`, `created_at`, `read_at`).
 
 ## Schema do banco
 

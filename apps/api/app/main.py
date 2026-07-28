@@ -10,6 +10,7 @@ from .database import SessionLocal
 from .inventory_api import router as inventory_router
 from .permissions import ensure_role_configs
 from .routers.auth import router as auth_router
+from .routers.chat import router as chat_router
 from .routers.tickets import router as tickets_router
 from .routers.remote_access import router as remote_access_router
 from .routers.users_assets import router as users_assets_router
@@ -35,6 +36,7 @@ app.include_router(tickets_router)
 app.include_router(admin_router)
 app.include_router(inventory_router)
 app.include_router(remote_access_router)
+app.include_router(chat_router)
 
 
 @app.on_event("startup")

@@ -1,6 +1,6 @@
 # Portal Interno ADCETEI
 
-Hub operacional modular da ADCETEI (Prefeitura de Cabo Frio): chamados técnicos, inventário de equipamentos, catálogo de serviços, usuários e cadastro por e-mail institucional verificado. Novos módulos (impressoras, memorandos, etc.) entram sem alterar a estrutura central.
+Hub operacional modular da ADCETEI (Prefeitura de Cabo Frio): chamados técnicos, inventário de equipamentos, catálogo de serviços, mensagens diretas entre servidores, usuários e cadastro por e-mail institucional verificado. Novos módulos (impressoras, memorandos, etc.) entram sem alterar a estrutura central.
 
 ## Documentação
 
