@@ -1,4 +1,5 @@
 const http = require("http");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -36,17 +37,27 @@ function sendJson(response, status, payload) {
 
 function authorize(request) {
   if (!SHARED_SECRET) return true;
-  return request.headers["x-bridge-token"] === SHARED_SECRET;
+  const provided = Buffer.from(String(request.headers["x-bridge-token"] || ""), "utf8");
+  const expected = Buffer.from(SHARED_SECRET, "utf8");
+  if (provided.length !== expected.length) return false;
+  return crypto.timingSafeEqual(provided, expected);
 }
 
 function readBody(request) {
   return new Promise((resolve, reject) => {
     let body = "";
+    let rejected = false;
     request.on("data", (chunk) => {
+      if (rejected) return;
       body += chunk;
-      if (body.length > 1024 * 1024) request.destroy();
+      if (body.length > 1024 * 1024) {
+        rejected = true;
+        reject(new Error("Corpo da requisição excede o limite permitido."));
+        request.destroy();
+      }
     });
     request.on("end", () => {
+      if (rejected) return;
       if (!body.trim()) return resolve({});
       try {
         resolve(JSON.parse(body));
@@ -54,7 +65,11 @@ function readBody(request) {
         reject(new Error("JSON inválido no corpo da requisição."));
       }
     });
-    request.on("error", reject);
+    request.on("error", (error) => {
+      if (rejected) return;
+      rejected = true;
+      reject(error);
+    });
   });
 }
 
@@ -539,6 +554,30 @@ const server = http.createServer((request, response) => {
     sendJson(response, 500, { detail: error.message || "Erro interno no Mesh Bridge." });
   });
 });
+
+function sweepOrphanedTempFiles() {
+  // Se o processo for encerrado (OOM, SIGKILL, restart) no meio de um runMeshCtrl(), os
+  // arquivos meshctrl-out-*/meshctrl-err-* daquela chamada nunca chegam a ser removidos.
+  // Uma varredura na subida evita acúmulo indefinido no volume do container.
+  let removed = 0;
+  try {
+    for (const entry of fs.readdirSync(os.tmpdir())) {
+      if (/^meshctrl-(out|err)-.+\.(json|log)$/.test(entry)) {
+        try {
+          fs.unlinkSync(path.join(os.tmpdir(), entry));
+          removed += 1;
+        } catch {
+          // ignore individual file cleanup errors
+        }
+      }
+    }
+  } catch {
+    // tmpdir not readable, nothing to do
+  }
+  if (removed > 0) console.log(`Mesh Bridge removeu ${removed} arquivo(s) temporário(s) órfão(s) na subida.`);
+}
+
+sweepOrphanedTempFiles();
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Mesh Bridge ouvindo na porta ${PORT}. Mock=${MOCK ? "sim" : "não"}`);

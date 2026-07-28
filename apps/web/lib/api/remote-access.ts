@@ -1,19 +1,10 @@
 import type { RemoteAccessDevicePage, RemoteAccessHealth, RemoteAccessLaunch, RemoteAccessSession, RemoteAccessSessionPayload } from "../types/remote-access";
-import { request } from "./client";
-
-function query(params: Record<string, string | number | undefined>) {
-  const search = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== "") search.set(key, String(value));
-  });
-  const text = search.toString();
-  return text ? `?${text}` : "";
-}
+import { buildQuery, request } from "./client";
 
 export const remoteAccessApi = {
   remoteAccessHealth: () => request<RemoteAccessHealth>("/remote-access/health"),
   remoteDevices: (params: { page?: number; page_size?: number; search?: string; status?: string } = {}) =>
-    request<RemoteAccessDevicePage>(`/remote-access/devices${query(params)}`),
+    request<RemoteAccessDevicePage>(`/remote-access/devices${buildQuery(params)}`),
   createRemoteSession: (payload: RemoteAccessSessionPayload) =>
     request<RemoteAccessSession>("/remote-access/sessions", { method: "POST", body: JSON.stringify(payload) }),
   connectRemoteSession: (payload: RemoteAccessSessionPayload) =>

@@ -42,19 +42,23 @@ export default function RemoteAccessSessionPage() {
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
   const initialized = useRef(false);
+  const requestSequence = useRef(0);
 
   const sessionId = params.id;
 
   const loadSession = async () => {
+    const requestId = ++requestSequence.current;
     setLoading(true);
     setError("");
     try {
       const result = await api.remoteSession(sessionId);
+      if (requestId !== requestSequence.current) return;
       setSession(result);
     } catch (err) {
+      if (requestId !== requestSequence.current) return;
       setError(err instanceof Error ? err.message : "Não foi possível carregar a sessão remota.");
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
   };
 

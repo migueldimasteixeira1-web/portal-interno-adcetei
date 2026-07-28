@@ -53,13 +53,21 @@ def _parse_datetime(value: Any) -> datetime | None:
     return None
 
 
+def _first_present(payload: dict[str, Any], *keys: str) -> Any:
+    """Retorna o valor da primeira chave presente no payload, mesmo que seja falsy (False/0)."""
+    for key in keys:
+        if key in payload:
+            return payload[key]
+    return None
+
+
 def _device_from_payload(payload: dict[str, Any]) -> MeshDevice:
     return MeshDevice(
         node_id=str(payload.get("node_id") or payload.get("nodeId") or payload.get("id") or "").strip(),
         name=str(payload.get("name") or payload.get("display_name") or payload.get("displayName") or "Sem nome").strip(),
         group_id=str(payload.get("group_id") or payload.get("groupId") or payload.get("meshid") or "").strip(),
         group_name=str(payload.get("group_name") or payload.get("groupName") or payload.get("meshname") or "").strip(),
-        online=bool(payload.get("online") or payload.get("connected") or payload.get("conn")),
+        online=bool(_first_present(payload, "online", "connected", "conn")),
         operating_system=str(payload.get("operating_system") or payload.get("operatingSystem") or payload.get("os") or "").strip(),
         ip_address=str(payload.get("ip_address") or payload.get("ipAddress") or payload.get("ip") or "").strip(),
         last_seen_at=_parse_datetime(payload.get("last_seen_at") or payload.get("lastSeenAt") or payload.get("lastconnect") or payload.get("lastseen")),
@@ -77,7 +85,9 @@ class MeshBridgeClient:
         return self._request("GET", "/health")
 
     def list_devices(self, *, page: int, page_size: int, search: str = "", status: str = "") -> dict[str, Any]:
-        params: dict[str, Any] = {"page": page, "page_size": page_size, "search": search, "status": status}
+        # O bridge aceita tanto "status" quanto "online" para o mesmo filtro; envia-se só um
+        # para manter o contrato HTTP sem parâmetros redundantes.
+        params: dict[str, Any] = {"page": page, "page_size": page_size, "search": search}
         normalized = status.strip().lower()
         if normalized == "online":
             params["online"] = "true"

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, joinedload
 
 from ..audit import add_audit
@@ -12,7 +13,7 @@ from ..database import get_db
 from ..integrations.meshcentral_client import MeshBridgeClient, MeshBridgeError, MeshDevice
 from ..inventory_service import build_asset_display_name
 from ..models import Asset, RemoteAccessSession, RemoteDeviceLink, Ticket, User
-from ..permissions import require_permission
+from ..permissions import has_permission, require_permission
 from ..schemas import (
     RemoteAccessAssetRefOut,
     RemoteAccessDeviceOut,
@@ -24,6 +25,8 @@ from ..schemas import (
     RemoteAccessSummaryOut,
 )
 from ..time_utils import utc_now
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/remote-access", tags=["acesso remoto"])
 
@@ -97,6 +100,27 @@ def _remote_user_id(user: User) -> str:
     return f"portal_{user.username}".lower().replace(" ", ".")
 
 
+def _ensure_session_access(db: Session, session: RemoteAccessSession, current_user: User) -> None:
+    """Restringe leitura/operação de uma sessão a quem a abriu ou a quem gerencia o módulo.
+
+    Sem essa checagem, qualquer usuário com `remote_access.view`/`.connect` podia consultar,
+    reabrir ou encerrar a sessão de acesso remoto de outra pessoa (IDOR), incluindo o motivo
+    informado e o IP de origem.
+    """
+    if session.portal_user_id == current_user.id:
+        return
+    if has_permission(db, current_user, "remote_access.manage"):
+        return
+    raise HTTPException(status_code=403, detail="Você não tem acesso a esta sessão de acesso remoto.")
+
+
+def _bridge_error_detail(exc: MeshBridgeError, *, context: str) -> str:
+    # O mesh-bridge/meshctrl pode incluir caminhos, argumentos ou detalhes internos na mensagem
+    # de erro. Isso fica só no log do servidor; o usuário recebe uma mensagem genérica.
+    logger.warning("Falha no Mesh Bridge (%s): %s", context, exc)
+    return "Não foi possível se comunicar com o Mesh Bridge. Tente novamente em instantes."
+
+
 @router.get("/health", response_model=RemoteAccessHealthOut)
 def remote_access_health(
     current_user: User = Depends(require_permission("remote_access.view")),
@@ -123,7 +147,7 @@ def list_remote_devices(
     try:
         result = _bridge().list_devices(page=page, page_size=page_size, search=search.strip(), status=status)
     except MeshBridgeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=_bridge_error_detail(exc, context="list_devices")) from exc
 
     node_ids = [item.node_id for item in result["items"]]
     links = {}
@@ -143,6 +167,8 @@ def list_remote_devices(
     if "online" in summary_payload:
         online = int(summary_payload["online"])
     else:
+        # Sem "summary" do bridge só enxergamos a página atual, então este número reflete
+        # apenas os itens retornados, não o total real de dispositivos online.
         online = sum(1 for item in result["items"] if item.online)
     if "offline" in summary_payload:
         offline = int(summary_payload["offline"])
@@ -162,7 +188,7 @@ def _resolve_remote_device(node_id: str) -> MeshDevice:
     try:
         device = _bridge().get_device(node_id)
     except MeshBridgeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=_bridge_error_detail(exc, context="get_device")) from exc
     if not device.online:
         raise HTTPException(status_code=409, detail="Este computador está offline no MeshCentral.")
     return device
@@ -239,7 +265,7 @@ def _launch_remote_session_record(
         session.status = "failed"
         session.failure_reason = str(exc)
         db.commit()
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=_bridge_error_detail(exc, context="create_session_url")) from exc
 
     session.status = "open"
     session.opened_at = session.opened_at or utc_now()
@@ -326,6 +352,7 @@ def get_remote_access_session(
     )
     if not session:
         raise HTTPException(status_code=404, detail="Sessão de acesso remoto não encontrada.")
+    _ensure_session_access(db, session, current_user)
     return _session_out(session)
 
 
@@ -343,8 +370,10 @@ def launch_remote_access_session(
     )
     if not session:
         raise HTTPException(status_code=404, detail="Sessão de acesso remoto não encontrada.")
+    _ensure_session_access(db, session, current_user)
     if session.status == "ended":
         raise HTTPException(status_code=409, detail="Esta sessão já foi encerrada.")
+    _resolve_remote_device(session.mesh_node_id)
     launch = _launch_remote_session_record(session=session, db=db, current_user=current_user)
     session = db.scalar(
         select(RemoteAccessSession)
@@ -371,9 +400,16 @@ def close_remote_access_session(
     )
     if not session:
         raise HTTPException(status_code=404, detail="Sessão de acesso remoto não encontrada.")
-    if session.status != "ended":
-        session.status = "ended"
-        session.ended_at = utc_now()
+    _ensure_session_access(db, session, current_user)
+
+    # UPDATE condicional atômico: se duas requisições de encerramento chegarem concorrentemente
+    # para a mesma sessão, apenas uma altera uma linha e apenas essa grava auditoria.
+    result = db.execute(
+        update(RemoteAccessSession)
+        .where(RemoteAccessSession.id == session.id, RemoteAccessSession.status != "ended")
+        .values(status="ended", ended_at=utc_now())
+    )
+    if result.rowcount:
         add_audit(
             db,
             actor=current_user,
