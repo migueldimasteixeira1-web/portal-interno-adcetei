@@ -10,6 +10,7 @@ from .inventory_service import build_asset_display_name, legacy_asset_status, no
 from .models import (
     Asset,
     AssetMovement,
+    ChatMessage,
     InventoryContract,
     InventoryEquipmentModel,
     InventoryEquipmentType,
@@ -261,4 +262,11 @@ def seed_database(db: Session) -> None:
         TicketComment(ticket_id=tickets[6].id, author_id=users[2].id, body="Software instalado e testado com sucesso.", internal=False),
     ]
     db.add_all(comments)
+
+    chat_messages = [
+        ChatMessage(sender_id=users[1].id, recipient_id=users[0].id, body="Bom dia! O chamado da internet do SEGTEA já está comigo, vou até o setor agora.", created_at=now - timedelta(hours=1, minutes=10)),
+        ChatMessage(sender_id=users[0].id, recipient_id=users[1].id, body="Perfeito, obrigado. Qualquer coisa me avisa que já libero um técnico de apoio.", created_at=now - timedelta(hours=1, minutes=5)),
+        ChatMessage(sender_id=users[1].id, recipient_id=users[0].id, body="Combinado, te aviso assim que resolver.", created_at=now - timedelta(hours=1)),
+    ]
+    db.add_all(chat_messages)
     db.commit()

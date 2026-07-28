@@ -841,3 +841,42 @@ class RemoteAccessHealthOut(BaseModel):
     enabled: bool
     bridge_online: bool
     message: str
+
+
+class ChatContactOut(BaseModel):
+    id: int
+    full_name: str
+    role: str
+    secretariat: str
+    department: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatMessageCreate(BaseModel):
+    recipient_id: int
+    body: str = Field(min_length=1, max_length=4000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    sender_id: int
+    recipient_id: int
+    body: str
+    created_at: datetime
+    read_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "read_at")
+    def serialize_chat_message_dates(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class ChatConversationOut(BaseModel):
+    contact: ChatContactOut
+    last_message: Optional[ChatMessageOut] = None
+    unread_count: int
+
+
+class ChatUnreadCountOut(BaseModel):
+    unread_count: int
