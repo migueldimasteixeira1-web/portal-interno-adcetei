@@ -515,7 +515,7 @@ export default function InventoryDeliveryTermsPage() {
                         <tr key={`${item.index}-${item.serial_number}`}>
                           <td className="font-mono text-xs">{item.serial_number || "-"}</td>
                           <td>{item.message}</td>
-                          <td><Badge className="border border-[#f0c4c4] bg-[#fff4f4] text-[#9b1c1c]">Erro</Badge></td>
+                          <td><Badge className="border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[var(--status-red-text)]">Erro</Badge></td>
                         </tr>
                       ))}
                     </tbody>

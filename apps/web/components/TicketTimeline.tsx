@@ -48,7 +48,7 @@ export default function TicketTimeline({ comments, currentUser }: { comments: Ti
               <div className={cn(
                 "rounded-md border px-3.5 py-2.5 text-left text-sm leading-6",
                 item.internal
-                  ? "border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[#78350f]"
+                  ? "border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]"
                   : alignRight
                     ? "border-[var(--status-blue-border)] bg-[var(--blue-100)] text-[var(--foreground)]"
                     : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]",
