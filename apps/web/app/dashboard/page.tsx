@@ -57,15 +57,15 @@ export default function DashboardPage() {
       />
 
       <div className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="rounded-md border border-[#c5daf0] bg-[#f3f7fb] p-4">
-          <p className="text-sm font-semibold text-[#164f84]">Hub modular do portal</p>
-          <p className="mt-1 text-sm leading-6 text-[#5c6b7e]">
+        <div className="rounded-md border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] p-4">
+          <p className="text-sm font-semibold text-[var(--primary-hover)]">Hub modular do portal</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
             Use esta tela como ponto de partida para suporte técnico, ativos e módulos planejados do portal.
           </p>
         </div>
-        <div className="rounded-md border border-[#d4dbe4] bg-white p-4">
-          <p className="text-sm font-semibold text-[#1a2332]">Atalho recomendado</p>
-          <p className="mt-1 text-sm leading-6 text-[#5c6b7e]">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--card)] p-4">
+          <p className="text-sm font-semibold text-[var(--foreground)]">Atalho recomendado</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
             {user?.role === "user" ? "Abra ou acompanhe suas solicitações técnicas pelo módulo de chamados." : "Acompanhe a fila técnica pelo módulo de chamados."}
           </p>
           <Link href="/chamados" className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "mt-3")}>

@@ -447,7 +447,7 @@ export default function InventoryDeliveryTermsPage() {
                 <Field label="Buscar equipamento">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
                       <Input
                         ref={inputRef}
                         className="pl-8"
@@ -466,26 +466,26 @@ export default function InventoryDeliveryTermsPage() {
                   </div>
                 </Field>
                 {assetSearch.trim().length >= 2 && (
-                  <div className="overflow-hidden rounded-md border border-[#e8edf2]">
-                    {assetSearchLoading && <p className="px-3 py-2 text-sm text-[#5c6b7e]">Buscando...</p>}
+                  <div className="overflow-hidden rounded-md border border-[var(--border-subtle)]">
+                    {assetSearchLoading && <p className="px-3 py-2 text-sm text-[var(--muted)]">Buscando...</p>}
                     {!assetSearchLoading && assetResults.map((asset) => (
                       <button
                         key={asset.id}
                         type="button"
                         onClick={() => addAsset(asset)}
-                        className="block w-full border-b border-[#e8edf2] bg-white px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[#f7f9fb]"
+                        className="block w-full border-b border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--surface-subtle)]"
                       >
-                        <span className="font-semibold text-[#1a2332]">{asset.serial_number}</span>
-                        <span className="mt-0.5 block text-xs text-[#5c6b7e]">{asset.display_name}</span>
+                        <span className="font-semibold text-[var(--foreground)]">{asset.serial_number}</span>
+                        <span className="mt-0.5 block text-xs text-[var(--muted)]">{asset.display_name}</span>
                       </button>
                     ))}
-                    {!assetSearchLoading && !assetResults.length && <p className="px-3 py-2 text-sm text-[#5c6b7e]">Nenhum equipamento em estoque encontrado.</p>}
+                    {!assetSearchLoading && !assetResults.length && <p className="px-3 py-2 text-sm text-[var(--muted)]">Nenhum equipamento em estoque encontrado.</p>}
                   </div>
                 )}
                 {serials.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {serials.map((serial) => (
-                      <Badge key={serial} className="border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]">
+                      <Badge key={serial} className="border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]">
                         {serial}
                         <button type="button" className="ml-1 font-bold" onClick={() => removeSerial(serial)} aria-label={`Remover ${serial}`}>x</button>
                       </Badge>
@@ -508,7 +508,7 @@ export default function InventoryDeliveryTermsPage() {
                         <tr key={item.serial_number}>
                           <td className="font-mono text-xs">{item.serial_number}</td>
                           <td>{item.specification || [item.asset_type, item.manufacturer, item.model].filter(Boolean).join(" · ")}</td>
-                          <td><Badge className="border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]">OK</Badge></td>
+                          <td><Badge className="border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]">OK</Badge></td>
                         </tr>
                       ))}
                       {preview?.errors.map((item) => (
@@ -534,20 +534,20 @@ export default function InventoryDeliveryTermsPage() {
               <div className="space-y-3 p-4">
                 <Field label="Buscar recebedor">
                   <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
                     <Input className="pl-8" value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} placeholder="Nome, e-mail ou matrícula" />
                   </div>
                 </Field>
-                <div className="max-h-52 overflow-y-auto rounded-md border border-[#e8edf2]">
+                <div className="max-h-52 overflow-y-auto rounded-md border border-[var(--border-subtle)]">
                   {filteredUsers.map((recipient) => (
                     <button
                       type="button"
                       key={recipient.id}
                       onClick={() => selectRecipient(recipient)}
-                      className={`block w-full border-b border-[#e8edf2] px-3 py-2 text-left text-sm last:border-b-0 ${draft.recipient_user_id === String(recipient.id) ? "bg-[#f3f7fb]" : "bg-white hover:bg-[#f7f9fb]"}`}
+                      className={`block w-full border-b border-[var(--border-subtle)] px-3 py-2 text-left text-sm last:border-b-0 ${draft.recipient_user_id === String(recipient.id) ? "bg-[var(--status-blue-bg)]" : "bg-[var(--card)] hover:bg-[var(--surface-subtle)]"}`}
                     >
-                      <span className="font-semibold text-[#1a2332]">{recipient.full_name}</span>
-                      <span className="mt-0.5 block text-xs text-[#5c6b7e]">{recipient.email} · {recipient.registration || "sem matrícula"}{!recipient.active ? " · conta bloqueada" : ""}</span>
+                      <span className="font-semibold text-[var(--foreground)]">{recipient.full_name}</span>
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">{recipient.email} · {recipient.registration || "sem matrícula"}{!recipient.active ? " · conta bloqueada" : ""}</span>
                     </button>
                   ))}
                   {!filteredUsers.length && <EmptyState title="Nenhum usuário encontrado" description={canManageUsers ? "Cadastre o recebedor para usar no termo." : "Peça a um administrador para cadastrar o recebedor."} className="py-6" />}
@@ -578,11 +578,11 @@ export default function InventoryDeliveryTermsPage() {
             <tbody>
               {visibleTerms.map((term) => (
                 <tr key={term.id}>
-                  <td><p className="font-semibold text-[#1a2332]">{term.term_number}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{formatDate(term.issued_at)}</p></td>
-                  <td><p className="font-medium text-[#1a2332]">{term.recipient_name}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{term.recipient_email}</p></td>
-                  <td><p className="font-medium text-[#1a2332]">{term.destination_unit}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{term.contract_number || "Sem contrato informado"}</p></td>
+                  <td><p className="font-semibold text-[var(--foreground)]">{term.term_number}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{formatDate(term.issued_at)}</p></td>
+                  <td><p className="font-medium text-[var(--foreground)]">{term.recipient_name}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{term.recipient_email}</p></td>
+                  <td><p className="font-medium text-[var(--foreground)]">{term.destination_unit}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{term.contract_number || "Sem contrato informado"}</p></td>
                   <td>{term.items.length}</td>
-                  <td><Badge className={term.status === "delivered" ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]"}>{term.status === "delivered" && <CheckCircle2 size={13} />}{statusLabels[term.status]}</Badge></td>
+                  <td><Badge className={term.status === "delivered" ? "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]" : "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]"}>{term.status === "delivered" && <CheckCircle2 size={13} />}{statusLabels[term.status]}</Badge></td>
                   <td>
                     <div className="flex flex-wrap gap-1.5">
                       <Button type="button" variant="ghost" size="sm" onClick={() => void downloadTerm(term)}><Download size={15} />DOCX</Button>

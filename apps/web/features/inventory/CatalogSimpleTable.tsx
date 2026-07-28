@@ -31,22 +31,22 @@ export default function CatalogSimpleTable({ tab, items, supplierNameById, secre
             <tr key={item.id}>
               {tab === "sectors" ? (
                 <>
-                  <td className="font-semibold text-[#1a2332]">{secretariatNameById?.get((item as InventorySector).secretariat_id || 0) || "Secretaria não vinculada"}</td>
-                  <td className="text-[#5c6b7e]">{item.name}</td>
+                  <td className="font-semibold text-[var(--foreground)]">{secretariatNameById?.get((item as InventorySector).secretariat_id || 0) || "Secretaria não vinculada"}</td>
+                  <td className="text-[var(--muted)]">{item.name}</td>
                 </>
               ) : (
-                <td className="font-semibold text-[#1a2332]">{item.name}</td>
+                <td className="font-semibold text-[var(--foreground)]">{item.name}</td>
               )}
               <td>
                 <Badge className={activeBadgeClass(item.is_active)}>{item.is_active ? "Ativo" : "Inativo"}</Badge>
               </td>
               {tab === "contracts" && (
-                <td className="text-[#5c6b7e]">{supplierNameById?.get((item as InventoryContract).supplier_id) || "Fornecedor não informado"}</td>
+                <td className="text-[var(--muted)]">{supplierNameById?.get((item as InventoryContract).supplier_id) || "Fornecedor não informado"}</td>
               )}
               {tab === "sectors" && (
-                <td className="text-[#5c6b7e]">
+                <td className="text-[var(--muted)]">
                   {isDefaultSector(item.name) ? (
-                    <Badge className="border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]">Padrão do sistema</Badge>
+                    <Badge className="border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]">Padrão do sistema</Badge>
                   ) : (
                     "—"
                   )}

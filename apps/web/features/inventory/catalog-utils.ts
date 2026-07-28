@@ -55,8 +55,8 @@ export function isDefaultSector(name: string) {
 
 export function activeBadgeClass(isActive: boolean) {
   return isActive
-    ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]"
-    : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]";
+    ? "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]"
+    : "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]";
 }
 
 export function sortByName<T extends { name: string }>(items: T[]) {

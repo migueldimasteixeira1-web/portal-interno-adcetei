@@ -33,15 +33,15 @@ export default function TicketCommentSection({
     <Card className="overflow-hidden">
       <SectionHeader title="Histórico do atendimento" description="Mensagens, notas internas e alterações administrativas." />
       <TicketTimeline comments={ticket.comments || []} currentUser={user} />
-      <form onSubmit={onSubmit} className="border-t border-[#e8edf2] bg-[#f7f9fb] p-4">
+      <form onSubmit={onSubmit} className="border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4">
         {canAddInternalNote && (
-          <div className="mb-3 inline-flex rounded-md border border-[#d4dbe4] bg-white p-0.5">
+          <div className="mb-3 inline-flex rounded-md border border-[var(--border)] bg-[var(--card)] p-0.5">
             <button
               type="button"
               onClick={() => onInternalChange(false)}
               className={cn(
                 "rounded px-2.5 py-1 text-xs font-semibold transition",
-                !internal ? "bg-[#f3f7fb] text-[#1a5f9e]" : "text-[#8b97a8] hover:text-[#1a2332]",
+                !internal ? "bg-[var(--status-blue-bg)] text-[var(--primary)]" : "text-[var(--muted-light)] hover:text-[var(--foreground)]",
               )}
             >
               <MessageSquareText className="mr-1 inline" size={13} />
@@ -52,7 +52,7 @@ export default function TicketCommentSection({
               onClick={() => onInternalChange(true)}
               className={cn(
                 "rounded px-2.5 py-1 text-xs font-semibold transition",
-                internal ? "bg-[#fffbeb] text-[#92400e]" : "text-[#8b97a8] hover:text-[#1a2332]",
+                internal ? "bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]" : "text-[var(--muted-light)] hover:text-[var(--foreground)]",
               )}
             >
               <LockKeyhole className="mr-1 inline" size={13} />
@@ -69,10 +69,10 @@ export default function TicketCommentSection({
               ? "Registre uma nota visível apenas para a equipe de TI."
               : "Escreva uma resposta para os participantes do chamado."
           }
-          className={internal ? "border-[#fcd9a8] bg-[#fffbeb] focus:border-[#b45309] focus:ring-[#fffbeb]" : "bg-white"}
+          className={internal ? "border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] focus:border-[var(--amber-600)] focus:ring-[var(--status-amber-bg)]" : "bg-[var(--card)]"}
         />
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[#8b97a8]">
+          <p className="text-xs text-[var(--muted-light)]">
             {internal
               ? "Esta nota não será exibida ao solicitante."
               : isUserProfile

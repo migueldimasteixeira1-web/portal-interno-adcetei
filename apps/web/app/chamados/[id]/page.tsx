@@ -196,7 +196,7 @@ export default function TicketDetailPage() {
     <>
       <button
         onClick={() => router.push("/chamados")}
-        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#5c6b7e] hover:text-[#1a5f9e]"
+        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--muted)] hover:text-[var(--primary)]"
       >
         <ArrowLeft size={16} /> Voltar aos chamados
       </button>

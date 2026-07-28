@@ -53,7 +53,7 @@ export default function TicketSidePanel({
         />
         <div className="space-y-3 p-4">
           {(canQuickAssign || canQuickClose) && (
-            <div className="grid gap-2 border-b border-[#e8edf2] pb-3">
+            <div className="grid gap-2 border-b border-[var(--border-subtle)] pb-3">
               {canQuickAssign && (
                 <Button
                   type="button"
@@ -77,10 +77,10 @@ export default function TicketSidePanel({
                 </Button>
               )}
               {hasPendingChanges && (
-                <p className="text-xs text-[#8b97a8]">Salve ou desfaça as alterações pendentes antes de usar ações rápidas.</p>
+                <p className="text-xs text-[var(--muted-light)]">Salve ou desfaça as alterações pendentes antes de usar ações rápidas.</p>
               )}
               {canQuickClose && !ticket.assignee && (
-                <p className="text-xs text-[#8b97a8]">Atribua um responsável antes de encerrar.</p>
+                <p className="text-xs text-[var(--muted-light)]">Atribua um responsável antes de encerrar.</p>
               )}
             </div>
           )}
@@ -157,28 +157,28 @@ export default function TicketSidePanel({
             </>
           )}
 
-          <div className="border-t border-[#e8edf2] pt-2">
+          <div className="border-t border-[var(--border-subtle)] pt-2">
             <DetailRow label="Categoria" value={ticket.category} />
             <DetailRow label="Equipe" value={ticket.team} />
             <DetailRow label="Localização" value={ticket.location || "Não informada"} />
           </div>
 
           {ticket.asset && (
-            <div className="rounded-md border border-[#d4dbe4] bg-[#f7f9fb] p-3">
+            <div className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
               <div className="flex items-start gap-2.5">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[#d4dbe4] bg-white text-[#5c6b7e]">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted)]">
                   <Computer size={16} />
                 </span>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8b97a8]">Equipamento vinculado</p>
-                  <p className="mt-0.5 text-sm font-semibold text-[#1a2332]">{ticket.asset.name}</p>
-                  <p className="mt-0.5 text-xs text-[#5c6b7e]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-light)]">Equipamento vinculado</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[var(--foreground)]">{ticket.asset.name}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">
                     {assetTypeLabels[ticket.asset.asset_type] || ticket.asset.asset_type}
                     {!isUserProfile && ticket.asset.manufacturer
                       ? ` · ${ticket.asset.manufacturer} ${ticket.asset.model || ""}`
                       : ""}
                   </p>
-                  <p className="text-xs text-[#8b97a8]">
+                  <p className="text-xs text-[var(--muted-light)]">
                     {!isUserProfile && `IP ${ticket.asset.ip_address || "não informado"} · `}
                     Patrimônio {ticket.asset.patrimony || "não informado"}
                   </p>
@@ -187,10 +187,10 @@ export default function TicketSidePanel({
             </div>
           )}
 
-          <div className="border-t border-[#e8edf2] pt-2">
+          <div className="border-t border-[var(--border-subtle)] pt-2">
             <div className="mb-2 flex items-center gap-1.5">
-              <Clock3 className={overdue ? "text-[#b91c1c]" : "text-[#8b97a8]"} size={15} />
-              <p className="text-sm font-semibold text-[#1a2332]">Prazos</p>
+              <Clock3 className={overdue ? "text-[var(--red-600)]" : "text-[var(--muted-light)]"} size={15} />
+              <p className="text-sm font-semibold text-[var(--foreground)]">Prazos</p>
             </div>
             <DetailRow label="Última atualização" value={formatDate(ticket.updated_at)} />
             <DetailRow label="Prazo estimado" value={formatDate(ticket.due_at)} />

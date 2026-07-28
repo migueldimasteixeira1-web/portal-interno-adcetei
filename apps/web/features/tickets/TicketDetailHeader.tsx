@@ -26,22 +26,22 @@ export default function TicketDetailHeader({
   onSaveClick,
 }: Props) {
   return (
-    <div className="mb-4 flex flex-col gap-3 border-b border-[#d4dbe4] pb-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="mb-4 flex flex-col gap-3 border-b border-[var(--border)] pb-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold tabular-nums text-[#8b97a8]">#{String(ticket.id).padStart(4, "0")}</span>
+          <span className="text-xs font-semibold tabular-nums text-[var(--muted-light)]">#{String(ticket.id).padStart(4, "0")}</span>
           <StatusChip status={ticket.status} />
           {!isUserProfile && <PriorityChip priority={ticket.priority} />}
-          {overdue && <Badge className="border border-[#f5c2c2] bg-[#fef2f2] text-[#991b1b]">Prazo vencido</Badge>}
+          {overdue && <Badge className="border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[var(--status-red-text)]">Prazo vencido</Badge>}
         </div>
-        <h1 className="text-xl font-semibold text-[#1a2332] sm:text-2xl">{ticket.title}</h1>
-        <p className="mt-1 text-sm text-[#5c6b7e]">
+        <h1 className="text-xl font-semibold text-[var(--foreground)] sm:text-2xl">{ticket.title}</h1>
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Aberto por {ticket.requester.full_name} em {formatDate(ticket.created_at)}
         </p>
       </div>
       {canChangeStatus && (
         <Button
-          className={cn(changes.length && "border-[#b45309] bg-[#b45309] hover:border-[#92400e] hover:bg-[#92400e]")}
+          className={cn(changes.length && "border-[var(--amber-600)] bg-[var(--amber-600)] hover:border-[var(--status-amber-text)] hover:bg-[var(--status-amber-text)]")}
           disabled={!changes.length || isFinalStatus}
           onClick={onSaveClick}
         >

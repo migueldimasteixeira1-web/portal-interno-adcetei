@@ -91,13 +91,13 @@ export function BulkScanSerialPanel({ inputRef, serialInput, serials, onSerialIn
       <SectionHeader
         title="Leitura dos números de série"
         description="Use o leitor como teclado ou digite a série e pressione Enter."
-        action={<Badge className="border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[#164f84]">{serials.length} lido(s)</Badge>}
+        action={<Badge className="border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]">{serials.length} lido(s)</Badge>}
       />
       <div className="space-y-4 p-4">
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             ref={inputRef}
-            className="h-11 w-full rounded-md border border-[#d4dbe4] bg-white px-3 text-base text-[#1a2332] outline-none transition placeholder:text-[#8b97a8] focus:border-[#1a5f9e] focus:ring-2 focus:ring-[#e8f1f9]"
+            className="h-11 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-base text-[var(--foreground)] outline-none transition placeholder:text-[var(--muted-light)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--blue-100)]"
             value={serialInput}
             autoFocus
             placeholder="Leia ou digite o número de série"
@@ -118,8 +118,8 @@ export function BulkScanSerialPanel({ inputRef, serialInput, serials, onSerialIn
               <tbody>
                 {serials.map((serial, index) => (
                   <tr key={`${serial}-${index}`}>
-                    <td className="text-[#5c6b7e]">{index + 1}</td>
-                    <td className="font-medium text-[#1a2332]">{serial}</td>
+                    <td className="text-[var(--muted)]">{index + 1}</td>
+                    <td className="font-medium text-[var(--foreground)]">{serial}</td>
                     <td><Button type="button" variant="ghost" size="sm" onClick={() => onRemoveSerial(serial)}><Trash2 size={14} />Remover</Button></td>
                   </tr>
                 ))}
@@ -148,22 +148,22 @@ export function BulkScanPreviewCard({ preview }: PreviewProps) {
     <Card className="overflow-hidden">
       <SectionHeader title="Pré-validação" description="Revise os itens antes de confirmar a criação no estoque." />
       <div className="grid gap-2 p-4 sm:grid-cols-3">
-        <div className="panel-flat p-3"><p className="text-xs text-[#5c6b7e]">Total enviado</p><p className="mt-1 text-xl font-semibold text-[#1a2332]">{preview.total}</p></div>
-        <div className="panel-flat p-3"><p className="text-xs text-[#5c6b7e]">Válidos</p><p className="mt-1 text-xl font-semibold text-[#0d5c4f]">{preview.valid_count}</p></div>
-        <div className="panel-flat p-3"><p className="text-xs text-[#5c6b7e]">Com erro</p><p className="mt-1 text-xl font-semibold text-[#991b1b]">{preview.invalid_count}</p></div>
+        <div className="panel-flat p-3"><p className="text-xs text-[var(--muted)]">Total enviado</p><p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{preview.total}</p></div>
+        <div className="panel-flat p-3"><p className="text-xs text-[var(--muted)]">Válidos</p><p className="mt-1 text-xl font-semibold text-[var(--status-green-text)]">{preview.valid_count}</p></div>
+        <div className="panel-flat p-3"><p className="text-xs text-[var(--muted)]">Com erro</p><p className="mt-1 text-xl font-semibold text-[var(--status-red-text)]">{preview.invalid_count}</p></div>
       </div>
       {preview.errors.length > 0 && (
-        <div className="border-t border-[#e8edf2] p-4">
-          <p className="mb-2 text-sm font-semibold text-[#1a2332]">Pendências encontradas</p>
+        <div className="border-t border-[var(--border-subtle)] p-4">
+          <p className="mb-2 text-sm font-semibold text-[var(--foreground)]">Pendências encontradas</p>
           <div className="overflow-x-auto soft-scrollbar">
             <table className="data-table min-w-[620px]">
               <thead><tr><th>Linha</th><th>Número de série</th><th>Erro</th></tr></thead>
               <tbody>
                 {preview.errors.map((item) => (
                   <tr key={`${item.index}-${item.normalized_serial}`}>
-                    <td className="text-[#5c6b7e]">{item.index}</td>
-                    <td className="text-[#5c6b7e]">{item.serial_number || "Não informado"}</td>
-                    <td className="text-[#991b1b]">{item.message}</td>
+                    <td className="text-[var(--muted)]">{item.index}</td>
+                    <td className="text-[var(--muted)]">{item.serial_number || "Não informado"}</td>
+                    <td className="text-[var(--status-red-text)]">{item.message}</td>
                   </tr>
                 ))}
               </tbody>

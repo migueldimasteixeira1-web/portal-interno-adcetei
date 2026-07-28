@@ -48,7 +48,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4 py-6 sm:px-6">
-      <div className="grid w-full max-w-[940px] overflow-hidden rounded-lg border border-[var(--border)] bg-white shadow-[var(--shadow-md)] md:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid w-full max-w-[940px] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-md)] md:grid-cols-[0.9fr_1.1fr]">
         <aside className="relative hidden min-h-[610px] flex-col justify-between overflow-hidden bg-[var(--navy-900)] p-8 text-white md:flex">
           <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full border border-white/8" />
           <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full border border-white/8" />
@@ -127,7 +127,7 @@ export default function LoginPage() {
           {showDemoUsers && <div className="mt-7 border-t border-[var(--border-subtle)] pt-5">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-xs font-semibold text-[var(--muted)]">Acessos de demonstração</p>
-              <span className="rounded border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] px-2 py-0.5 text-[10px] font-semibold text-[#92400e]">Ambiente local</span>
+              <span className="rounded border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-amber-text)]">Ambiente local</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {demoUsers.map(([user, label]) => (

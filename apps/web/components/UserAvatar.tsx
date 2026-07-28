@@ -14,9 +14,9 @@ export default function UserAvatar({
 }) {
   const sizes = { sm: "h-8 w-8 text-[10px]", md: "h-9 w-9 text-xs" };
   const variants = {
-    default: "bg-[#e8f1f9] text-[#1a5f9e] border border-[#c5daf0]",
+    default: "bg-[var(--blue-100)] text-[var(--primary)] border border-[var(--status-blue-border)]",
     sidebar: "bg-white/15 text-white border border-white/20",
-    internal: "bg-[#fffbeb] text-[#92400e] border border-[#fcd9a8]",
+    internal: "bg-[var(--status-amber-bg)] text-[var(--status-amber-text)] border border-[var(--status-amber-border)]",
   };
 
   return (
