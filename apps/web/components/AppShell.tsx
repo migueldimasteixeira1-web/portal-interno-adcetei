@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { useAuth } from "./AuthProvider";
+import CommandPalette from "./CommandPalette";
 import LoadingScreen from "./LoadingScreen";
+import ThemeToggle from "./ThemeToggle";
 import UserAvatar from "./UserAvatar";
 import { Button, cn } from "./ui";
 import { roleLabels } from "@/lib/format";
@@ -35,7 +37,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 flex w-[240px] -translate-x-full flex-col border-r border-[#0a1f33] bg-[#0f2d4a] text-white transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 flex w-[240px] -translate-x-full flex-col border-r border-[var(--navy-950)] bg-[var(--navy-900)] text-white transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
         open && "translate-x-0",
       )}>
         <div className="border-b border-white/10 px-4 py-4">
@@ -103,24 +105,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {open && <button className="fixed inset-0 z-30 bg-[#0a1f33]/40 lg:hidden" onClick={() => setOpen(false)} aria-label="Fechar menu" />}
+      {open && <button className="fixed inset-0 z-30 bg-[var(--navy-950)]/40 lg:hidden" onClick={() => setOpen(false)} aria-label="Fechar menu" />}
 
       <main className="min-w-0">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[#d4dbe4] bg-white px-4 sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <button onClick={() => setOpen(true)} className="rounded-md p-1.5 text-[#5c6b7e] hover:bg-[#e8edf2] lg:hidden" aria-label="Abrir menu">
+            <button onClick={() => setOpen(true)} className="rounded-md p-1.5 text-[var(--muted)] hover:bg-[var(--border-subtle)] lg:hidden" aria-label="Abrir menu">
               <Menu size={20} />
             </button>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#1a2332]">{currentLabel}</p>
-              <p className="hidden truncate text-xs text-[#8b97a8] sm:block">{user.department} · {user.secretariat}</p>
+              <p className="truncate text-sm font-semibold text-[var(--foreground)]">{currentLabel}</p>
+              <p className="hidden truncate text-xs text-[var(--muted-light)] sm:block">{user.department} · {user.secretariat}</p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2.5">
-            {environmentLabel && <span className="hidden items-center gap-1.5 rounded-md border border-[#a7d9cf] bg-[#edf7f5] px-2 py-1 text-[11px] font-semibold text-[#0d5c4f] sm:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0d7a6a]" />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <CommandPalette />
+            {environmentLabel && <span className="hidden items-center gap-1.5 rounded-md border border-[var(--status-green-border)] bg-[var(--status-green-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--status-green-text)] sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
               {environmentLabel}
             </span>}
+            <ThemeToggle />
             <UserAvatar name={user.full_name} size="sm" className="hidden sm:flex" />
           </div>
         </header>
