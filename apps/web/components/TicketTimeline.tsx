@@ -14,7 +14,7 @@ export default function TicketTimeline({ comments, currentUser }: { comments: Ti
       {comments.map((item) => {
         const own = item.author.id === currentUser.id;
         const isEvent = item.event_type !== "comment";
-        const alignRight = own && !item.internal && !isEvent;
+        const alignRight = own && !isEvent;
 
         if (isEvent) {
           return (
