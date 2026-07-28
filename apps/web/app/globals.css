@@ -185,8 +185,8 @@ button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 ::selection {
-  background: #c5daf0;
-  color: #0f2d4a;
+  background: var(--status-blue-border);
+  color: var(--foreground);
 }
 
 @theme inline {
@@ -224,7 +224,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 .data-table thead {
   border-bottom: 1px solid var(--border);
-  background: #f7f9fb;
+  background: var(--surface-subtle);
 }
 
 .data-table th {
@@ -243,7 +243,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .data-table tbody tr:hover {
-  background: #f7f9fb;
+  background: var(--surface-subtle);
 }
 
 .data-table tbody tr:last-child td {
@@ -252,11 +252,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 /* Scrollbar */
 .soft-scrollbar {
-  scrollbar-color: #c5cdd8 transparent;
+  scrollbar-color: var(--disabled) transparent;
   scrollbar-width: thin;
 }
 .soft-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.soft-scrollbar::-webkit-scrollbar-thumb { background: #c5cdd8; border-radius: 3px; }
+.soft-scrollbar::-webkit-scrollbar-thumb { background: var(--disabled); border-radius: 3px; }
 .soft-scrollbar::-webkit-scrollbar-track { background: transparent; }
 
 /* Foco acessível */
