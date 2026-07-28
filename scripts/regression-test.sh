@@ -86,7 +86,9 @@ if [[ ! -x "$API_PYTHON" ]]; then
 fi
 
 "$API_PYTHON" -c "import uvicorn" >/dev/null
-if rg -q -F '"/assets/ticket-options"' "$ROOT_DIR/apps/web" || rg -q -F "'/assets/ticket-options'" "$ROOT_DIR/apps/web"; then
+GREP_EXCLUDES=(--exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.venv)
+if grep -rq "${GREP_EXCLUDES[@]}" -F '"/assets/ticket-options"' "$ROOT_DIR/apps/web" \
+  || grep -rq "${GREP_EXCLUDES[@]}" -F "'/assets/ticket-options'" "$ROOT_DIR/apps/web"; then
   echo "Frontend ainda consome a rota legada /assets/ticket-options."
   exit 1
 fi

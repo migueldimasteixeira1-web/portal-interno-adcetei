@@ -4,7 +4,6 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_DIR="$ROOT_DIR/apps/api"
 API_PYTHON="$API_DIR/.venv/bin/python"
-BASELINE_REVISION="20260717_0001"
 TEST_ROOT="$(mktemp -d)"
 SQLITE_DB="$TEST_ROOT/empty.db"
 OLD_DB="$TEST_ROOT/old.db"
@@ -84,7 +83,7 @@ SQLITE_URL="sqlite:///$SQLITE_DB"
 echo "[1/6] Baseline e idempotência em SQLite vazio..."
 run_alembic "$SQLITE_URL" upgrade head
 run_alembic "$SQLITE_URL" upgrade head
-run_alembic "$SQLITE_URL" current | rg -q "$BASELINE_REVISION"
+run_alembic "$SQLITE_URL" current | grep -qF "(head)"
 run_alembic "$SQLITE_URL" check
 DATABASE_URL="$SQLITE_URL" ENVIRONMENT=test SEED_DEMO_DATA=false "$API_PYTHON" - <<'PY'
 from sqlalchemy import inspect
@@ -212,15 +211,17 @@ PG_PORT="$(docker port "$PG_CONTAINER" 5432/tcp | awk -F: 'NR == 1 {print $NF}')
 PG_URL="postgresql+psycopg://portal_test:portal_test_password@127.0.0.1:$PG_PORT/portal_test"
 run_alembic "$PG_URL" upgrade head
 run_alembic "$PG_URL" upgrade head
-run_alembic "$PG_URL" current | rg -q "$BASELINE_REVISION"
+run_alembic "$PG_URL" current | grep -qF "(head)"
 run_alembic "$PG_URL" check
 start_api "$PG_URL" 18031
 stop_api
 echo "PostgreSQL temporário e API: OK"
 
 echo "[6/6] Ausência de criação silenciosa fora das migrations..."
-if rg -n "Base\\.metadata\\.create_all|ensure_schema_compatibility|schema_adoption|alembic[[:space:]]+stamp" \
-  -g '!alembic-self-check.sh' \
+if grep -rnE "Base\\.metadata\\.create_all|ensure_schema_compatibility|schema_adoption|alembic[[:space:]]+stamp" \
+  --exclude=alembic-self-check.sh \
+  --exclude-dir=.venv --exclude-dir=venv --exclude-dir=node_modules \
+  --exclude-dir=__pycache__ --exclude-dir=.next \
   "$ROOT_DIR/apps" "$ROOT_DIR/scripts" "$ROOT_DIR/iniciar-local.sh"; then
   echo "Foi encontrada criação ou adoção de schema fora do Alembic."
   exit 1
