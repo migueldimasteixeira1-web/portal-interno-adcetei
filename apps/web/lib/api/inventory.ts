@@ -30,7 +30,7 @@ import type {
   InventorySectorCreatePayload,
   InventorySectorUpdatePayload,
 } from "../types";
-import { downloadRequest, request } from "./client";
+import { buildQuery, downloadRequest, request } from "./client";
 
 export const inventoryApi = {
   assetTicketOptions: () => request<AssetTicketOption[]>("/inventory/assets/ticket-options"),
@@ -77,17 +77,10 @@ export const inventoryApi = {
     request<InventoryCatalogItem>(`/inventory/catalogs/sectors/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteInventorySector: (id: number) =>
     request<{ message: string }>(`/inventory/catalogs/sectors/${id}`, { method: "DELETE" }),
-  inventoryAssets: (params: Record<string, string | number | undefined> = {}) => {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => value !== undefined && value !== "" && query.set(key, String(value)));
-    return request<InventoryAssetPage>(`/inventory/assets?${query.toString()}`);
-  },
-  exportInventorySpreadsheet: (params: Record<string, string | number | undefined> = {}) => {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => value !== undefined && value !== "" && query.set(key, String(value)));
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-    return downloadRequest(`/inventory/assets/export${suffix}`, "inventario_adcetei.xlsx");
-  },
+  inventoryAssets: (params: Record<string, string | number | undefined> = {}) =>
+    request<InventoryAssetPage>(`/inventory/assets${buildQuery(params)}`),
+  exportInventorySpreadsheet: (params: Record<string, string | number | undefined> = {}) =>
+    downloadRequest(`/inventory/assets/export${buildQuery(params)}`, "inventario_adcetei.xlsx"),
   inventoryAsset: (id: number | string) => request<InventoryAsset>(`/inventory/assets/${id}`),
   inventoryAssetMovements: (id: number | string) => request<InventoryMovement[]>(`/inventory/assets/${id}/movements`),
   createInventoryAsset: (payload: InventoryAssetCreatePayload) =>
