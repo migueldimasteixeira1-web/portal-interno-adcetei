@@ -74,7 +74,7 @@ export function NewTicketServicePicker({ search, services, onSearchChange, onSel
     <>
       <div className="mb-4 max-w-lg">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
           <Input aria-label="Buscar serviço" className="pl-8" placeholder="Buscar serviço, categoria ou palavra-chave" value={search} onChange={(e) => onSearchChange(e.target.value)} />
         </div>
       </div>
@@ -83,9 +83,9 @@ export function NewTicketServicePicker({ search, services, onSearchChange, onSel
         {categories.map((category) => (
           <section key={category} aria-labelledby={`category-${category}`}>
             <div className="mb-2 flex items-center gap-3">
-              <h2 id={`category-${category}`} className="text-sm font-semibold text-[#1a2332]">{category}</h2>
-              <span className="h-px flex-1 bg-[#d4dbe4]" />
-              <span className="text-xs text-[#8b97a8]">{filteredServices.filter((service) => service.category === category).length} serviço(s)</span>
+              <h2 id={`category-${category}`} className="text-sm font-semibold text-[var(--foreground)]">{category}</h2>
+              <span className="h-px flex-1 bg-[var(--border)]" />
+              <span className="text-xs text-[var(--muted-light)]">{filteredServices.filter((service) => service.category === category).length} serviço(s)</span>
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {filteredServices.filter((service) => service.category === category).map((service) => (
@@ -93,16 +93,16 @@ export function NewTicketServicePicker({ search, services, onSearchChange, onSel
                   key={service.id}
                   type="button"
                   onClick={() => onSelect(service.id)}
-                  className="panel-flat flex items-start gap-3 p-3.5 text-left transition hover:border-[#1a5f9e] focus-visible:border-[#1a5f9e]"
+                  className="panel-flat flex items-start gap-3 p-3.5 text-left transition hover:border-[var(--primary)] focus-visible:border-[var(--primary)]"
                 >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]">
                     <CatalogIcon name={service.icon} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-[#1a2332]">{service.name}</h3>
-                    <p className="mt-1 text-sm leading-5 text-[#5c6b7e]">{service.description}</p>
+                    <h3 className="font-semibold text-[var(--foreground)]">{service.name}</h3>
+                    <p className="mt-1 text-sm leading-5 text-[var(--muted)]">{service.description}</p>
                   </div>
-                  <ArrowRight className="mt-0.5 shrink-0 text-[#8b97a8]" size={16} />
+                  <ArrowRight className="mt-0.5 shrink-0 text-[var(--muted-light)]" size={16} />
                 </button>
               ))}
             </div>

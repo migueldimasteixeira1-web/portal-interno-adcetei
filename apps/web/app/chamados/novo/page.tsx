@@ -87,13 +87,13 @@ export default function NewTicketPage() {
       />
 
       <div className="mb-4 flex items-center gap-3 text-sm">
-        <span className="flex items-center gap-1.5 font-medium text-[#0d7a6a]">
-          <span className="grid h-6 w-6 place-items-center rounded-md border border-[#a7d9cf] bg-[#edf7f5]"><Check size={13} /></span>
+        <span className="flex items-center gap-1.5 font-medium text-[var(--accent)]">
+          <span className="grid h-6 w-6 place-items-center rounded-md border border-[var(--status-green-border)] bg-[var(--status-green-bg)]"><Check size={13} /></span>
           Serviço escolhido
         </span>
-        <span className="h-px flex-1 bg-[#d4dbe4]" />
-        <span className="flex items-center gap-1.5 font-semibold text-[#1a5f9e]">
-          <span className="grid h-6 w-6 place-items-center rounded-md border border-[#c5daf0] bg-[#f3f7fb] text-xs">2</span>
+        <span className="h-px flex-1 bg-[var(--border)]" />
+        <span className="flex items-center gap-1.5 font-semibold text-[var(--primary)]">
+          <span className="grid h-6 w-6 place-items-center rounded-md border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-xs">2</span>
           Detalhes
         </span>
       </div>
@@ -102,10 +102,10 @@ export default function NewTicketPage() {
         <Card className="p-4 sm:p-5">
           {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
-          <div className="mb-5 rounded-md border border-[#d4dbe4] bg-[#f7f9fb] p-3.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8b97a8]">Serviço selecionado</p>
-            <p className="mt-1 font-semibold text-[#1a2332]">{selected.name}</p>
-            <p className="mt-1 text-sm leading-6 text-[#5c6b7e]">{selected.description}</p>
+          <div className="mb-5 rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-light)]">Serviço selecionado</p>
+            <p className="mt-1 font-semibold text-[var(--foreground)]">{selected.name}</p>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{selected.description}</p>
           </div>
 
           <div className="space-y-4">
@@ -132,13 +132,13 @@ export default function NewTicketPage() {
                 }}
                 placeholder="Ex.: Preciso instalar a impressora Brother na estação ADSEGTEA004. A impressora já está no setor e possui o IP 192.168.22.18."
               />
-              <span className="block text-right text-xs text-[#8b97a8]">{description.length} caracteres</span>
+              <span className="block text-right text-xs text-[var(--muted-light)]">{description.length} caracteres</span>
             </Field>
             {dynamicFields.length > 0 && (
-              <section className="rounded-md border border-[#d4dbe4] bg-[#f7f9fb] p-4" aria-labelledby="service-fields-title">
+              <section className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-4" aria-labelledby="service-fields-title">
                 <div className="mb-4">
-                  <h2 id="service-fields-title" className="text-sm font-semibold text-[#1a2332]">Informações do serviço</h2>
-                  <p className="mt-0.5 text-xs leading-5 text-[#5c6b7e]">Campos definidos pelo catálogo para agilizar a triagem.</p>
+                  <h2 id="service-fields-title" className="text-sm font-semibold text-[var(--foreground)]">Informações do serviço</h2>
+                  <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">Campos definidos pelo catálogo para agilizar a triagem.</p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   {dynamicFields.map((field) => (
@@ -181,8 +181,8 @@ export default function NewTicketPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[#e8edf2] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#8b97a8]">O título será definido automaticamente como &ldquo;{selected.name}&rdquo;.</p>
+          <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[var(--border-subtle)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[var(--muted-light)]">O título será definido automaticamente como &ldquo;{selected.name}&rdquo;.</p>
             <Button disabled={submitting || description.trim().length < 5}>
               {submitting ? "Enviando solicitação..." : "Enviar chamado"}
               <ArrowRight size={16} />
@@ -192,15 +192,15 @@ export default function NewTicketPage() {
 
         <div className="space-y-4">
           <Card className="p-4">
-            <h2 className="text-sm font-semibold text-[#1a2332]">O que acontece depois?</h2>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">O que acontece depois?</h2>
             <ol className="mt-3 space-y-3">
               {[
                 "O chamado entra na fila central da TI.",
                 "A equipe avalia a prioridade e define um responsável.",
                 "Você acompanha respostas e mudanças no histórico.",
               ].map((item, index) => (
-                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[#5c6b7e]">
-                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[11px] font-semibold text-[#1a5f9e]">{index + 1}</span>
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] text-[11px] font-semibold text-[var(--primary)]">{index + 1}</span>
                   {item}
                 </li>
               ))}
@@ -223,12 +223,12 @@ export default function NewTicketPage() {
       {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
       <div className="mb-4 flex items-center gap-3 text-sm">
-        <span className="flex items-center gap-1.5 font-semibold text-[#1a5f9e]">
-          <span className="grid h-6 w-6 place-items-center rounded-md border border-[#c5daf0] bg-[#f3f7fb] text-xs">1</span>
+        <span className="flex items-center gap-1.5 font-semibold text-[var(--primary)]">
+          <span className="grid h-6 w-6 place-items-center rounded-md border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-xs">1</span>
           Escolher serviço
         </span>
-        <span className="h-px flex-1 bg-[#d4dbe4]" />
-        <span className="text-[#8b97a8]">Detalhes</span>
+        <span className="h-px flex-1 bg-[var(--border)]" />
+        <span className="text-[var(--muted-light)]">Detalhes</span>
       </div>
 
       <NewTicketServicePicker search={search} services={services} onSearchChange={setSearch} onSelect={selectService} />

@@ -14,9 +14,9 @@ export default function ListPagination({ page, totalPages, total, updating, hasF
   if (total <= 0 && !hasFilters) return null;
 
   return (
-    <div className="flex flex-col gap-3 border-t border-[#e8edf2] bg-[#f7f9fb] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs text-[#5c6b7e]">
-        Página <strong className="text-[#1a2332]">{page}</strong> de <strong className="text-[#1a2332]">{totalPages}</strong>
+    <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-[var(--muted)]">
+        Página <strong className="text-[var(--foreground)]">{page}</strong> de <strong className="text-[var(--foreground)]">{totalPages}</strong>
         <span className="ml-1">· {total} registro(s) no total</span>
       </p>
       <div className="flex gap-2">

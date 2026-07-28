@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import LoadingScreen from "@/components/LoadingScreen";
 import PageHeader from "@/components/PageHeader";
 import { Alert, Button, Card, ConfirmDialog, EmptyState, SectionHeader, buttonStyles } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import CatalogFormDialog from "@/features/inventory/CatalogFormDialog";
 import CatalogModelsTable from "@/features/inventory/CatalogModelsTable";
 import CatalogSimpleTable from "@/features/inventory/CatalogSimpleTable";
@@ -35,13 +36,13 @@ import type { InventoryCatalogItem, InventoryCatalogs, InventoryContract, Invent
 
 export default function InventoryCatalogsPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const canManage = hasPermission(user, "inventory.manage_catalogs");
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyCatalogs);
   const [tab, setTab] = useState<CatalogTab>("secretariats");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [editingSimple, setEditingSimple] = useState<InventoryCatalogItem | null>(null);
@@ -131,7 +132,6 @@ export default function InventoryCatalogsPage() {
 
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       const payload = { name, is_active: simpleDraft.is_active };
       if (tab === "secretariats") {
@@ -147,7 +147,7 @@ export default function InventoryCatalogsPage() {
         if (editingSimple) await api.updateInventoryManufacturer(editingSimple.id, payload);
         else await api.createInventoryManufacturer(payload);
       }
-      setMessage(editingSimple ? "Cadastro atualizado com sucesso." : "Cadastro criado com sucesso.");
+      toast(editingSimple ? "Cadastro atualizado com sucesso." : "Cadastro criado com sucesso.");
       setDialogOpen(false);
       resetForm();
       await load();
@@ -175,12 +175,11 @@ export default function InventoryCatalogsPage() {
 
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       const payload = { name, is_active: sectorDraft.is_active, secretariat_id: Number(sectorDraft.secretariat_id) };
       if (editingSimple) await api.updateInventorySector(editingSimple.id, payload);
       else await api.createInventorySector(payload);
-      setMessage(editingSimple ? "Setor atualizado com sucesso." : "Setor criado com sucesso.");
+      toast(editingSimple ? "Setor atualizado com sucesso." : "Setor criado com sucesso.");
       setDialogOpen(false);
       resetForm();
       await load();
@@ -208,7 +207,6 @@ export default function InventoryCatalogsPage() {
 
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       const payload = {
         name,
@@ -218,7 +216,7 @@ export default function InventoryCatalogsPage() {
       };
       if (editingModel) await api.updateInventoryModel(editingModel.id, payload);
       else await api.createInventoryModel(payload);
-      setMessage(editingModel ? "Modelo atualizado com sucesso." : "Modelo criado com sucesso.");
+      toast(editingModel ? "Modelo atualizado com sucesso." : "Modelo criado com sucesso.");
       setDialogOpen(false);
       resetForm();
       await load();
@@ -242,12 +240,11 @@ export default function InventoryCatalogsPage() {
 
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       const payload = { name, is_active: contractDraft.is_active, supplier_id: Number(contractDraft.supplier_id) };
       if (editingSimple) await api.updateInventoryContract(editingSimple.id, payload);
       else await api.createInventoryContract(payload);
-      setMessage(editingSimple ? "Contrato atualizado com sucesso." : "Contrato criado com sucesso.");
+      toast(editingSimple ? "Contrato atualizado com sucesso." : "Contrato criado com sucesso.");
       setDialogOpen(false);
       resetForm();
       await load();
@@ -264,7 +261,6 @@ export default function InventoryCatalogsPage() {
     if (!deleting) return;
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       const id = deleting.item.id;
       if (deleting.tab === "suppliers") await api.deleteInventorySupplier(id);
@@ -275,7 +271,7 @@ export default function InventoryCatalogsPage() {
       else if (deleting.tab === "models") await api.deleteInventoryModel(id);
       else await api.deleteInventorySector(id);
       setDeleting(null);
-      setMessage("Cadastro excluído com sucesso.");
+      toast("Cadastro excluído com sucesso.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível excluir o cadastro");
@@ -302,14 +298,12 @@ export default function InventoryCatalogsPage() {
           </Link>
         )}
       />
-      {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && !dialogOpen && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
       <CatalogTabs
         tab={tab}
         onTabChange={(nextTab) => {
           setTab(nextTab);
-          setMessage("");
           setError("");
         }}
       />

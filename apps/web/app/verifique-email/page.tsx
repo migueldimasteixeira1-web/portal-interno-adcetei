@@ -34,7 +34,7 @@ function CheckEmailContent() {
 
   return (
     <AuthCardShell>
-        <div className="grid h-12 w-12 place-items-center rounded-md bg-[#edf7f5] text-[#0d5c4f]"><MailCheck size={24} /></div>
+        <div className="grid h-12 w-12 place-items-center rounded-md bg-[var(--status-green-bg)] text-[var(--status-green-text)]"><MailCheck size={24} /></div>
         <h1 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">Verifique seu e-mail</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
           Confirme o link recebido para liberar o acesso ao Portal Interno ADCETEI.

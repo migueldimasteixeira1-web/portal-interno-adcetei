@@ -8,6 +8,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
 import { Alert, Button, Card, ConfirmDialog, EmptyState } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import { ServiceCatalogFormDialog, ServiceCatalogGrid, type ServiceCatalogDraft } from "@/features/admin/ServiceCatalogPanels";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
@@ -31,12 +32,12 @@ const emptyOptions: CatalogOptions = {
 
 export default function CatalogPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const canManage = hasPermission(user, "catalog.manage");
   const [services, setServices] = useState<CatalogService[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [editing, setEditing] = useState<CatalogService | null>(null);
   const [deleting, setDeleting] = useState<CatalogService | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,7 +117,6 @@ export default function CatalogPage() {
   const save = async () => {
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       const payload = {
         name: draft.name,
@@ -129,10 +129,10 @@ export default function CatalogPage() {
       };
       if (editing) {
         await api.updateCatalogService(editing.id, payload);
-        setMessage("Serviço atualizado com sucesso.");
+        toast("Serviço atualizado com sucesso.");
       } else {
         await api.createCatalogService(payload);
-        setMessage("Serviço criado com sucesso.");
+        toast("Serviço criado com sucesso.");
       }
       setDialogOpen(false);
       await load();
@@ -147,11 +147,10 @@ export default function CatalogPage() {
     if (!deleting) return;
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       await api.deleteCatalogService(deleting.id);
       setDeleting(null);
-      setMessage("Serviço excluído com sucesso.");
+      toast("Serviço excluído com sucesso.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível excluir o serviço");
@@ -171,7 +170,6 @@ export default function CatalogPage() {
         subtitle="Crie serviços, organize categorias e defina os campos apresentados na abertura do chamado."
         actions={<Button onClick={openCreate}><Plus size={16} />Novo serviço</Button>}
       />
-      {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && !dialogOpen && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
       <div className="mb-4 grid gap-2 sm:grid-cols-3">

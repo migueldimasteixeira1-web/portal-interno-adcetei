@@ -20,14 +20,14 @@ export function TicketChangesDialog({ open, onOpenChange, changes, saving, onCon
       loading={saving}
       onConfirm={onConfirm}
     >
-      <div className="divide-y divide-[#e8edf2] rounded-md border border-[#d4dbe4]">
+      <div className="divide-y divide-[var(--border-subtle)] rounded-md border border-[var(--border)]">
         {changes.map((change) => (
           <div key={change.field} className="p-3 text-sm">
-            <p className="font-semibold text-[#1a2332]">{change.label}</p>
-            <p className="mt-1 text-[#5c6b7e]">
-              <span className="line-through decoration-[#8b97a8]">{change.from}</span>
-              <span className="mx-2 text-[#8b97a8]">→</span>
-              <span className="font-medium text-[#1a5f9e]">{change.to}</span>
+            <p className="font-semibold text-[var(--foreground)]">{change.label}</p>
+            <p className="mt-1 text-[var(--muted)]">
+              <span className="line-through decoration-[var(--muted-light)]">{change.from}</span>
+              <span className="mx-2 text-[var(--muted-light)]">→</span>
+              <span className="font-medium text-[var(--primary)]">{change.to}</span>
             </p>
           </div>
         ))}
@@ -71,11 +71,11 @@ export function TicketCloseDialog({
         value={resolutionMessage}
         onChange={(event) => onResolutionMessageChange(event.target.value)}
         placeholder="Ex.: Atendimento realizado, conexão normalizada e serviço validado com o setor."
-        className="bg-white"
+        className="bg-[var(--card)]"
       />
       {!ticket.assignee && <Alert tone="warning" className="mt-3">Atribua um responsável antes de encerrar o chamado.</Alert>}
       {resolutionMessage.trim().length < 2 && (
-        <p className="mt-2 text-xs text-[#8b97a8]">A mensagem de encerramento é obrigatória.</p>
+        <p className="mt-2 text-xs text-[var(--muted-light)]">A mensagem de encerramento é obrigatória.</p>
       )}
     </ConfirmDialog>
   );

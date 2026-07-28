@@ -97,33 +97,33 @@ export const catalogFieldLabels: Record<string, string> = {
 
 export function assetStatusTone(status: string): string {
   const map: Record<string, string> = {
-    active: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[#0d5c4f]",
-    allocated: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[#0d5c4f]",
-    maintenance: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[#92400e]",
-    stock: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[#164f84]",
-    retired: "border border-[var(--border)] bg-[#f0f3f7] text-[var(--muted)]",
+    active: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]",
+    allocated: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]",
+    maintenance: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
+    stock: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]",
+    retired: "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]",
   };
-  return map[status] || "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]";
+  return map[status] || "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]";
 }
 
 export function statusTone(status: string): string {
   const map: Record<string, string> = {
     new: "border border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
-    assigned: "border border-[#fde68a] bg-[#fffbeb] text-[#92400e]",
+    assigned: "border border-[#fde68a] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
     closed: "border border-[#a7f3d0] bg-[#ecfdf5] text-[#047857]",
-    cancelled: "border border-[#fecaca] bg-[#fef2f2] text-[#b91c1c]",
+    cancelled: "border border-[#fecaca] bg-[var(--status-red-bg)] text-[var(--red-600)]",
   };
-  return map[status] || "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]";
+  return map[status] || "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]";
 }
 
 export function priorityTone(priority: string): string {
   const map: Record<string, string> = {
-    low: "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]",
-    medium: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[#164f84]",
-    high: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[#92400e]",
-    critical: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[#991b1b]",
+    low: "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]",
+    medium: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]",
+    high: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
+    critical: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[var(--status-red-text)]",
   };
-  return map[priority] || "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]";
+  return map[priority] || "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]";
 }
 
 export function formatDate(value?: string | null, withTime = true): string {

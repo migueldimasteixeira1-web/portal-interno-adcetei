@@ -23,10 +23,10 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusTone: Record<string, string> = {
-  authorized: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[#164f84]",
-  open: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[#0d5c4f]",
-  ended: "border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]",
-  failed: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[#991b1b]",
+  authorized: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]",
+  open: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]",
+  ended: "border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]",
+  failed: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[var(--status-red-text)]",
 };
 
 export default function RemoteAccessSessionPage() {
@@ -141,10 +141,10 @@ export default function RemoteAccessSessionPage() {
       {session && (
         <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
           <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e8edf2] px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
               <div>
-                <p className="text-sm font-semibold text-[#1a2332]">Visualizador remoto</p>
-                <p className="mt-0.5 text-xs text-[#5c6b7e]">Área de trabalho · nova aba MeshCentral</p>
+                <p className="text-sm font-semibold text-[var(--foreground)]">Visualizador remoto</p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">Área de trabalho · nova aba MeshCentral</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge className={statusTone[session.status] || statusTone.authorized}>
@@ -182,7 +182,7 @@ export default function RemoteAccessSessionPage() {
                 </Button>
               </div>
             </div>
-            <div className="grid min-h-[320px] place-items-center bg-[#0f2d4a] p-8 text-center text-white">
+            <div className="grid min-h-[320px] place-items-center bg-[var(--navy-900)] p-8 text-center text-white">
               <div className="max-w-lg">
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-white/10">
                   <MonitorCog size={22} />
@@ -206,12 +206,12 @@ export default function RemoteAccessSessionPage() {
 
           <Card className="h-fit p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[#1a2332]">Dados da sessão</p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">Dados da sessão</p>
               <Badge className={statusTone[session.status] || statusTone.authorized}>
                 {statusLabel[session.status] || session.status}
               </Badge>
             </div>
-            <div className="divide-y divide-[#e8edf2]">
+            <div className="divide-y divide-[var(--border-subtle)]">
               <DetailRow label="Computador" value={session.device_name_snapshot} />
               <DetailRow label="ID MeshCentral" value={<span className="break-all">{session.mesh_node_id}</span>} />
               <DetailRow label="Solicitado em" value={formatDate(session.requested_at)} />

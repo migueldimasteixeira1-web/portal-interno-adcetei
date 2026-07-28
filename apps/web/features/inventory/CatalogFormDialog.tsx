@@ -108,7 +108,7 @@ export default function CatalogFormDialog({
               />
             </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332] sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)] sm:col-span-2">
             <input
               type="checkbox"
               checked={modelDraft.is_active}
@@ -134,7 +134,7 @@ export default function CatalogFormDialog({
               placeholder="Ex.: Contrato nº 046/2026 - PMCF / IART"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]">
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
             <input
               type="checkbox"
               checked={contractDraft.is_active}
@@ -164,7 +164,7 @@ export default function CatalogFormDialog({
           {editingDefaultSector && (
             <Alert tone="info">O setor ADCETEI é o estoque padrão do sistema. O nome não pode ser alterado por aqui.</Alert>
           )}
-          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]">
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
             <input
               type="checkbox"
               checked={sectorDraft.is_active}
@@ -187,7 +187,7 @@ export default function CatalogFormDialog({
           {editingDefaultSector && (
             <Alert tone="info">O setor ADCETEI é o estoque padrão do sistema. O nome não pode ser alterado por aqui.</Alert>
           )}
-          <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]">
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
             <input
               type="checkbox"
               checked={simpleDraft.is_active}

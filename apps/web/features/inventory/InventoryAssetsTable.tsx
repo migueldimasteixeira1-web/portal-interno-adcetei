@@ -58,7 +58,7 @@ export default function InventoryAssetsTable({
       <Toolbar className="mb-4">
         <div className="grid w-full gap-2 xl:grid-cols-[minmax(220px,1fr)_170px_170px_190px_170px_auto_auto]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
             <Input
               aria-label="Buscar equipamentos"
               className="pl-8"
@@ -97,7 +97,7 @@ export default function InventoryAssetsTable({
 
       <Card className="relative overflow-hidden" aria-busy={updating}>
         {updating && (
-          <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-md border border-[#c5daf0] bg-white px-2.5 py-1 text-xs font-medium text-[#164f84] shadow-sm">
+          <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-md border border-[var(--status-blue-border)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--primary-hover)] shadow-sm">
             <LoaderCircle className="animate-spin" size={13} /> Atualizando
           </div>
         )}
@@ -111,15 +111,15 @@ export default function InventoryAssetsTable({
             <tbody>
               {assets.map((asset) => (
                 <tr key={asset.id}>
-                  <td><p className="font-semibold text-[#1a2332]">{asset.serial_number || "Não informado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{asset.display_name || "Equipamento sem descrição"}</p></td>
-                  <td className="text-[#5c6b7e]">{catalogRefName(asset.equipment_type)}</td>
-                  <td className="text-[#5c6b7e]">{manufacturerModel(asset)}</td>
-                  <td className="text-[#5c6b7e]">{catalogRefName(asset.supplier)}</td>
-                  <td><p className="font-medium text-[#1a2332]">{asset.sector?.secretariat?.name || "Não informado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{catalogRefName(asset.sector)}</p></td>
-                  <td><p className="font-medium text-[#1a2332]">{asset.assigned_user?.full_name || "Não vinculado"}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{asset.assigned_user ? `${asset.assigned_user.secretariat} - ${asset.assigned_user.department}` : "—"}</p></td>
+                  <td><p className="font-semibold text-[var(--foreground)]">{asset.serial_number || "Não informado"}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{asset.display_name || "Equipamento sem descrição"}</p></td>
+                  <td className="text-[var(--muted)]">{catalogRefName(asset.equipment_type)}</td>
+                  <td className="text-[var(--muted)]">{manufacturerModel(asset)}</td>
+                  <td className="text-[var(--muted)]">{catalogRefName(asset.supplier)}</td>
+                  <td><p className="font-medium text-[var(--foreground)]">{asset.sector?.secretariat?.name || "Não informado"}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{catalogRefName(asset.sector)}</p></td>
+                  <td><p className="font-medium text-[var(--foreground)]">{asset.assigned_user?.full_name || "Não vinculado"}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{asset.assigned_user ? `${asset.assigned_user.secretariat} - ${asset.assigned_user.department}` : "—"}</p></td>
                   <td><Badge className={assetStatusTone(asset.status)}>{inventoryAssetStatusLabels[asset.status] || asset.status}</Badge></td>
-                  <td className="text-[#5c6b7e]">{formatDate(asset.received_at, false)}</td>
-                  <td className="text-[#5c6b7e]">{formatDate(asset.delivered_at, false)}</td>
+                  <td className="text-[var(--muted)]">{formatDate(asset.received_at, false)}</td>
+                  <td className="text-[var(--muted)]">{formatDate(asset.delivered_at, false)}</td>
                   <td>
                     <Link href={`/inventario/${asset.id}`} className={buttonStyles({ variant: "ghost", size: "sm" })} aria-label={`Ver detalhes de ${asset.serial_number || "equipamento"}`}>
                       <Eye size={15} />

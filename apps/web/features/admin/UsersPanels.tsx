@@ -38,7 +38,7 @@ export function UsersTable({ users, canManage, search, role, onSearchChange, onR
       <Toolbar className="mb-4">
         <div className="grid w-full gap-2 lg:grid-cols-[1fr_200px]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
             <Input aria-label="Buscar usuários" className="pl-8" placeholder="Buscar por nome, usuário, e-mail ou setor" value={search} onChange={(e) => onSearchChange(e.target.value)} />
           </div>
           <Select aria-label="Filtrar por perfil" value={role} onChange={(e) => onRoleChange(e.target.value)}>
@@ -54,11 +54,11 @@ export function UsersTable({ users, canManage, search, role, onSearchChange, onR
           <tbody>
             {users.map((item) => (
               <tr key={item.id}>
-                <td><div className="flex items-center gap-2.5"><UserAvatar name={item.full_name} /><div><p className="font-semibold text-[#1a2332]">{item.full_name}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{item.username} · {item.email}</p></div></div></td>
-                <td><Badge className="border border-[#c5daf0] bg-[#f3f7fb] text-[#164f84]">{roleLabels[item.role]}</Badge></td>
-                <td><p className="font-medium text-[#1a2332]">{item.department}</p><p className="mt-0.5 text-xs text-[#8b97a8]">{item.secretariat}</p></td>
-                <td><Badge className={item.email_verified_at ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#fcd9a8] bg-[#fffbeb] text-[#92400e]"}>{item.email_verified_at ? <MailCheck size={13} /> : <MailWarning size={13} />}{item.email_verified_at ? "Verificado" : "Pendente"}</Badge></td>
-                <td><Badge className={item.active ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]"}>{item.active ? "Ativo" : "Bloqueado"}</Badge></td>
+                <td><div className="flex items-center gap-2.5"><UserAvatar name={item.full_name} /><div><p className="font-semibold text-[var(--foreground)]">{item.full_name}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{item.username} · {item.email}</p></div></div></td>
+                <td><Badge className="border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]">{roleLabels[item.role]}</Badge></td>
+                <td><p className="font-medium text-[var(--foreground)]">{item.department}</p><p className="mt-0.5 text-xs text-[var(--muted-light)]">{item.secretariat}</p></td>
+                <td><Badge className={item.email_verified_at ? "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]" : "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]"}>{item.email_verified_at ? <MailCheck size={13} /> : <MailWarning size={13} />}{item.email_verified_at ? "Verificado" : "Pendente"}</Badge></td>
+                <td><Badge className={item.active ? "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]" : "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]"}>{item.active ? "Ativo" : "Bloqueado"}</Badge></td>
                 {canManage && (
                   <td>
                     <div className="flex flex-wrap gap-1.5">
@@ -145,8 +145,8 @@ export function UserFormDialog({ open, editing, draft, saving, error, secretaria
         >
           <Input type="password" required={passwordRequired} minLength={10} value={draft.password} onChange={(e) => onDraftChange({ ...draft, password: e.target.value })} />
         </Field>
-        <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Conta ativa</label>
-        <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.email_verified} onChange={(e) => onDraftChange({ ...draft, email_verified: e.target.checked })} />E-mail verificado</label>
+        <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Conta ativa</label>
+        <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]"><input type="checkbox" checked={draft.email_verified} onChange={(e) => onDraftChange({ ...draft, email_verified: e.target.checked })} />E-mail verificado</label>
       </div>
       {error && <Alert tone="danger" className="mt-4">{error}</Alert>}
     </ConfirmDialog>

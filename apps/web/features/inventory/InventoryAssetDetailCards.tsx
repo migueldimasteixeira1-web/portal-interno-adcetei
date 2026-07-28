@@ -77,25 +77,25 @@ export function InventoryMovementTable({ movements }: MovementsProps) {
             <tbody>
               {movements.map((movement) => (
                 <tr key={movement.id}>
-                  <td className="text-[#5c6b7e]">{formatDate(movement.movement_date, false)}</td>
+                  <td className="text-[var(--muted)]">{formatDate(movement.movement_date, false)}</td>
                   <td>
                     <Badge className={assetStatusTone(movement.to_status)}>{inventoryMovementActionLabels[movement.action] || movement.action}</Badge>
-                    <p className="mt-0.5 text-xs text-[#8b97a8]">Registrado {formatDate(movement.created_at)}</p>
+                    <p className="mt-0.5 text-xs text-[var(--muted-light)]">Registrado {formatDate(movement.created_at)}</p>
                   </td>
-                  <td className="text-[#5c6b7e]">
+                  <td className="text-[var(--muted)]">
                     {transitionLabel(sectorWithSecretariat(movement.from_sector, "Sem setor"), sectorWithSecretariat(movement.to_sector, "Sem setor"))}
                   </td>
-                  <td className="text-[#5c6b7e]">
+                  <td className="text-[var(--muted)]">
                     {transitionLabel(userDisplayName(movement.from_user), userDisplayName(movement.to_user))}
                   </td>
-                  <td className="text-[#5c6b7e]">
+                  <td className="text-[var(--muted)]">
                     {transitionLabel(
                       movement.from_status ? inventoryAssetStatusLabels[movement.from_status] || movement.from_status : "Sem status",
                       inventoryAssetStatusLabels[movement.to_status] || movement.to_status,
                     )}
                   </td>
-                  <td className="text-[#5c6b7e]">{userDisplayName(movement.actor, "Não informado")}</td>
-                  <td className="text-[#5c6b7e]">{notesText(movement.notes)}</td>
+                  <td className="text-[var(--muted)]">{userDisplayName(movement.actor, "Não informado")}</td>
+                  <td className="text-[var(--muted)]">{notesText(movement.notes)}</td>
                 </tr>
               ))}
             </tbody>

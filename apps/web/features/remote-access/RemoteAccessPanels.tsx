@@ -33,7 +33,7 @@ type Props = {
 function statusBadge(device: RemoteAccessDevice) {
   return device.online
     ? <Badge className="border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--teal-600)]"><Wifi size={13} />Online</Badge>
-    : <Badge className="border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]"><WifiOff size={13} />Offline</Badge>;
+    : <Badge className="border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]"><WifiOff size={13} />Offline</Badge>;
 }
 
 function nodeLabel(nodeId: string) {
@@ -102,7 +102,7 @@ export default function RemoteAccessPanels({
       <Toolbar className="mb-4">
         <div className="grid w-full gap-2 md:grid-cols-[minmax(240px,1fr)_180px_auto]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8b97a8]" size={16} />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
             <Input
               aria-label="Buscar computadores"
               className="pl-8"
@@ -122,7 +122,7 @@ export default function RemoteAccessPanels({
 
       <Card className="relative overflow-hidden" aria-busy={updating}>
         {updating && (
-          <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-md border border-[#c5daf0] bg-white px-2.5 py-1 text-xs font-medium text-[#164f84] shadow-sm">
+          <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-md border border-[var(--status-blue-border)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--primary-hover)] shadow-sm">
             <LoaderCircle className="animate-spin" size={13} /> Atualizando
           </div>
         )}
@@ -148,24 +148,24 @@ export default function RemoteAccessPanels({
               {devices.map((device) => (
                 <tr key={device.node_id}>
                   <td>
-                    <p className="font-semibold text-[#1a2332]">{device.name}</p>
-                    <p className="mt-0.5 text-xs text-[#8b97a8]">ID {nodeLabel(device.node_id)}</p>
+                    <p className="font-semibold text-[var(--foreground)]">{device.name}</p>
+                    <p className="mt-0.5 text-xs text-[var(--muted-light)]">ID {nodeLabel(device.node_id)}</p>
                   </td>
                   <td>{statusBadge(device)}</td>
-                  <td className="text-[#5c6b7e]">{device.group_name || device.group_id || "Não informado"}</td>
-                  <td className="text-[#5c6b7e]">{device.ip_address || "—"}</td>
-                  <td className="text-[#5c6b7e]">{device.operating_system || "—"}</td>
+                  <td className="text-[var(--muted)]">{device.group_name || device.group_id || "Não informado"}</td>
+                  <td className="text-[var(--muted)]">{device.ip_address || "—"}</td>
+                  <td className="text-[var(--muted)]">{device.operating_system || "—"}</td>
                   <td>
                     {device.asset ? (
                       <div>
-                        <p className="font-medium text-[#1a2332]">#{device.asset.id} · {device.asset.serial_number || "Sem série"}</p>
-                        <p className="mt-0.5 max-w-[260px] truncate text-xs text-[#8b97a8]">{device.asset.display_name}</p>
+                        <p className="font-medium text-[var(--foreground)]">#{device.asset.id} · {device.asset.serial_number || "Sem série"}</p>
+                        <p className="mt-0.5 max-w-[260px] truncate text-xs text-[var(--muted-light)]">{device.asset.display_name}</p>
                       </div>
                     ) : (
-                      <span className="text-[#8b97a8]">Não vinculado</span>
+                      <span className="text-[var(--muted-light)]">Não vinculado</span>
                     )}
                   </td>
-                  <td className="text-[#5c6b7e]">{formatDate(device.last_seen_at)}</td>
+                  <td className="text-[var(--muted)]">{formatDate(device.last_seen_at)}</td>
                   <td>
                     <Button
                       type="button"
@@ -223,8 +223,8 @@ export default function RemoteAccessPanels({
               <Input type="number" min="1" value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="ID do inventário" />
             </Field>
           </div>
-          <div className="rounded-md border border-[#e8edf2] bg-[#f7f9fb] p-3 text-xs leading-5 text-[#5c6b7e]">
-            <p className="flex items-center gap-2 font-semibold text-[#1a2332]"><ShieldCheck size={14} />Registro obrigatório</p>
+          <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 text-xs leading-5 text-[var(--muted)]">
+            <p className="flex items-center gap-2 font-semibold text-[var(--foreground)]"><ShieldCheck size={14} />Registro obrigatório</p>
             <p className="mt-1">A autorização, abertura e encerramento da sessão ficam na auditoria administrativa do Portal.</p>
           </div>
         </div>

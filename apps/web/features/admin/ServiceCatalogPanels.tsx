@@ -27,31 +27,31 @@ export function ServiceCatalogGrid({ services, onEdit, onDelete }: GridProps) {
       {categories.map((category) => {
         const categoryServices = services.filter((service) => service.category === category);
         return (
-          <div key={category} className="overflow-hidden rounded-md border border-[#d4dbe4] bg-white">
-            <div className="border-b border-[#e8edf2] px-4 py-3">
-              <h3 className="font-semibold text-[#1a2332]">{category}</h3>
-              <p className="text-xs text-[#5c6b7e]">{categoryServices.length} serviço(s) nesta categoria.</p>
+          <div key={category} className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)]">
+            <div className="border-b border-[var(--border-subtle)] px-4 py-3">
+              <h3 className="font-semibold text-[var(--foreground)]">{category}</h3>
+              <p className="text-xs text-[var(--muted)]">{categoryServices.length} serviço(s) nesta categoria.</p>
             </div>
-            <div className="divide-y divide-[#e8edf2] md:grid md:grid-cols-2 md:divide-y-0 xl:grid-cols-3">
+            <div className="divide-y divide-[var(--border-subtle)] md:grid md:grid-cols-2 md:divide-y-0 xl:grid-cols-3">
               {categoryServices.map((service) => (
-                <article key={service.id} className="border-b border-[#e8edf2] p-4 md:border-b-0 md:border-r">
+                <article key={service.id} className="border-b border-[var(--border-subtle)] p-4 md:border-b-0 md:border-r">
                   <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="grid h-8 w-8 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]">
+                    <div className="grid h-8 w-8 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]">
                       <CatalogIcon name={service.icon} size={16} />
                     </div>
                     <div className="flex items-center gap-1">
-                      <Badge className={service.active ? "border border-[#a7d9cf] bg-[#edf7f5] text-[#0d5c4f]" : "border border-[#d4dbe4] bg-[#f0f3f7] text-[#5c6b7e]"}>{service.active ? "Ativo" : "Arquivado"}</Badge>
+                      <Badge className={service.active ? "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]" : "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]"}>{service.active ? "Ativo" : "Arquivado"}</Badge>
                       <Button variant="ghost" size="sm" onClick={() => onEdit(service)} aria-label={`Editar ${service.name}`}><Pencil size={15} /></Button>
                       <Button variant="ghost" size="sm" onClick={() => onDelete(service)} aria-label={`Excluir ${service.name}`}><Trash2 size={15} /></Button>
                     </div>
                   </div>
-                  <h4 className="font-semibold text-[#1a2332]">{service.name}</h4>
-                  <p className="mt-1 text-sm leading-5 text-[#5c6b7e]">{service.description}</p>
-                  <div className="mt-3 border-t border-[#e8edf2] pt-2">
-                    <p className="text-[11px] font-medium text-[#8b97a8]">Campos do formulário</p>
+                  <h4 className="font-semibold text-[var(--foreground)]">{service.name}</h4>
+                  <p className="mt-1 text-sm leading-5 text-[var(--muted)]">{service.description}</p>
+                  <div className="mt-3 border-t border-[var(--border-subtle)] pt-2">
+                    <p className="text-[11px] font-medium text-[var(--muted-light)]">Campos do formulário</p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {(service.form_schema.fields || []).map((field) => <span key={field.key} className="rounded border border-[#d4dbe4] bg-[#f7f9fb] px-1.5 py-0.5 text-[11px] font-medium text-[#5c6b7e]">{field.label}{field.required ? " *" : ""}</span>)}
-                      {!service.form_schema.fields?.length && <span className="text-xs text-[#8b97a8]">Somente descrição geral</span>}
+                      {(service.form_schema.fields || []).map((field) => <span key={field.key} className="rounded border border-[var(--border)] bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--muted)]">{field.label}{field.required ? " *" : ""}</span>)}
+                      {!service.form_schema.fields?.length && <span className="text-xs text-[var(--muted-light)]">Somente descrição geral</span>}
                     </div>
                   </div>
                 </article>
@@ -127,19 +127,19 @@ export function ServiceCatalogFormDialog({
         <div className="sm:col-span-2"><Field label="Descrição"><Textarea value={draft.description} onChange={(e) => onDraftChange({ ...draft, description: e.target.value })} /></Field></div>
         <Field label="Ícone">
           <div className="flex gap-2">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[#d4dbe4] bg-[#f7f9fb] text-[#5c6b7e]"><CatalogIcon name={draft.icon} size={17} /></span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]"><CatalogIcon name={draft.icon} size={17} /></span>
             <Select value={draft.icon} onChange={(e) => onDraftChange({ ...draft, icon: e.target.value })}>
               {iconOptions.map((icon) => <option key={icon.key} value={icon.key}>{icon.label}</option>)}
             </Select>
           </div>
         </Field>
         <Field label="Cor"><Input type="color" value={draft.color} onChange={(e) => onDraftChange({ ...draft, color: e.target.value })} /></Field>
-        <label className="flex items-center gap-2 text-sm font-medium text-[#1a2332]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Disponível para abertura</label>
+        <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]"><input type="checkbox" checked={draft.active} onChange={(e) => onDraftChange({ ...draft, active: e.target.checked })} />Disponível para abertura</label>
       </div>
 
-      <div className="mt-5 border-t border-[#e8edf2] pt-4">
+      <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <div><p className="text-sm font-semibold text-[#1a2332]">Campos específicos</p><p className="text-xs text-[#5c6b7e]">A descrição geral continua obrigatória.</p></div>
+          <div><p className="text-sm font-semibold text-[var(--foreground)]">Campos específicos</p><p className="text-xs text-[var(--muted)]">A descrição geral continua obrigatória.</p></div>
           <div className="flex gap-2">
             <Select value={selectedFieldKey} onChange={(e) => onSelectedFieldKeyChange(e.target.value)} className="w-56">
               <option value="">Selecionar campo</option>
@@ -150,15 +150,15 @@ export function ServiceCatalogFormDialog({
         </div>
         <div className="space-y-3">
           {draft.fields.map((field, index) => (
-            <div key={index} className="rounded-md border border-[#d4dbe4] bg-[#f7f9fb] p-3">
+            <div key={index} className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-[#1a2332]">{field.label}</p>
-                  <p className="mt-0.5 text-xs text-[#5c6b7e]">{field.placeholder || field.help || "Campo predefinido do catálogo."}</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{field.label}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">{field.placeholder || field.help || "Campo predefinido do catálogo."}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Badge className="border border-[#d4dbe4] bg-white text-[#5c6b7e]">{field.key}</Badge>
-                    <Badge className="border border-[#d4dbe4] bg-white text-[#5c6b7e]">{field.type}</Badge>
-                    {!options.fields.some((item) => item.key === field.key) && <Badge className="border border-[#fcd9a8] bg-[#fffbeb] text-[#92400e]">Legado</Badge>}
+                    <Badge className="border border-[var(--border)] bg-[var(--card)] text-[var(--muted)]">{field.key}</Badge>
+                    <Badge className="border border-[var(--border)] bg-[var(--card)] text-[var(--muted)]">{field.type}</Badge>
+                    {!options.fields.some((item) => item.key === field.key) && <Badge className="border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]">Legado</Badge>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -168,8 +168,8 @@ export function ServiceCatalogFormDialog({
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm text-[#1a2332]"><input type="checkbox" checked={field.required} onChange={(e) => onUpdateFieldRequired(index, e.target.checked)} />Obrigatório</label>
-                {field.type === "select" && !!field.options.length && <span className="text-xs text-[#8b97a8]">Opções: {field.options.join(", ")}</span>}
+                <label className="flex items-center gap-2 text-sm text-[var(--foreground)]"><input type="checkbox" checked={field.required} onChange={(e) => onUpdateFieldRequired(index, e.target.checked)} />Obrigatório</label>
+                {field.type === "select" && !!field.options.length && <span className="text-xs text-[var(--muted-light)]">Opções: {field.options.join(", ")}</span>}
               </div>
             </div>
           ))}

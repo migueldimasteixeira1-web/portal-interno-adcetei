@@ -33,9 +33,9 @@ export default function CatalogModelsTable({
         <tbody>
           {items.map((model) => (
             <tr key={model.id}>
-              <td className="font-semibold text-[#1a2332]">{model.name}</td>
-              <td className="text-[#5c6b7e]">{manufacturerNameById.get(model.manufacturer_id) || "—"}</td>
-              <td className="text-[#5c6b7e]">{equipmentTypeNameById.get(model.equipment_type_id) || "—"}</td>
+              <td className="font-semibold text-[var(--foreground)]">{model.name}</td>
+              <td className="text-[var(--muted)]">{manufacturerNameById.get(model.manufacturer_id) || "—"}</td>
+              <td className="text-[var(--muted)]">{equipmentTypeNameById.get(model.equipment_type_id) || "—"}</td>
               <td>
                 <Badge className={activeBadgeClass(model.is_active)}>{model.is_active ? "Ativo" : "Inativo"}</Badge>
               </td>

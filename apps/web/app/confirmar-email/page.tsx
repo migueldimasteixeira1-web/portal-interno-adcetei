@@ -36,7 +36,7 @@ function ConfirmEmailContent() {
 
   return (
     <AuthCardShell>
-        <div className={status === "success" ? "grid h-12 w-12 place-items-center rounded-md bg-[#edf7f5] text-[#0d5c4f]" : "grid h-12 w-12 place-items-center rounded-md bg-[#fffbeb] text-[#92400e]"}>
+        <div className={status === "success" ? "grid h-12 w-12 place-items-center rounded-md bg-[var(--status-green-bg)] text-[var(--status-green-text)]" : "grid h-12 w-12 place-items-center rounded-md bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]"}>
           <Icon size={24} />
         </div>
         <h1 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">
@@ -51,7 +51,7 @@ function ConfirmEmailContent() {
               <RefreshCcw size={16} />Reenviar verificação
             </Link>
           )}
-          <Link href="/login" className="inline-flex h-9 w-full items-center justify-center rounded-md border border-[#164f84] bg-[#1a5f9e] px-4 text-sm font-semibold text-white hover:bg-[#164f84]">
+          <Link href="/login" className="inline-flex h-9 w-full items-center justify-center rounded-md border border-[var(--primary-hover)] bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)]">
             Ir para o login
           </Link>
         </div>

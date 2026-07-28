@@ -8,6 +8,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
 import { Alert, Button, Card, ConfirmDialog, EmptyState, SectionHeader } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import { UserFormDialog, UsersTable, type UserDraft } from "@/features/admin/UsersPanels";
 import { completeInstitutionalEmail } from "@/components/InstitutionalEmailInput";
 import { activeCatalogItems, emptyInventoryCatalogs } from "@/features/inventory/inventory-utils";
@@ -32,11 +33,11 @@ const emptyDraft: UserDraft = {
 
 export default function UsersPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -115,7 +116,6 @@ export default function UsersPage() {
     }
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       if (editing) {
         const payload: Record<string, unknown> = {
@@ -133,14 +133,14 @@ export default function UsersPage() {
         payload.role = draft.role;
         if (draft.password) payload.password = draft.password;
         await api.updateUser(editing.id, payload);
-        setMessage("Usuário atualizado com sucesso.");
+        toast("Usuário atualizado com sucesso.");
       } else {
         await api.createUser({
           ...draft,
           department_sector_id: draft.department_sector_id ? Number(draft.department_sector_id) : null,
           email: completeInstitutionalEmail(draft.email),
         });
-        setMessage("Usuário local criado com sucesso.");
+        toast("Usuário local criado com sucesso.");
       }
       setDialogOpen(false);
       await load();
@@ -153,10 +153,9 @@ export default function UsersPage() {
 
   const resendVerification = async (item: User) => {
     setError("");
-    setMessage("");
     try {
       await api.resendUserVerification(item.id);
-      setMessage("Verificação reenviada para o e-mail institucional.");
+      toast("Verificação reenviada para o e-mail institucional.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível reenviar a verificação");
@@ -167,11 +166,10 @@ export default function UsersPage() {
     if (!deleting) return;
     setSaving(true);
     setError("");
-    setMessage("");
     try {
       await api.deleteUser(deleting.id);
       setDeleting(null);
-      setMessage("Usuário excluído com sucesso.");
+      toast("Usuário excluído com sucesso.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível excluir o usuário");
@@ -191,7 +189,6 @@ export default function UsersPage() {
         subtitle="Gerencie contas locais, bloqueios, verificação de e-mail e perfis atribuídos manualmente."
         actions={canManage ? <Button onClick={openCreate}><UserPlus size={16} />Novo usuário</Button> : undefined}
       />
-      {message && <Alert tone="success" className="mb-4">{message}</Alert>}
       {error && !dialogOpen && <Alert tone="danger" className="mb-4">{error}</Alert>}
 
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
