@@ -108,10 +108,10 @@ export function assetStatusTone(status: string): string {
 
 export function statusTone(status: string): string {
   const map: Record<string, string> = {
-    new: "border border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
-    assigned: "border border-[#fde68a] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
-    closed: "border border-[#a7f3d0] bg-[#ecfdf5] text-[#047857]",
-    cancelled: "border border-[#fecaca] bg-[var(--status-red-bg)] text-[var(--red-600)]",
+    new: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--status-blue-text)]",
+    assigned: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
+    closed: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]",
+    cancelled: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[var(--status-red-text)]",
   };
   return map[status] || "border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]";
 }

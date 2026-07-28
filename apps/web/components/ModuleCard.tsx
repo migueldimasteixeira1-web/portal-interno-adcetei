@@ -16,7 +16,7 @@ export default function ModuleCard({ item }: { item: PortalNavItem }) {
       href={item.href}
       className={cn(
         "panel-flat group flex min-h-[168px] flex-col justify-between p-4 transition hover:border-[var(--primary)] hover:shadow-sm",
-        planned && "bg-[#fbfcfe]",
+        planned && "bg-[var(--surface-subtle)]",
       )}
     >
       <div>
