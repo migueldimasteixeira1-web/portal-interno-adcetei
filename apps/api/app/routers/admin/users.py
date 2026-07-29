@@ -10,7 +10,7 @@ from ...audit import add_audit
 from ...auth import hash_password, validate_institutional_email
 from ...database import get_db
 from ...email_verification import send_user_verification
-from ...models import Asset, AssetMovement, AuditLog, InventoryDeliveryTerm, InventorySector, Ticket, TicketComment, User
+from ...models import Asset, AssetMovement, AuditLog, InventoryDeliveryTerm, InventoryReturnTerm, InventorySector, Ticket, TicketComment, User
 from ...permissions import require_permission
 from ...schemas import UserCreate, UserOut, UserUpdate
 from ...time_utils import utc_now
@@ -231,6 +231,13 @@ def delete_user(
                     InventoryDeliveryTerm.recipient_user_id == user.id,
                     InventoryDeliveryTerm.created_by_user_id == user.id,
                     InventoryDeliveryTerm.delivered_by_user_id == user.id,
+                )
+            ),
+            select(InventoryReturnTerm.id).where(
+                or_(
+                    InventoryReturnTerm.returner_user_id == user.id,
+                    InventoryReturnTerm.created_by_user_id == user.id,
+                    InventoryReturnTerm.confirmed_by_user_id == user.id,
                 )
             ),
         )

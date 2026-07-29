@@ -23,6 +23,7 @@ from ...models import (
     InventoryEquipmentModel,
     InventoryEquipmentType,
     InventoryManufacturer,
+    InventoryReturnTerm,
     InventorySecretariat,
     InventorySector,
     InventorySupplier,
@@ -177,7 +178,15 @@ def delete_contract(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("inventory.manage_catalogs")),
 ):
-    return delete_item(db, InventoryContract, item_id, (select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.contract_id == item_id),))
+    return delete_item(
+        db,
+        InventoryContract,
+        item_id,
+        (
+            select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.contract_id == item_id),
+            select(InventoryReturnTerm.id).where(InventoryReturnTerm.contract_id == item_id),
+        ),
+    )
 
 
 @router.post("/catalogs/equipment-types", response_model=InventoryCatalogItemOut, status_code=201)
@@ -373,5 +382,6 @@ def delete_sector(
             select(AssetMovement.id).where(or_(AssetMovement.from_sector_id == item_id, AssetMovement.to_sector_id == item_id)),
             select(User.id).where(User.department_sector_id == item_id),
             select(InventoryDeliveryTerm.id).where(InventoryDeliveryTerm.destination_sector_id == item_id),
+            select(InventoryReturnTerm.id).where(InventoryReturnTerm.origin_sector_id == item_id),
         ),
     )

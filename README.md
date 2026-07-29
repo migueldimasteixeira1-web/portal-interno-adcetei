@@ -192,9 +192,12 @@ A Parte 7 adicionou entrada em lote por leitura/digitação de números de séri
 
 A Parte 8 adicionou a tela `/administracao/base-cadastros` para gerenciar a base usada por inventário, usuários e termos. O acesso exige `inventory.manage_catalogs`. A rota antiga `/inventario/cadastros` redireciona para essa base administrativa.
 
-O fluxo de termos de recebimento fica separado em `/inventario/termos`. Ele sugere o próximo número, usa contrato cadastrado vinculado a fornecedor, preenche o destino como `Secretaria - Setor`, valida os números de série antes da emissão, emite o DOCX oficial a partir do template cadastrado na API, permite cancelar termo aberto e só altera o inventário quando a entrega assinada é confirmada. A confirmação aloca todos os itens do termo para o setor/usuário e registra uma movimentação por equipamento. Equipamentos também têm campo de especificações, usado na relação do termo. Movimentações diretas usam uma ação única para setor/responsável e bloqueiam responsável fora do setor selecionado.
+O fluxo de termos de recebimento e devolução fica em `/inventario/termos`, com um alternador entre os dois. Ambos sugerem o próximo número, validam os números de série antes da emissão, emitem o DOCX oficial a partir do template cadastrado na API, permitem cancelar termo aberto e só alteram o inventário quando a assinatura é confirmada. Movimentações diretas usam uma ação única para setor/responsável e bloqueiam responsável fora do setor selecionado.
 
-Enquanto um termo está aberto (`draft` ou `emitted`), seus equipamentos ficam reservados e não podem ser editados ou movimentados. A confirmação revalida estoque, lotação e datas e aplica todos os itens em uma única transação; o cancelamento libera a reserva.
+- **Recebimento**: usa contrato cadastrado vinculado a fornecedor, preenche o destino como `Secretaria - Setor`. A confirmação aloca todos os itens do termo para o setor/usuário e registra uma movimentação por equipamento.
+- **Devolução**: o servidor devolvedor é selecionado primeiro e a busca de equipamento já vem filtrada aos itens alocados a ele; contrato e termo de recebimento de referência são opcionais (cobre equipamento locado e patrimoniado). A confirmação devolve todos os itens ao estoque padrão ADCETEI. No DOCX, o devolvedor assina primeiro e a ADCETEI em segundo — ordem invertida em relação ao termo de recebimento.
+
+Enquanto um termo (de qualquer um dos dois tipos) está aberto (`draft` ou `emitted`), seus equipamentos ficam reservados e não podem ser editados ou movimentados nem entrar em outro termo. A confirmação revalida estoque, lotação e datas e aplica todos os itens em uma única transação; o cancelamento libera a reserva.
 
 O setor padrão `ADCETEI` é protegido no backend: não pode ser renomeado nem desativado via API.
 

@@ -8,6 +8,7 @@ from ...admin_helpers import ensure_unique_asset, has_rows, reject_null_fields, 
 from ...audit import add_audit
 from ...database import get_db
 from ...delivery_terms_service import asset_has_delivery_term_history, ensure_asset_not_reserved
+from ...return_terms_service import asset_has_return_term_history
 from ...models import Asset, AssetMovement, Ticket, User
 from ...permissions import require_permission
 from ...schemas import AssetCreate, AssetOut, AssetUpdate
@@ -106,6 +107,8 @@ def delete_asset(
     ensure_asset_not_reserved(db, asset.id)
     if asset_has_delivery_term_history(db, asset.id):
         raise HTTPException(status_code=409, detail="Equipamento possui termo de recebimento vinculado. Use a baixa em vez de excluir.")
+    if asset_has_return_term_history(db, asset.id):
+        raise HTTPException(status_code=409, detail="Equipamento possui termo de devolução vinculado. Use a baixa em vez de excluir.")
     if has_rows(db, select(Ticket.id).where(Ticket.asset_id == asset.id)):
         raise HTTPException(status_code=409, detail="Equipamento possui chamados vinculados. Baixe ou arquive em vez de excluir.")
 

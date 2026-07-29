@@ -253,6 +253,65 @@ class InventoryDeliveryTermItem(Base):
     asset: Mapped[Asset] = relationship()
 
 
+class InventoryReturnTerm(Base):
+    __tablename__ = "inventory_return_terms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    term_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    contract_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_contracts.id"), nullable=True, index=True)
+    contract_number: Mapped[str] = mapped_column(String(120), default="")
+    related_delivery_term_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("inventory_delivery_terms.id"), nullable=True, index=True
+    )
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    origin_sector_id: Mapped[int] = mapped_column(ForeignKey("inventory_sectors.id"), index=True)
+    origin_unit: Mapped[str] = mapped_column(String(180))
+    returner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    returner_name: Mapped[str] = mapped_column(String(180))
+    returner_email: Mapped[str] = mapped_column(String(180))
+    returner_registration: Mapped[str] = mapped_column(String(80), default="")
+    returner_phone: Mapped[str] = mapped_column(String(40), default="")
+    adcetei_signer_name: Mapped[str] = mapped_column(String(180), default="William Barreto Corrêa")
+    adcetei_signer_title: Mapped[str] = mapped_column(String(180), default="Coordenador Geral de Tecnologia da Informação")
+    item_observation: Mapped[str] = mapped_column(String(180), default="Equipamento devolvido")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(30), default="emitted", index=True)
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    confirmed_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    returner: Mapped[User] = relationship(foreign_keys=[returner_user_id])
+    contract: Mapped[Optional[InventoryContract]] = relationship()
+    related_delivery_term: Mapped[Optional[InventoryDeliveryTerm]] = relationship()
+    origin_sector: Mapped[InventorySector] = relationship()
+    created_by: Mapped[Optional[User]] = relationship(foreign_keys=[created_by_user_id])
+    confirmed_by: Mapped[Optional[User]] = relationship(foreign_keys=[confirmed_by_user_id])
+    items: Mapped[list["InventoryReturnTermItem"]] = relationship(
+        back_populates="term",
+        cascade="all, delete-orphan",
+        order_by="InventoryReturnTermItem.id",
+    )
+
+
+class InventoryReturnTermItem(Base):
+    __tablename__ = "inventory_return_term_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    term_id: Mapped[int] = mapped_column(ForeignKey("inventory_return_terms.id"), index=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    asset_type: Mapped[str] = mapped_column(String(80), default="")
+    manufacturer: Mapped[str] = mapped_column(String(120), default="")
+    model: Mapped[str] = mapped_column(String(160), default="")
+    serial_number: Mapped[str] = mapped_column(String(120), default="")
+    specification: Mapped[str] = mapped_column(Text, default="")
+    observation: Mapped[str] = mapped_column(String(180), default="")
+
+    term: Mapped[InventoryReturnTerm] = relationship(back_populates="items")
+    asset: Mapped[Asset] = relationship()
+
+
 class RemoteDeviceLink(Base):
     __tablename__ = "remote_device_links"
     __table_args__ = (UniqueConstraint("mesh_node_id", name="uq_remote_device_links_mesh_node_id"),)

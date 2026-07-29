@@ -16,6 +16,7 @@ bash -n iniciar-local.sh resetar-dados.sh scripts/*.sh
 ./scripts/regression-test.sh
 ./scripts/smoke-test.sh
 ./scripts/delivery-term-self-check.sh
+./scripts/return-term-self-check.sh
 
 cd apps/api
 alembic heads
