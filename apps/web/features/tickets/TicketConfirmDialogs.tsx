@@ -80,3 +80,85 @@ export function TicketCloseDialog({
     </ConfirmDialog>
   );
 }
+
+export function TicketResolveDialog({
+  open,
+  onOpenChange,
+  ticket,
+  resolutionMessage,
+  quickAction,
+  onResolutionMessageChange,
+  onConfirm,
+}: CloseDialogProps) {
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Marcar chamado como resolvido?"
+      description="Descreva o que foi feito. O solicitante poderá confirmar o encerramento ou responder se o problema persistir."
+      confirmLabel="Marcar como resolvido"
+      loading={quickAction === "resolve"}
+      confirmDisabled={!ticket.assignee || resolutionMessage.trim().length < 2}
+      onConfirm={onConfirm}
+    >
+      <Textarea
+        aria-label="Mensagem de resolução"
+        value={resolutionMessage}
+        onChange={(event) => onResolutionMessageChange(event.target.value)}
+        placeholder="Ex.: Impressora reconectada e teste de impressão validado com o setor."
+        className="bg-[var(--card)]"
+      />
+      {!ticket.assignee && <Alert tone="warning" className="mt-3">Atribua um responsável antes de resolver o chamado.</Alert>}
+      {resolutionMessage.trim().length < 2 && (
+        <p className="mt-2 text-xs text-[var(--muted-light)]">A mensagem de resolução é obrigatória.</p>
+      )}
+    </ConfirmDialog>
+  );
+}
+
+type ReasonDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  placeholder: string;
+  reason: string;
+  loading: boolean;
+  onReasonChange: (value: string) => void;
+  onConfirm: () => void;
+};
+
+export function TicketReasonDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel,
+  placeholder,
+  reason,
+  loading,
+  onReasonChange,
+  onConfirm,
+}: ReasonDialogProps) {
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      loading={loading}
+      onConfirm={onConfirm}
+    >
+      <Textarea
+        aria-label="Motivo (opcional)"
+        value={reason}
+        onChange={(event) => onReasonChange(event.target.value)}
+        placeholder={placeholder}
+        className="bg-[var(--card)]"
+      />
+      <p className="mt-2 text-xs text-[var(--muted-light)]">Opcional — se preenchido, vira uma resposta pública no histórico do chamado.</p>
+    </ConfirmDialog>
+  );
+}

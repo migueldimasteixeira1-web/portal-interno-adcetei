@@ -5,10 +5,17 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from ..domain import PRIORITY_LABELS, STATUS_LABELS, TECHNICIAN_STATUSES
-from ..models import Asset, Ticket, User
+from ..domain import (
+    OPEN_STATUSES,
+    PRIORITY_LABELS,
+    REOPEN_WINDOW_DAYS,
+    REOPENABLE_STATUSES,
+    STATUS_LABELS,
+    TECHNICIAN_STATUSES,
+)
+from ..models import Asset, Ticket, TicketComment, User
 from ..permissions import has_permission
-from ..time_utils import utc_now
+from ..time_utils import ensure_utc, utc_now
 
 FIELD_LABELS = {
     "status": "o status",
@@ -25,6 +32,7 @@ FIELD_LABELS = {
 FINAL_TICKET_STATUSES = {"closed", "cancelled"}
 TECHNICIAN_UPDATE_FIELDS = {"status", "resolution_message"}
 NON_NULLABLE_UPDATE_FIELDS = {"status", "priority", "urgency", "impact", "category", "team", "location"}
+STATUS_WITH_RESOLUTION_MESSAGE = {"resolved", "closed"}
 
 
 def now_utc() -> datetime:
@@ -34,6 +42,31 @@ def now_utc() -> datetime:
 def due_for_priority(priority: str) -> datetime:
     hours = {"critical": 2, "high": 4, "medium": 48, "low": 72}.get(priority, 48)
     return now_utc() + timedelta(hours=hours)
+
+
+def can_reopen(ticket: Ticket) -> bool:
+    if ticket.status not in REOPENABLE_STATUSES:
+        return False
+    if ticket.status not in FINAL_TICKET_STATUSES:
+        return True
+    closed_at = ensure_utc(ticket.closed_at)
+    if not closed_at:
+        return True
+    return now_utc() - closed_at <= timedelta(days=REOPEN_WINDOW_DAYS)
+
+
+def reopen_ticket(ticket: Ticket, actor: User, db: Session, *, target_status: str | None = None, auto: bool = False) -> None:
+    old_status = ticket.status
+    ticket.status = target_status if target_status in OPEN_STATUSES else ("assigned" if ticket.assignee_id else "new")
+    ticket.closed_at = None
+    ticket.updated_at = now_utc()
+    old_label = STATUS_LABELS.get(old_status, old_status)
+    body = (
+        f"Chamado reaberto automaticamente após resposta de {actor.full_name} (estava {old_label})."
+        if auto
+        else f"{actor.full_name} reabriu o chamado (estava {old_label})."
+    )
+    db.add(TicketComment(ticket_id=ticket.id, author_id=actor.id, body=body, event_type="event"))
 
 
 def display_value(field: str, value: Any, db: Session) -> str:

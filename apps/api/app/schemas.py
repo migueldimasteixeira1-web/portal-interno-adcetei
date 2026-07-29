@@ -722,6 +722,9 @@ class TicketDetailOut(TicketListOut):
 class TicketQueueSummaryOut(BaseModel):
     new: int
     assigned: int
+    in_progress: int
+    waiting_requester: int
+    resolved: int
     closed: int
     cancelled: int
 
@@ -738,6 +741,9 @@ class DashboardOut(BaseModel):
     total: int
     new: int
     assigned: int
+    in_progress: int
+    waiting_requester: int
+    resolved: int
     closed: int
     cancelled: int
     overdue: int

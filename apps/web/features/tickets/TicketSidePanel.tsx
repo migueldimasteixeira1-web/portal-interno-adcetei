@@ -1,7 +1,17 @@
-import { CheckCircle2, Clock3, Computer, LoaderCircle, UserPlus } from "lucide-react";
+import { ReactNode } from "react";
+import { Clock3, Computer, LoaderCircle } from "lucide-react";
 import { Button, Card, DetailRow, Field, SectionHeader, Select } from "@/components/ui";
 import { assetTypeLabels, formatDate, priorityLabels, priorityOptions, roleLabels, statusLabels } from "@/lib/format";
 import type { Asset, Ticket, User } from "@/lib/types";
+
+export type TicketAction = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  hint?: string;
+  disabled?: boolean;
+  onClick: () => void;
+};
 
 type Props = {
   ticket: Ticket;
@@ -13,15 +23,11 @@ type Props = {
   isFinalStatus: boolean;
   canChangeStatus: boolean;
   canEditAdministrativeFields: boolean;
-  canQuickAssign: boolean;
-  canQuickClose: boolean;
-  canCloseNow: boolean;
+  actions: TicketAction[];
   hasPendingChanges: boolean;
   saving: boolean;
   quickAction: string;
   onDraftChange: (draft: Record<string, string>) => void;
-  onQuickAssign: () => void;
-  onQuickClose: () => void;
 };
 
 export default function TicketSidePanel({
@@ -34,15 +40,11 @@ export default function TicketSidePanel({
   isFinalStatus,
   canChangeStatus,
   canEditAdministrativeFields,
-  canQuickAssign,
-  canQuickClose,
-  canCloseNow,
+  actions,
   hasPendingChanges,
   saving,
   quickAction,
   onDraftChange,
-  onQuickAssign,
-  onQuickClose,
 }: Props) {
   return (
     <aside className="space-y-4">
@@ -52,35 +54,24 @@ export default function TicketSidePanel({
           description={canChangeStatus ? "Revise e confirme antes de salvar." : undefined}
         />
         <div className="space-y-3 p-4">
-          {(canQuickAssign || canQuickClose) && (
+          {actions.length > 0 && (
             <div className="grid gap-2 border-b border-[var(--border-subtle)] pb-3">
-              {canQuickAssign && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={saving || !!quickAction || hasPendingChanges}
-                  onClick={onQuickAssign}
-                >
-                  {quickAction === "assign" ? <LoaderCircle className="animate-spin" size={16} /> : <UserPlus size={16} />}
-                  Atribuir a mim
-                </Button>
-              )}
-              {canQuickClose && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={saving || !!quickAction || hasPendingChanges || !canCloseNow}
-                  onClick={onQuickClose}
-                >
-                  <CheckCircle2 size={16} />
-                  Encerrar chamado
-                </Button>
-              )}
+              {actions.map((action) => (
+                <div key={action.key}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={saving || !!quickAction || hasPendingChanges || action.disabled}
+                    onClick={action.onClick}
+                  >
+                    {quickAction === action.key ? <LoaderCircle className="animate-spin" size={16} /> : action.icon}
+                    {action.label}
+                  </Button>
+                  {action.hint && <p className="mt-1 text-xs text-[var(--muted-light)]">{action.hint}</p>}
+                </div>
+              ))}
               {hasPendingChanges && (
                 <p className="text-xs text-[var(--muted-light)]">Salve ou desfaça as alterações pendentes antes de usar ações rápidas.</p>
-              )}
-              {canQuickClose && !ticket.assignee && (
-                <p className="text-xs text-[var(--muted-light)]">Atribua um responsável antes de encerrar.</p>
               )}
             </div>
           )}

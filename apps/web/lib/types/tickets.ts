@@ -43,6 +43,9 @@ export interface TicketPage {
   summary: {
     new: number;
     assigned: number;
+    in_progress: number;
+    waiting_requester: number;
+    resolved: number;
     closed: number;
     cancelled: number;
   };
@@ -52,6 +55,9 @@ export interface DashboardData {
   total: number;
   new: number;
   assigned: number;
+  in_progress: number;
+  waiting_requester: number;
+  resolved: number;
   closed: number;
   cancelled: number;
   overdue: number;

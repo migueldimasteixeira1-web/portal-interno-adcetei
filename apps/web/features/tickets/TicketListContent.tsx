@@ -30,7 +30,8 @@ function rowAccent(ticket: Ticket, isUserProfile: boolean) {
   if (ticket.priority === "critical") return "border-l-[var(--red-600)]";
   if (ticket.priority === "high") return "border-l-[var(--amber-600)]";
   if (!ticket.assignee && !isUserProfile) return "border-l-[var(--amber-600)]";
-  if (ticket.status === "closed") return "border-l-[var(--accent)]";
+  if (ticket.status === "waiting_requester") return "border-l-[var(--amber-600)]";
+  if (ticket.status === "resolved" || ticket.status === "closed") return "border-l-[var(--accent)]";
   if (ticket.status === "cancelled") return "border-l-[var(--status-red-text)]";
   return "border-l-[var(--primary)]";
 }

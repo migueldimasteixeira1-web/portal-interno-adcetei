@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Ban, CheckCircle2, Plus, TicketCheck, Tickets, UserCheck } from "lucide-react";
+import { Activity, Ban, CheckCircle2, ClipboardCheck, Hourglass, Plus, TicketCheck, Tickets, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
@@ -21,7 +21,15 @@ export default function TicketsPage() {
   const [priority, setPriority] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ search: "", status: "", priority: "" });
   const [page, setPage] = useState(1);
-  const [summary, setSummary] = useState({ new: 0, assigned: 0, closed: 0, cancelled: 0 });
+  const [summary, setSummary] = useState({
+    new: 0,
+    assigned: 0,
+    in_progress: 0,
+    waiting_requester: 0,
+    resolved: 0,
+    closed: 0,
+    cancelled: 0,
+  });
   const [initialLoading, setInitialLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
@@ -87,10 +95,13 @@ export default function TicketsPage() {
         actions={<Link href="/chamados/novo" className={buttonStyles()}><Plus size={16} /> Abrir chamado</Link>}
       />
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Chamados" value={total} icon={<Tickets size={17} />} hint="Total encontrado" tone="blue" />
         <MetricCard label="Novos" value={summary.new} icon={<TicketCheck size={17} />} hint="Aguardando atribuição" tone="cyan" />
-        <MetricCard label="Atribuídos" value={summary.assigned} icon={<UserCheck size={17} />} hint="Com responsável" tone="amber" />
+        <MetricCard label="Atribuídos" value={summary.assigned} icon={<UserCheck size={17} />} hint="Aguardando início" tone="amber" />
+        <MetricCard label="Em andamento" value={summary.in_progress} icon={<Activity size={17} />} hint="Sendo atendidos" tone="blue" />
+        <MetricCard label="Aguardando solicitante" value={summary.waiting_requester} icon={<Hourglass size={17} />} hint="Depende do solicitante" tone="amber" />
+        <MetricCard label="Resolvidos" value={summary.resolved} icon={<ClipboardCheck size={17} />} hint="Pendente de confirmação" tone="green" />
         <MetricCard label="Fechados" value={summary.closed} icon={<CheckCircle2 size={17} />} hint="Encerrados" tone="green" />
         <MetricCard label="Cancelados" value={summary.cancelled} icon={<Ban size={17} />} hint="Interrompidos" tone="slate" />
       </div>

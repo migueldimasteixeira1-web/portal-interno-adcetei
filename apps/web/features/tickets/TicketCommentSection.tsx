@@ -2,6 +2,7 @@ import { FormEvent } from "react";
 import { LockKeyhole, MessageSquareText, Send } from "lucide-react";
 import TicketTimeline from "@/components/TicketTimeline";
 import { Button, Card, SectionHeader, Textarea, cn } from "@/components/ui";
+import { statusLabels } from "@/lib/format";
 import type { Ticket, User } from "@/lib/types";
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
   saving: boolean;
   canAddInternalNote: boolean;
   isUserProfile: boolean;
+  willReopenOnReply: boolean;
   onCommentChange: (value: string) => void;
   onInternalChange: (value: boolean) => void;
   onSubmit: (event: FormEvent) => void;
@@ -25,6 +27,7 @@ export default function TicketCommentSection({
   saving,
   canAddInternalNote,
   isUserProfile,
+  willReopenOnReply,
   onCommentChange,
   onInternalChange,
   onSubmit,
@@ -33,6 +36,11 @@ export default function TicketCommentSection({
     <Card className="overflow-hidden">
       <SectionHeader title="Histórico do atendimento" description="Mensagens, notas internas e alterações administrativas." />
       <TicketTimeline comments={ticket.comments || []} currentUser={user} />
+      {willReopenOnReply && (
+        <p className="border-t border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] px-4 py-2 text-xs font-medium text-[var(--status-amber-text)]">
+          Este chamado está {statusLabels[ticket.status]?.toLowerCase() || "finalizado"}. Enviar uma resposta pública vai reabri-lo.
+        </p>
+      )}
       <form onSubmit={onSubmit} className="border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4">
         {canAddInternalNote && (
           <div className="mb-3 inline-flex rounded-md border border-[var(--border)] bg-[var(--card)] p-0.5">
