@@ -209,6 +209,16 @@ Operação, variáveis de ambiente, validação e troubleshooting: [ACESSO-REMOT
 - `form_schema` legado (lista de strings) e configurável (objetos com `key`, `type`, `required`);
 - respostas em `tickets.form_data`, snapshot em `form_schema_snapshot`.
 
+### Ciclo de vida
+
+Status possíveis (`app/domain.py`): `new` → `assigned` → `in_progress` → `waiting_requester` → `resolved` → `closed`, com `cancelled` disponível a partir de qualquer estado não finalizado.
+
+- `waiting_requester` ("Aguardando solicitante") pausa a cobrança de prazo — fica fora de `OVERDUE_ELIGIBLE_STATUSES`, embora continue contando como aberto (`OPEN_STATUSES`) para as filas do técnico;
+- `resolved` exige responsável e mensagem de resolução, e **não é um estado final** — pode ser confirmado (`closed`, sem exigir nova mensagem) ou reaberto livremente, já que o solicitante ainda não confirmou;
+- `closed`/`cancelled` são finais, mas podem ser reabertos dentro de `REOPEN_WINDOW_DAYS` (7 dias corridos a partir de `closed_at`) enviando `{"status": "assigned"}` (ou outro status aberto) via `PATCH /api/tickets/{id}` — a API detecta que é uma reabertura (`can_reopen`/`reopen_ticket` em `services/tickets_service.py`) e registra um evento no histórico;
+- se o **solicitante** responde publicamente a um chamado `resolved`/`closed`/`cancelled` dentro da janela de reabertura, o chamado reabre automaticamente (mesmo mecanismo, acionado em `POST /tickets/{id}/comments`) — não existe reabertura "manual" para quem não é responsável ou triagem;
+- o painel de atendimento (`TicketSidePanel`) mostra apenas as ações válidas para o status atual (iniciar, aguardar solicitante, retomar, resolver, encerrar, cancelar, reabrir), calculadas no frontend a partir do mesmo conjunto de regras.
+
 ## Mensagens
 
 Conversas diretas (1:1) entre qualquer par de usuários ativos do portal, sem exigir permissão além de estar autenticado — é um canal de comunicação geral da equipe, não vinculado a chamados.

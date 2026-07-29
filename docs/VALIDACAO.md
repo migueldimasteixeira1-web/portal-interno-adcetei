@@ -78,6 +78,7 @@ O `scripts/regression-test.sh` valida, entre outros:
 3. seed habilitado/desabilitado;
 4. visibilidade de assets por perfil e endpoint resumido para chamados;
 5. paginação, filtros e resumo agregado de chamados;
+5a. ciclo de vida completo do chamado (em andamento, aguardando solicitante, resolvido, confirmação de encerramento, reabertura dentro da janela de 7 dias, cancelamento e reabertura automática por resposta do solicitante);
 6. campos dinâmicos do catálogo (validação, persistência, snapshot);
 7. CRUD administrativo de usuários, equipamentos, catálogo e perfis;
 8. proteção do último administrador e dependências de permissões;

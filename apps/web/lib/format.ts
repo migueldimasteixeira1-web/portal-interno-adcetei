@@ -7,6 +7,9 @@ export const roleLabels: Record<string, string> = {
 export const statusLabels: Record<string, string> = {
   new: "Novo",
   assigned: "Atribuído",
+  in_progress: "Em andamento",
+  waiting_requester: "Aguardando solicitante",
+  resolved: "Resolvido",
   closed: "Fechado",
   cancelled: "Cancelado",
 };
@@ -14,12 +17,9 @@ export const statusLabels: Record<string, string> = {
 export const statusOptions = [
   ["new", "Novo"],
   ["assigned", "Atribuído"],
-  ["closed", "Fechado"],
-  ["cancelled", "Cancelado"],
-] as const;
-
-export const technicianStatusOptions = [
-  ["assigned", "Atribuído"],
+  ["in_progress", "Em andamento"],
+  ["waiting_requester", "Aguardando solicitante"],
+  ["resolved", "Resolvido"],
   ["closed", "Fechado"],
   ["cancelled", "Cancelado"],
 ] as const;
@@ -110,6 +110,9 @@ export function statusTone(status: string): string {
   const map: Record<string, string> = {
     new: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--status-blue-text)]",
     assigned: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
+    in_progress: "border border-[var(--status-blue-border)] bg-[var(--status-blue-bg)] text-[var(--primary-hover)]",
+    waiting_requester: "border border-[var(--status-amber-border)] bg-[var(--status-amber-bg)] text-[var(--status-amber-text)]",
+    resolved: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]",
     closed: "border border-[var(--status-green-border)] bg-[var(--status-green-bg)] text-[var(--status-green-text)]",
     cancelled: "border border-[var(--status-red-border)] bg-[var(--status-red-bg)] text-[var(--status-red-text)]",
   };

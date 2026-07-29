@@ -1089,8 +1089,12 @@ tech_id = next(item["id"] for item in users if item["username"] == "tecnico")
 
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "valor_invalido"})
 expect(status, 422, "status inválido")
-status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "in_progress"})
-expect(status, 422, "status antigo rejeitado")
+status, in_progress_ticket = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "in_progress"})
+expect(status, 200, "novo status em andamento aceito")
+expect(in_progress_ticket["status"], "in_progress", "chamado em andamento")
+status, reset_ticket = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "new"})
+expect(status, 200, "reset para status novo")
+expect(reset_ticket["status"], "new", "chamado volta para novo")
 status, _ = call("PATCH", f"/tickets/{ticket['id']}", operator, {"status": "closed", "resolution_message": "Atendimento concluído."})
 expect(status, 409, "encerramento exige responsável")
 status, updated = call(
@@ -1102,7 +1106,7 @@ status, updated = call(
 expect(status, 200, "triagem do técnico")
 expect(updated["status"], "assigned", "atribuição promove status novo")
 events = [item for item in updated["comments"] if item["event_type"] == "update"]
-expect(len(events), 3, "eventos administrativos")
+expect(len(events), 5, "eventos administrativos")
 if not all("Maiana Ignácio" in item["body"] and not item["internal"] for item in events):
     raise AssertionError("eventos devem ter autoria e ser públicos")
 
@@ -1118,7 +1122,7 @@ assert_explicit_zone(note["created_at"], "comentário.created_at")
 status, requester_view = call("GET", f"/tickets/{ticket['id']}", requester)
 expect(status, 200, "usuário acompanha chamado")
 expect(sum(1 for item in requester_view["comments"] if item["internal"]), 0, "notas internas filtradas")
-expect(sum(1 for item in requester_view["comments"] if item["event_type"] == "update"), 3, "eventos visíveis")
+expect(sum(1 for item in requester_view["comments"] if item["event_type"] == "update"), 5, "eventos visíveis")
 
 status, _ = call("GET", f"/tickets/{ticket['id']}", technician)
 expect(status, 200, "técnico acessa chamado atribuído")
@@ -1135,8 +1139,79 @@ status, closed_ticket = call(
 expect(status, 200, "técnico altera status permitido")
 expect(closed_ticket["status"], "closed", "chamado encerrado")
 expect(any("Mensagem de encerramento" in item["body"] for item in closed_ticket["comments"]), True, "mensagem de encerramento registrada")
-status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "assigned"})
-expect(status, 409, "chamado fechado não altera status")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"priority": "critical"})
+expect(status, 409, "chamado fechado não altera outros campos")
+status, _ = call("PATCH", f"/tickets/{ticket['id']}", technician, {"status": "cancelled"})
+expect(status, 409, "chamado fechado não pode virar cancelado diretamente (só reabertura)")
+
+# Ciclo de vida completo: em andamento, aguardando solicitante, resolvido,
+# confirmação de encerramento, reabertura dentro da janela, cancelamento e
+# reabertura automática por resposta do solicitante.
+status, lifecycle_ticket = call(
+    "POST",
+    "/tickets",
+    requester,
+    {
+        "service_id": general_service["id"],
+        "description": "Teste do ciclo de vida completo do chamado.",
+        "form_data": {"details": "Validação de estados intermediários."},
+    },
+)
+expect(status, 201, "abertura para teste de ciclo de vida")
+lifecycle_id = lifecycle_ticket["id"]
+
+status, _ = call("PATCH", f"/tickets/{lifecycle_id}", operator, {"assignee_id": tech_id})
+expect(status, 200, "atribuição para ciclo de vida")
+
+status, _ = call("PATCH", f"/tickets/{lifecycle_id}", technician, {"status": "in_progress"})
+expect(status, 200, "técnico inicia atendimento")
+
+status, waiting_ticket = call("PATCH", f"/tickets/{lifecycle_id}", technician, {"status": "waiting_requester"})
+expect(status, 200, "técnico aguarda solicitante")
+expect(waiting_ticket["status"], "waiting_requester", "status aguardando solicitante")
+
+status, _ = call("PATCH", f"/tickets/{lifecycle_id}", technician, {"status": "resolved"})
+expect(status, 422, "resolução exige mensagem")
+
+status, resolved_ticket = call(
+    "PATCH",
+    f"/tickets/{lifecycle_id}",
+    technician,
+    {"status": "resolved", "resolution_message": "Problema corrigido remotamente."},
+)
+expect(status, 200, "técnico resolve chamado")
+expect(resolved_ticket["status"], "resolved", "chamado resolvido")
+expect(any("Mensagem de resolução" in item["body"] for item in resolved_ticket["comments"]), True, "mensagem de resolução registrada")
+
+status, confirmed_ticket = call("PATCH", f"/tickets/{lifecycle_id}", technician, {"status": "closed"})
+expect(status, 200, "confirmação de encerramento sem nova mensagem")
+expect(confirmed_ticket["status"], "closed", "chamado encerrado após resolução")
+
+status, reopened_ticket = call("PATCH", f"/tickets/{lifecycle_id}", technician, {"status": "in_progress"})
+expect(status, 200, "chamado fechado reaberto dentro da janela")
+expect(reopened_ticket["status"], "in_progress", "reabertura aplica o status solicitado")
+expect(any("reabriu o chamado" in item["body"] for item in reopened_ticket["comments"]), True, "evento de reabertura registrado")
+
+status, cancelled_ticket = call("PATCH", f"/tickets/{lifecycle_id}", technician, {"status": "cancelled"})
+expect(status, 200, "técnico cancela chamado")
+expect(cancelled_ticket["status"], "cancelled", "chamado cancelado")
+
+status, _ = call(
+    "POST",
+    f"/tickets/{lifecycle_id}/comments",
+    requester,
+    {"body": "O problema voltou a acontecer.", "internal": False},
+)
+expect(status, 201, "solicitante responde chamado cancelado")
+
+status, reopened_by_reply = call("GET", f"/tickets/{lifecycle_id}", requester)
+expect(status, 200, "consulta após resposta do solicitante")
+expect(reopened_by_reply["status"], "assigned", "resposta do solicitante reabre o chamado automaticamente")
+expect(
+    any("reaberto automaticamente" in item["body"] for item in reopened_by_reply["comments"]),
+    True,
+    "evento de reabertura automática registrado",
+)
 
 _, page = call("GET", "/tickets", operator, params={"page_size": 100})
 foreign_ticket = next(

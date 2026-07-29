@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from ..auth import get_current_user
 from ..catalog_forms import normalize_form_schema, validate_form_data
 from ..database import get_db
-from ..domain import OPEN_STATUSES, TECHNICIAN_STATUSES
+from ..domain import OPEN_STATUSES, OVERDUE_ELIGIBLE_STATUSES, TECHNICIAN_STATUSES
 from ..models import Asset, ServiceCatalog, Ticket, TicketComment, User
 from ..permissions import has_permission
 from ..schemas import CommentCreate, CommentOut, DashboardOut, TicketCreate, TicketDetailOut, TicketPageOut, TicketUpdate
@@ -15,11 +15,14 @@ from ..serializers.tickets import serialize_ticket
 from ..services.tickets_service import (
     FINAL_TICKET_STATUSES,
     NON_NULLABLE_UPDATE_FIELDS,
+    STATUS_WITH_RESOLUTION_MESSAGE,
     TECHNICIAN_UPDATE_FIELDS,
+    can_reopen,
     change_message,
     due_for_priority,
     ensure_ticket_access,
     now_utc,
+    reopen_ticket,
     ticket_filter_conditions,
     ticket_visibility,
     ticket_visibility_conditions,
@@ -66,6 +69,9 @@ def list_tickets(
         summary={
             "new": aggregate_count(Ticket.status == "new"),
             "assigned": aggregate_count(Ticket.status == "assigned"),
+            "in_progress": aggregate_count(Ticket.status == "in_progress"),
+            "waiting_requester": aggregate_count(Ticket.status == "waiting_requester"),
+            "resolved": aggregate_count(Ticket.status == "resolved"),
             "closed": aggregate_count(Ticket.status == "closed"),
             "cancelled": aggregate_count(Ticket.status == "cancelled"),
         },
@@ -187,16 +193,27 @@ def update_ticket(
             raise HTTPException(status_code=403, detail="Status não permitido para técnico")
 
     if ticket.status in FINAL_TICKET_STATUSES and data:
+        requested_status = data.get("status")
+        if set(data) <= {"status"} and requested_status in OPEN_STATUSES and can_reopen(ticket):
+            reopen_ticket(ticket, current_user, db, target_status=requested_status)
+            db.commit()
+            return get_ticket(ticket_id, db, current_user)
         raise HTTPException(status_code=409, detail="Chamado finalizado não pode ser alterado")
 
     validate_ticket_references(data, db)
-    if resolution_message and data.get("status") != "closed":
-        raise HTTPException(status_code=422, detail="Mensagem de encerramento só é aceita ao encerrar chamado")
+    if resolution_message and data.get("status") not in STATUS_WITH_RESOLUTION_MESSAGE:
+        raise HTTPException(status_code=422, detail="Mensagem só é aceita ao resolver ou encerrar o chamado")
+
+    if data.get("status") == "resolved":
+        if not (data.get("assignee_id") or ticket.assignee_id):
+            raise HTTPException(status_code=409, detail="Atribua um responsável antes de resolver o chamado")
+        if not resolution_message:
+            raise HTTPException(status_code=422, detail="Informe a mensagem de resolução")
 
     if data.get("status") == "closed":
         if not (data.get("assignee_id") or ticket.assignee_id):
             raise HTTPException(status_code=409, detail="Atribua um responsável antes de encerrar o chamado")
-        if not resolution_message:
+        if ticket.status != "resolved" and not resolution_message:
             raise HTTPException(status_code=422, detail="Informe a mensagem de encerramento")
 
     if data.get("assignee_id") and ticket.status == "new" and data.get("status", "new") == "new":
@@ -230,12 +247,13 @@ def update_ticket(
             )
             for field, old, new in changes
         ]
-        if data.get("status") == "closed":
+        if resolution_message and data.get("status") in STATUS_WITH_RESOLUTION_MESSAGE:
+            label = "resolução" if data.get("status") == "resolved" else "encerramento"
             update_comments.append(
                 TicketComment(
                     ticket_id=ticket.id,
                     author_id=current_user.id,
-                    body=f"Mensagem de encerramento: {resolution_message}",
+                    body=f"Mensagem de {label}: {resolution_message}",
                     internal=False,
                     event_type="event",
                 )
@@ -262,6 +280,10 @@ def add_comment(
     comment = TicketComment(ticket_id=ticket_id, author_id=current_user.id, body=payload.body.strip(), internal=payload.internal)
     ticket.updated_at = now_utc()
     db.add(comment)
+
+    if not payload.internal and current_user.id == ticket.requester_id and can_reopen(ticket):
+        reopen_ticket(ticket, current_user, db, auto=True)
+
     db.commit()
     db.refresh(comment)
     return db.scalar(select(TicketComment).where(TicketComment.id == comment.id).options(joinedload(TicketComment.author)))
@@ -308,9 +330,12 @@ def dashboard(
         total=count(),
         new=count(Ticket.status == "new"),
         assigned=count(Ticket.status == "assigned"),
+        in_progress=count(Ticket.status == "in_progress"),
+        waiting_requester=count(Ticket.status == "waiting_requester"),
+        resolved=count(Ticket.status == "resolved"),
         closed=count(Ticket.status == "closed"),
         cancelled=count(Ticket.status == "cancelled"),
-        overdue=count(Ticket.due_at < current_time, Ticket.status.in_(OPEN_STATUSES)),
+        overdue=count(Ticket.due_at < current_time, Ticket.status.in_(OVERDUE_ELIGIBLE_STATUSES)),
         my_open=count(Ticket.assignee_id == current_user.id, Ticket.status.in_(OPEN_STATUSES))
         if current_user.role != "user"
         else count(Ticket.status.in_(OPEN_STATUSES)),
