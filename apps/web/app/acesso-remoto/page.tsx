@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { MonitorCog, ShieldCheck, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import AccessDenied from "@/components/AccessDenied";
@@ -7,14 +8,18 @@ import { useAuth } from "@/components/AuthProvider";
 import LoadingScreen from "@/components/LoadingScreen";
 import MetricCard from "@/components/MetricCard";
 import PageHeader from "@/components/PageHeader";
+import SearchParamsSuspense from "@/components/SearchParamsSuspense";
 import { Alert } from "@/components/ui";
 import RemoteAccessPanels from "@/features/remote-access/RemoteAccessPanels";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import type { RemoteAccessDevice, RemoteAccessHealth, RemoteAccessSummary } from "@/lib/types";
 
-export default function RemoteAccessPage() {
+function RemoteAccessContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const defaultTicketId = searchParams.get("ticket_id") || "";
+  const defaultAssetId = searchParams.get("asset_id") || "";
   const canView = hasPermission(user, "remote_access.view");
   const canConnect = hasPermission(user, "remote_access.connect");
   const [devices, setDevices] = useState<RemoteAccessDevice[]>([]);
@@ -117,6 +122,8 @@ export default function RemoteAccessPage() {
         hasFilters={hasFilters}
         filters={{ search, status }}
         canConnect={canConnect}
+        defaultTicketId={defaultTicketId}
+        defaultAssetId={defaultAssetId}
         onFiltersChange={(changes) => {
           if ("search" in changes) setSearch(changes.search ?? "");
           if ("status" in changes) setStatus(changes.status ?? "");
@@ -126,5 +133,13 @@ export default function RemoteAccessPage() {
         onError={setError}
       />
     </>
+  );
+}
+
+export default function RemoteAccessPage() {
+  return (
+    <SearchParamsSuspense>
+      <RemoteAccessContent />
+    </SearchParamsSuspense>
   );
 }
