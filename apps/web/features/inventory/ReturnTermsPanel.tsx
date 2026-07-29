@@ -71,8 +71,8 @@ export default function ReturnTermsPanel() {
   const [draft, setDraft] = useState<TermDraft>(emptyTermDraft());
   const [serials, setSerials] = useState<string[]>([]);
   const [assetSearch, setAssetSearch] = useState("");
-  const [assetResults, setAssetResults] = useState<InventoryAsset[]>([]);
-  const [assetSearchLoading, setAssetSearchLoading] = useState(false);
+  const [returnerAssets, setReturnerAssets] = useState<InventoryAsset[]>([]);
+  const [returnerAssetsLoading, setReturnerAssetsLoading] = useState(false);
   const [preview, setPreview] = useState<InventoryReturnTermPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [view, setView] = useState<TermsView>("emit");
@@ -134,37 +134,35 @@ export default function ReturnTermsPanel() {
   }, [canMove, draft.returner_user_id, serials]);
 
   useEffect(() => {
-    if (!canMove || !draft.returner_user_id || assetSearch.trim().length < 2) {
-      setAssetResults([]);
-      setAssetSearchLoading(false);
+    if (!canMove || !draft.returner_user_id) {
+      setReturnerAssets([]);
       return;
     }
     let active = true;
-    setAssetSearchLoading(true);
+    setReturnerAssetsLoading(true);
     const returnerId = Number(draft.returner_user_id);
-    const timer = setTimeout(() => {
-      api.inventoryAssets({ search: assetSearch.trim(), status_filter: "allocated", page_size: 20 })
-        .then((data) => {
-          if (!active) return;
-          setAssetResults(
-            data.items
-              .filter((asset) => asset.assigned_user_id === returnerId)
-              .filter((asset) => !serials.some((serial) => normalizedSerial(serial) === normalizedSerial(asset.serial_number)))
-              .slice(0, 8),
-          );
-        })
-        .catch(() => {
-          if (active) setAssetResults([]);
-        })
-        .finally(() => {
-          if (active) setAssetSearchLoading(false);
-        });
-    }, 200);
+    api.inventoryAssets({ status_filter: "allocated", page_size: 100 })
+      .then((data) => {
+        if (!active) return;
+        setReturnerAssets(data.items.filter((asset) => asset.assigned_user_id === returnerId));
+      })
+      .catch(() => {
+        if (active) setReturnerAssets([]);
+      })
+      .finally(() => {
+        if (active) setReturnerAssetsLoading(false);
+      });
     return () => {
       active = false;
-      clearTimeout(timer);
     };
-  }, [assetSearch, canMove, draft.returner_user_id, serials]);
+  }, [canMove, draft.returner_user_id]);
+
+  const visibleReturnerAssets = useMemo(() => {
+    const term = assetSearch.trim().toLowerCase();
+    return returnerAssets
+      .filter((asset) => !serials.some((serial) => normalizedSerial(serial) === normalizedSerial(asset.serial_number)))
+      .filter((asset) => !term || `${asset.serial_number} ${asset.display_name}`.toLowerCase().includes(term));
+  }, [assetSearch, returnerAssets, serials]);
 
   const selectedReturner = useMemo(
     () => users.find((item) => String(item.id) === draft.returner_user_id) || null,
@@ -202,7 +200,6 @@ export default function ReturnTermsPanel() {
     setError("");
     setSerials((current) => [...current, serial]);
     setAssetSearch("");
-    setAssetResults([]);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
@@ -220,10 +217,11 @@ export default function ReturnTermsPanel() {
       related_delivery_term_id: "",
     }));
     setSerials([]);
+    setAssetSearch("");
   };
 
   const submitAssetSearch = () => {
-    if (assetResults.length) addAsset(assetResults[0]);
+    if (visibleReturnerAssets.length) addAsset(visibleReturnerAssets[0]);
     else addSerial(assetSearch);
   };
 
@@ -343,44 +341,11 @@ export default function ReturnTermsPanel() {
       </div>
 
       {canMove && view === "emit" && (
-        <form onSubmit={createTerm} className="mb-5 grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <form onSubmit={createTerm} className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <Card className="overflow-hidden">
-              <SectionHeader title="Servidor devolvedor" description="Selecione primeiro: a busca de equipamentos usa este vínculo." />
-              <div className="space-y-3 p-4">
-                <Field label="Buscar servidor">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
-                    <Input className="pl-8" value={returnerSearch} onChange={(e) => setReturnerSearch(e.target.value)} placeholder="Nome, e-mail ou matrícula" />
-                  </div>
-                </Field>
-                <div className="max-h-52 overflow-y-auto rounded-md border border-[var(--border-subtle)]">
-                  {filteredUsers.map((returner) => (
-                    <button
-                      type="button"
-                      key={returner.id}
-                      onClick={() => selectReturner(returner)}
-                      className={`block w-full border-b border-[var(--border-subtle)] px-3 py-2 text-left text-sm last:border-b-0 ${draft.returner_user_id === String(returner.id) ? "bg-[var(--status-blue-bg)]" : "bg-[var(--card)] hover:bg-[var(--surface-subtle)]"}`}
-                    >
-                      <span className="font-semibold text-[var(--foreground)]">{returner.full_name}</span>
-                      <span className="mt-0.5 block text-xs text-[var(--muted-light)]">{returner.email} · {returner.registration || "sem matrícula"}</span>
-                    </button>
-                  ))}
-                  {!filteredUsers.length && <EmptyState title="Nenhum servidor encontrado" className="py-6" />}
-                </div>
-                {selectedReturner && (
-                  <Alert tone="info">
-                    Selecionado: <strong>{selectedReturner.full_name}</strong> ({selectedReturner.email})
-                  </Alert>
-                )}
-                <Field label="Matrícula no termo"><Input value={draft.returner_registration} onChange={(e) => setDraft({ ...draft, returner_registration: e.target.value })} /></Field>
-                <Field label="Telefone no termo"><Input value={draft.returner_phone} onChange={(e) => setDraft({ ...draft, returner_phone: e.target.value })} /></Field>
-              </div>
-            </Card>
-
-            <Card className="overflow-hidden">
               <SectionHeader title="Dados do termo" />
-              <div className="grid gap-4 p-4">
+              <div className="grid gap-4 p-4 sm:grid-cols-2">
                 <Field label="Número do termo"><Input value={draft.term_number} onChange={(e) => setDraft({ ...draft, term_number: e.target.value })} placeholder="001/2026" /></Field>
                 <Field label="Data do termo"><Input type="date" value={draft.issued_at} onChange={(e) => setDraft({ ...draft, issued_at: e.target.value })} /></Field>
                 <Field label="Contrato (opcional)" help="Deixe em branco para equipamento patrimoniado, sem vínculo de locação.">
@@ -399,16 +364,16 @@ export default function ReturnTermsPanel() {
                     {returnerDeliveryTerms.map((term) => <option key={term.id} value={term.id}>{term.term_number}</option>)}
                   </Select>
                 </Field>
-                <Field label="Observação na relação dos equipamentos"><Input value={draft.item_observation} onChange={(e) => setDraft({ ...draft, item_observation: e.target.value })} /></Field>
+                <div className="sm:col-span-2">
+                  <Field label="Observação na relação dos equipamentos"><Input value={draft.item_observation} onChange={(e) => setDraft({ ...draft, item_observation: e.target.value })} /></Field>
+                </div>
               </div>
             </Card>
-          </div>
 
-          <div className="space-y-4">
             <Card className="overflow-hidden">
-              <SectionHeader title="Equipamentos" description={!draft.returner_user_id ? "Selecione o devolvedor para buscar os equipamentos vinculados a ele." : undefined} />
+              <SectionHeader title="Equipamentos" description={!draft.returner_user_id ? "Selecione o devolvedor ao lado para ver os equipamentos vinculados a ele." : "Equipamentos alocados a este servidor. Clique para adicionar ao termo."} />
               <div className="space-y-3 p-4">
-                <Field label="Buscar equipamento do devolvedor">
+                <Field label="Filtrar por série, modelo ou tipo">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
@@ -424,16 +389,16 @@ export default function ReturnTermsPanel() {
                             submitAssetSearch();
                           }
                         }}
-                        placeholder="Série, modelo ou tipo"
+                        placeholder="Deixe em branco para ver todos"
                       />
                     </div>
-                    <Button type="button" variant="secondary" disabled={!draft.returner_user_id} onClick={submitAssetSearch}><Plus size={15} />Adicionar</Button>
+                    <Button type="button" variant="secondary" disabled={!draft.returner_user_id || !visibleReturnerAssets.length} onClick={submitAssetSearch}><Plus size={15} />Adicionar</Button>
                   </div>
                 </Field>
-                {draft.returner_user_id && assetSearch.trim().length >= 2 && (
+                {draft.returner_user_id && (
                   <div className="overflow-hidden rounded-md border border-[var(--border-subtle)]">
-                    {assetSearchLoading && <p className="px-3 py-2 text-sm text-[var(--muted)]">Buscando...</p>}
-                    {!assetSearchLoading && assetResults.map((asset) => (
+                    {returnerAssetsLoading && <p className="px-3 py-2 text-sm text-[var(--muted)]">Buscando equipamentos vinculados...</p>}
+                    {!returnerAssetsLoading && visibleReturnerAssets.map((asset) => (
                       <button
                         key={asset.id}
                         type="button"
@@ -444,7 +409,11 @@ export default function ReturnTermsPanel() {
                         <span className="mt-0.5 block text-xs text-[var(--muted)]">{asset.display_name}</span>
                       </button>
                     ))}
-                    {!assetSearchLoading && !assetResults.length && <p className="px-3 py-2 text-sm text-[var(--muted)]">Nenhum equipamento alocado a este servidor foi encontrado.</p>}
+                    {!returnerAssetsLoading && !visibleReturnerAssets.length && (
+                      <p className="px-3 py-2 text-sm text-[var(--muted)]">
+                        {returnerAssets.length ? "Nenhum equipamento corresponde ao filtro." : "Nenhum equipamento alocado a este servidor."}
+                      </p>
+                    )}
                   </div>
                 )}
                 {serials.length > 0 && (
@@ -488,7 +457,42 @@ export default function ReturnTermsPanel() {
                 </div>
               </Card>
             )}
-            <Button className="w-full" disabled={saving || previewLoading || !canCreateTerm}><FileText size={16} />{saving ? "Emitindo..." : "Emitir termo"}</Button>
+          </div>
+
+          <div className="space-y-4">
+            <Card className="overflow-hidden">
+              <SectionHeader title="Servidor devolvedor" description="Selecione primeiro: a busca de equipamentos usa este vínculo." />
+              <div className="space-y-3 p-4">
+                <Field label="Buscar servidor">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)]" size={16} />
+                    <Input className="pl-8" value={returnerSearch} onChange={(e) => setReturnerSearch(e.target.value)} placeholder="Nome, e-mail ou matrícula" />
+                  </div>
+                </Field>
+                <div className="max-h-52 overflow-y-auto rounded-md border border-[var(--border-subtle)]">
+                  {filteredUsers.map((returner) => (
+                    <button
+                      type="button"
+                      key={returner.id}
+                      onClick={() => selectReturner(returner)}
+                      className={`block w-full border-b border-[var(--border-subtle)] px-3 py-2 text-left text-sm last:border-b-0 ${draft.returner_user_id === String(returner.id) ? "bg-[var(--status-blue-bg)]" : "bg-[var(--card)] hover:bg-[var(--surface-subtle)]"}`}
+                    >
+                      <span className="font-semibold text-[var(--foreground)]">{returner.full_name}</span>
+                      <span className="mt-0.5 block text-xs text-[var(--muted-light)]">{returner.email} · {returner.registration || "sem matrícula"}</span>
+                    </button>
+                  ))}
+                  {!filteredUsers.length && <EmptyState title="Nenhum servidor encontrado" className="py-6" />}
+                </div>
+                {selectedReturner && (
+                  <Alert tone="info">
+                    Selecionado: <strong>{selectedReturner.full_name}</strong> ({selectedReturner.email})
+                  </Alert>
+                )}
+                <Field label="Matrícula no termo"><Input value={draft.returner_registration} onChange={(e) => setDraft({ ...draft, returner_registration: e.target.value })} /></Field>
+                <Field label="Telefone no termo"><Input value={draft.returner_phone} onChange={(e) => setDraft({ ...draft, returner_phone: e.target.value })} /></Field>
+                <Button className="w-full" disabled={saving || previewLoading || !canCreateTerm}><FileText size={16} />{saving ? "Emitindo..." : "Emitir termo"}</Button>
+              </div>
+            </Card>
           </div>
         </form>
       )}
