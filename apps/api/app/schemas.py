@@ -531,6 +531,7 @@ class InventoryMovementOut(BaseModel):
 
 
 InventoryDeliveryTermStatus = Literal["draft", "emitted", "delivered", "cancelled"]
+InventoryReturnTermStatus = Literal["draft", "emitted", "confirmed", "cancelled"]
 
 
 class InventoryDeliveryTermCreate(BaseModel):
@@ -616,6 +617,87 @@ class InventoryDeliveryTermOut(BaseModel):
 
     @field_serializer("issued_at", "delivered_at", "created_at", "updated_at")
     def serialize_term_datetimes(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class InventoryReturnTermCreate(BaseModel):
+    term_number: str = Field(min_length=1, max_length=40)
+    contract_id: Optional[int] = None
+    contract_number: str = Field(default="", max_length=120)
+    related_delivery_term_id: Optional[int] = None
+    issued_at: date
+    returner_user_id: int
+    returner_registration: str = Field(default="", max_length=80)
+    returner_phone: str = Field(default="", max_length=40)
+    adcetei_signer_name: str = Field(default="William Barreto Corrêa", min_length=3, max_length=180)
+    adcetei_signer_title: str = Field(default="Coordenador Geral de Tecnologia da Informação", min_length=3, max_length=180)
+    item_observation: str = Field(default="Equipamento devolvido", max_length=180)
+    serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryReturnTermPreview(BaseModel):
+    returner_user_id: int
+    serial_numbers: list[str] = Field(min_length=1, max_length=500)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryReturnTermConfirm(BaseModel):
+    movement_date: date
+    notes: str = Field(default="", max_length=2000)
+    model_config = ConfigDict(extra="forbid")
+
+
+class InventoryReturnTermItemOut(BaseModel):
+    id: int
+    asset_id: int
+    asset_type: str
+    manufacturer: str
+    model: str
+    serial_number: str
+    specification: str
+    observation: str
+
+
+class InventoryReturnTermPreviewOut(BaseModel):
+    total: int
+    valid_count: int
+    invalid_count: int
+    valid_items: list[InventoryReturnTermItemOut] = Field(default_factory=list)
+    errors: list[InventoryDeliveryTermPreviewError] = Field(default_factory=list)
+
+
+class InventoryReturnTermNextNumberOut(BaseModel):
+    term_number: str
+
+
+class InventoryReturnTermOut(BaseModel):
+    id: int
+    term_number: str
+    contract_id: Optional[int] = None
+    contract_number: str
+    related_delivery_term_id: Optional[int] = None
+    issued_at: datetime
+    origin_sector_id: int
+    origin_unit: str
+    returner_user_id: int
+    returner_name: str
+    returner_email: EmailStr
+    returner_registration: str
+    returner_phone: str
+    adcetei_signer_name: str
+    adcetei_signer_title: str
+    item_observation: str
+    notes: str
+    status: InventoryReturnTermStatus
+    confirmed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    items: list[InventoryReturnTermItemOut] = Field(default_factory=list)
+
+    @field_serializer("issued_at", "confirmed_at", "created_at", "updated_at")
+    def serialize_return_term_datetimes(self, value: datetime | None) -> str | None:
         return iso_utc(value)
 
 

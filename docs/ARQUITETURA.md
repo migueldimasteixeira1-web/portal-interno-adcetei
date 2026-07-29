@@ -24,7 +24,7 @@ Portal Interno ADCETEI
 │   ├── cadastros base (fornecedor, tipo, fabricante, modelo, setor)
 │   ├── equipamentos e movimentações
 │   ├── entrada em lote por série
-│   ├── termos de recebimento e confirmação de entrega
+│   ├── termos de recebimento e devolução, com confirmação antes de movimentar
 │   └── opções resumidas para chamados
 ├── Acesso Remoto
 │   ├── listagem de computadores MeshCentral
@@ -92,7 +92,7 @@ Imports existentes `@/lib/api` e `@/lib/types` continuam válidos após a modula
 | `/chamados`, `/chamados/novo`, `/chamados/[id]` | `features/tickets/*` |
 | `/mensagens` | `features/chat/*` |
 | `/inventario`, `/inventario/[id]`, `/inventario/lote`, `/inventario/novo` | `features/inventory/*` |
-| `/inventario/termos` | Termos de recebimento e confirmação de entrega |
+| `/inventario/termos` | Termos de recebimento e devolução (`features/inventory/DeliveryTermsPanel`, `ReturnTermsPanel`) |
 | `/administracao/base-cadastros`, `/administracao/catalogo`, `/administracao/usuarios` | `features/admin/*` |
 | `/administracao/perfis`, `/administracao/auditoria` | Inline (telas menores) |
 | `/acesso-remoto`, `/acesso-remoto/sessoes/[id]` | `features/remote-access/*` |
@@ -154,6 +154,19 @@ A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados).
 - Ação única de movimentação direta define setor e, opcionalmente, responsável; a API valida que o responsável pertence ao setor de destino
 
 Termos de recebimento usam o cadastro existente de `users` como cadastro único de pessoas. Uma conta pode ficar bloqueada para login (`active=false`) e ainda ser usada como responsável recebedor do termo. A confirmação de entrega aplica a alocação em lote nos ativos e registra uma movimentação individual para cada equipamento.
+
+### Termos de devolução
+
+Simétrico ao termo de recebimento — mesma engrenagem (modelo, numeração sequencial, template DOCX, fluxo emitido → confirmado/cancelado), adaptada para o sentido inverso (equipamento → estoque):
+
+- `InventoryReturnTerm`/`InventoryReturnTermItem` (`/api/inventory/return-terms`) são tabelas próprias, não um reaproveitamento direto de `InventoryDeliveryTerm` — os campos (`returner_*`, `origin_sector_id`) e o status final (`confirmed`, não `delivered`) são de fato diferentes. A generalização num modelo "Documento" polimórfico único fica para uma etapa futura (ver auditoria de arquitetura, item de Documento generalizado), depois que os dois fluxos tiverem rodado em produção
+- `contract_id`/`contract_number` e `related_delivery_term_id` são opcionais: cobre tanto equipamento locado (com contrato e, opcionalmente, referência ao termo de recebimento original) quanto patrimoniado (nenhum dos dois)
+- Elegibilidade do equipamento: precisa estar com status `allocated` (não `stock`, `maintenance` ou `retired`) e vinculado (`assigned_user_id`) ao mesmo usuário selecionado como devolvedor — `asset_return_term_error` valida isso na prévia e na criação
+- Reserva própria (`inventory_return_terms.status` em `draft`/`emitted`) impede que o mesmo equipamento entre em dois termos de devolução simultâneos; `ensure_asset_not_reserved` (usado pela movimentação direta de devolução ao estoque) também passou a considerar essa reserva, além da de termos de recebimento
+- Confirmação aplica `apply_return_to_stock` (mesma função usada pela devolução direta em `/api/inventory/assets/{id}/return-to-stock`) e grava movimentação `returned_to_stock`, sempre para o setor padrão ADCETEI
+- Assinatura no DOCX: devolvedor assina primeiro, ADCETEI em segundo — ordem invertida em relação ao termo de recebimento, seguindo o padrão já usado nos termos de devolução manuais anteriores
+- Geração de DOCX reaproveita os utilitários OOXML genéricos extraídos para `docx_utils.py` (manipulação de parágrafos/tabelas, paginação, reflow em duas páginas) — `delivery_terms_docx.py` e `return_terms_docx.py` só têm a lógica específica de cada template
+- Tela `/inventario/termos` tem um alternador no topo ("Recebimento"/"Devolução"); cada lado é um componente próprio (`features/inventory/DeliveryTermsPanel.tsx` e `ReturnTermsPanel.tsx`). Na devolução, o servidor devolvedor é selecionado antes da busca de equipamento, que já vem filtrada aos itens alocados a ele
 
 Quando o cadastro administrativo não informa senha, o backend gera uma credencial aleatória que não é exibida nem registrada. A conta permanece bloqueada até uma futura redefinição administrativa.
 

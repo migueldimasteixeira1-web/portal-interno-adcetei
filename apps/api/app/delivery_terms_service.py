@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Asset, InventoryDeliveryTerm, InventoryDeliveryTermItem
+from .return_terms_service import open_return_term_for_asset, return_reservation_conflict_message
 
 
 OPEN_DELIVERY_TERM_STATUSES = ("draft", "emitted")
@@ -40,3 +41,6 @@ def ensure_asset_not_reserved(db: Session, asset_id: int) -> None:
     term = open_delivery_term_for_asset(db, asset_id)
     if term:
         raise HTTPException(status_code=409, detail=reservation_conflict_message(term))
+    return_term = open_return_term_for_asset(db, asset_id)
+    if return_term:
+        raise HTTPException(status_code=409, detail=return_reservation_conflict_message(return_term))

@@ -298,3 +298,75 @@ export interface InventoryDeliveryTermDeliverPayload {
   movement_date: string;
   notes?: string;
 }
+
+export type InventoryReturnTermStatus = "draft" | "emitted" | "confirmed" | "cancelled";
+
+export interface InventoryReturnTermItem {
+  id: number;
+  asset_id: number;
+  asset_type: string;
+  manufacturer: string;
+  model: string;
+  serial_number: string;
+  specification: string;
+  observation: string;
+}
+
+export interface InventoryReturnTerm {
+  id: number;
+  term_number: string;
+  contract_id?: number | null;
+  contract_number: string;
+  related_delivery_term_id?: number | null;
+  issued_at: string;
+  origin_sector_id: number;
+  origin_unit: string;
+  returner_user_id: number;
+  returner_name: string;
+  returner_email: string;
+  returner_registration: string;
+  returner_phone: string;
+  adcetei_signer_name: string;
+  adcetei_signer_title: string;
+  item_observation: string;
+  notes: string;
+  status: InventoryReturnTermStatus;
+  confirmed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: InventoryReturnTermItem[];
+}
+
+export interface InventoryReturnTermCreatePayload {
+  term_number: string;
+  contract_id?: number | null;
+  contract_number?: string;
+  related_delivery_term_id?: number | null;
+  issued_at: string;
+  returner_user_id: number;
+  returner_registration?: string;
+  returner_phone?: string;
+  adcetei_signer_name: string;
+  adcetei_signer_title: string;
+  item_observation?: string;
+  serial_numbers: string[];
+  notes?: string;
+}
+
+export interface InventoryReturnTermPreviewPayload {
+  returner_user_id: number;
+  serial_numbers: string[];
+}
+
+export interface InventoryReturnTermPreview {
+  total: number;
+  valid_count: number;
+  invalid_count: number;
+  valid_items: InventoryReturnTermItem[];
+  errors: InventoryDeliveryTermPreviewError[];
+}
+
+export interface InventoryReturnTermConfirmPayload {
+  movement_date: string;
+  notes?: string;
+}

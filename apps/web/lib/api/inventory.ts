@@ -27,6 +27,11 @@ import type {
   InventoryMovement,
   InventoryMovementPayload,
   InventoryRetirePayload,
+  InventoryReturnTerm,
+  InventoryReturnTermConfirmPayload,
+  InventoryReturnTermCreatePayload,
+  InventoryReturnTermPreview,
+  InventoryReturnTermPreviewPayload,
   InventorySectorCreatePayload,
   InventorySectorUpdatePayload,
 } from "../types";
@@ -113,4 +118,16 @@ export const inventoryApi = {
     request<InventoryDeliveryTerm>(`/inventory/delivery-terms/${id}/deliver`, { method: "POST", body: JSON.stringify(payload) }),
   cancelInventoryDeliveryTerm: (id: number | string) =>
     request<{ message: string }>(`/inventory/delivery-terms/${id}/cancel`, { method: "POST" }),
+  inventoryReturnTerms: () => request<InventoryReturnTerm[]>("/inventory/return-terms"),
+  nextInventoryReturnTermNumber: () => request<{ term_number: string }>("/inventory/return-terms/next-number"),
+  previewInventoryReturnTerm: (payload: InventoryReturnTermPreviewPayload) =>
+    request<InventoryReturnTermPreview>("/inventory/return-terms/preview", { method: "POST", body: JSON.stringify(payload) }),
+  createInventoryReturnTerm: (payload: InventoryReturnTermCreatePayload) =>
+    request<InventoryReturnTerm>("/inventory/return-terms", { method: "POST", body: JSON.stringify(payload) }),
+  downloadInventoryReturnTerm: (id: number | string, filename?: string) =>
+    downloadRequest(`/inventory/return-terms/${id}/document`, filename || `termo-devolucao-${id}.docx`),
+  confirmInventoryReturnTerm: (id: number | string, payload: InventoryReturnTermConfirmPayload) =>
+    request<InventoryReturnTerm>(`/inventory/return-terms/${id}/confirm`, { method: "POST", body: JSON.stringify(payload) }),
+  cancelInventoryReturnTerm: (id: number | string) =>
+    request<{ message: string }>(`/inventory/return-terms/${id}/cancel`, { method: "POST" }),
 };

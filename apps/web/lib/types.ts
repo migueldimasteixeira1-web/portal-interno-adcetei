@@ -39,6 +39,13 @@ export type {
   InventoryDeliveryTermPreviewError,
   InventoryDeliveryTermPreview,
   InventoryDeliveryTermDeliverPayload,
+  InventoryReturnTermStatus,
+  InventoryReturnTermItem,
+  InventoryReturnTerm,
+  InventoryReturnTermCreatePayload,
+  InventoryReturnTermPreviewPayload,
+  InventoryReturnTermPreview,
+  InventoryReturnTermConfirmPayload,
 } from "./types/inventory";
 export type { CatalogFormField, CatalogIconOption, CatalogOptions, CatalogService } from "./types/catalog";
 export type { TicketComment, Ticket, TicketPage, DashboardData } from "./types/tickets";
