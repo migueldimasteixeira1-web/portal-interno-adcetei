@@ -12,7 +12,7 @@ from ..config import settings
 from ..database import get_db
 from ..integrations.meshcentral_client import MeshBridgeClient, MeshBridgeError, MeshDevice
 from ..inventory_service import build_asset_display_name
-from ..models import Asset, RemoteAccessSession, RemoteDeviceLink, Ticket, User
+from ..models import Asset, RemoteAccessSession, RemoteDeviceLink, Ticket, TicketComment, User
 from ..permissions import has_permission, require_permission
 from ..schemas import (
     RemoteAccessAssetRefOut,
@@ -33,6 +33,18 @@ router = APIRouter(prefix="/api/remote-access", tags=["acesso remoto"])
 
 def _bridge() -> MeshBridgeClient:
     return MeshBridgeClient()
+
+
+def _log_session_close_on_ticket(db: Session, session: RemoteAccessSession, actor: User) -> None:
+    ticket = db.get(Ticket, session.ticket_id)
+    if not ticket:
+        return
+    device_label = session.device_name_snapshot or session.mesh_node_id
+    asset_note = f" (equipamento: {session.asset.name})" if session.asset else ""
+    body = f"Sessão de acesso remoto em {device_label}{asset_note} encerrada por {actor.full_name}."
+    db.add(TicketComment(ticket_id=ticket.id, author_id=actor.id, body=body, event_type="event"))
+    ticket.updated_at = utc_now()
+    db.commit()
 
 
 def _feature_enabled() -> None:
@@ -421,4 +433,9 @@ def close_remote_access_session(
         )
         db.commit()
         db.refresh(session)
+        if session.ticket_id:
+            try:
+                _log_session_close_on_ticket(db, session, current_user)
+            except Exception:
+                logger.exception("Falha ao registrar encerramento da sessão %s no chamado %s", session.id, session.ticket_id)
     return _session_out(session)

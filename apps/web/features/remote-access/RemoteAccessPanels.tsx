@@ -2,7 +2,7 @@
 
 import { CircleOff, LoaderCircle, MonitorCog, Play, Search, ShieldCheck, Wifi, WifiOff, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ListPagination from "@/components/ListPagination";
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, SectionHeader, Select, Textarea, Toolbar } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -24,6 +24,8 @@ type Props = {
   hasFilters: boolean;
   filters: FilterState;
   canConnect: boolean;
+  defaultTicketId?: string;
+  defaultAssetId?: string;
   onFiltersChange: (changes: Partial<FilterState>) => void;
   onClearFilters: () => void;
   onPageChange: (page: number) => void;
@@ -50,6 +52,8 @@ export default function RemoteAccessPanels({
   hasFilters,
   filters,
   canConnect,
+  defaultTicketId,
+  defaultAssetId,
   onFiltersChange,
   onClearFilters,
   onPageChange,
@@ -61,6 +65,7 @@ export default function RemoteAccessPanels({
   const [ticketId, setTicketId] = useState("");
   const [assetId, setAssetId] = useState("");
   const [creating, setCreating] = useState(false);
+  const autoOpenHandled = useRef(false);
   const selectedAssetId = selectedDevice?.asset?.id ? String(selectedDevice.asset.id) : "";
 
   const confirmDisabled = useMemo(() => reason.trim().length < 10, [reason]);
@@ -68,9 +73,17 @@ export default function RemoteAccessPanels({
   const openDialog = (device: RemoteAccessDevice) => {
     setSelectedDevice(device);
     setReason("");
-    setTicketId("");
-    setAssetId(device.asset?.id ? String(device.asset.id) : "");
+    setTicketId(defaultTicketId || "");
+    setAssetId(device.asset?.id ? String(device.asset.id) : defaultAssetId || "");
   };
+
+  useEffect(() => {
+    if (autoOpenHandled.current || !defaultAssetId || !canConnect || !devices.length) return;
+    autoOpenHandled.current = true;
+    const matches = devices.filter((device) => String(device.asset?.id ?? "") === defaultAssetId);
+    if (matches.length === 1 && matches[0].online) openDialog(matches[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices, defaultAssetId, canConnect]);
 
   const createSession = async () => {
     if (!selectedDevice) return;

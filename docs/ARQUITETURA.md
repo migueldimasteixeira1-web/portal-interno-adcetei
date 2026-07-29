@@ -194,6 +194,15 @@ Permissões: `remote_access.view`, `remote_access.connect`, `remote_access.manag
 
 Tabelas: `remote_device_links` (vínculo opcional com inventário) e `remote_access_sessions` (histórico de sessões).
 
+### Integração com chamados
+
+A tela de detalhe do chamado (`/chamados/[id]`) mostra um botão "Abrir acesso remoto" (visível com `remote_access.connect`, somente depois que o chamado tem responsável atribuído) que leva para `/acesso-remoto?ticket_id=<id>&asset_id=<id>` — o `asset_id` só é enviado quando o chamado já tem equipamento vinculado. A tela de acesso remoto lê esses parâmetros (`RemoteAccessContent`, envolvida em `SearchParamsSuspense`) e:
+
+- pré-preenche "Chamado relacionado" e "Equipamento no inventário" ao abrir o diálogo de conexão, dispensando digitação manual do número do chamado;
+- abre o diálogo automaticamente quando existe exatamente um computador do MeshCentral já vinculado ao equipamento do chamado e ele está online.
+
+Ao encerrar uma sessão vinculada a um chamado (`POST /sessions/{id}/close`), a API registra automaticamente um evento público na linha do tempo do chamado (`TicketComment`, `event_type="event"`) citando o equipamento quando houver vínculo. O registro é *best-effort*: uma falha ao comentar no chamado é logada, mas nunca impede o encerramento da sessão em si.
+
 O bridge consulta dispositivos com `meshctrl listdevices --json`, grava a saída em arquivo temporário (evita truncamento por pipe) e mantém cache em memória (`MESH_DEVICES_CACHE_TTL_MS`, padrão 30s). A URL de sessão usa login token AES-GCM:
 
 ```text

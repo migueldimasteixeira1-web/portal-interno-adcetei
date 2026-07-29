@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { ReactNode } from "react";
-import { Clock3, Computer, LoaderCircle } from "lucide-react";
-import { Button, Card, DetailRow, Field, SectionHeader, Select } from "@/components/ui";
+import { Clock3, Computer, LoaderCircle, MonitorCog } from "lucide-react";
+import { Button, buttonStyles, Card, DetailRow, Field, SectionHeader, Select } from "@/components/ui";
 import { assetTypeLabels, formatDate, priorityLabels, priorityOptions, roleLabels, statusLabels } from "@/lib/format";
 import type { Asset, Ticket, User } from "@/lib/types";
 
@@ -27,6 +28,7 @@ type Props = {
   hasPendingChanges: boolean;
   saving: boolean;
   quickAction: string;
+  remoteAccessHref?: string;
   onDraftChange: (draft: Record<string, string>) => void;
 };
 
@@ -44,6 +46,7 @@ export default function TicketSidePanel({
   hasPendingChanges,
   saving,
   quickAction,
+  remoteAccessHref,
   onDraftChange,
 }: Props) {
   return (
@@ -73,6 +76,14 @@ export default function TicketSidePanel({
               {hasPendingChanges && (
                 <p className="text-xs text-[var(--muted-light)]">Salve ou desfaça as alterações pendentes antes de usar ações rápidas.</p>
               )}
+            </div>
+          )}
+          {remoteAccessHref && (
+            <div className="border-b border-[var(--border-subtle)] pb-3">
+              <Link href={remoteAccessHref} className={buttonStyles({ variant: "secondary" })}>
+                <MonitorCog size={16} />
+                Abrir acesso remoto
+              </Link>
             </div>
           )}
           {canEditAdministrativeFields ? (
