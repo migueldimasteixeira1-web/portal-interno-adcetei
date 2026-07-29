@@ -255,7 +255,7 @@ export default function TicketDetailPage() {
   const hasAssignee = Boolean(ticket.assignee);
   const isRequester = ticket.requester.id === user.id;
   const willReopenOnReply = isRequester && canReopenTicket(ticket);
-  const remoteAccessHref = user.permissions.includes("remote_access.connect")
+  const remoteAccessHref = hasAssignee && user.permissions.includes("remote_access.connect")
     ? `/acesso-remoto?ticket_id=${ticket.id}${ticket.asset ? `&asset_id=${ticket.asset.id}` : ""}`
     : undefined;
   const formFieldLabels = Object.fromEntries(

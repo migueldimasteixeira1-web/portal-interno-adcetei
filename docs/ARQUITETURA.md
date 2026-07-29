@@ -196,7 +196,7 @@ Tabelas: `remote_device_links` (vínculo opcional com inventário) e `remote_acc
 
 ### Integração com chamados
 
-A tela de detalhe do chamado (`/chamados/[id]`) mostra um botão "Abrir acesso remoto" (visível com `remote_access.connect`) que leva para `/acesso-remoto?ticket_id=<id>&asset_id=<id>` — o `asset_id` só é enviado quando o chamado já tem equipamento vinculado. A tela de acesso remoto lê esses parâmetros (`RemoteAccessContent`, envolvida em `SearchParamsSuspense`) e:
+A tela de detalhe do chamado (`/chamados/[id]`) mostra um botão "Abrir acesso remoto" (visível com `remote_access.connect`, somente depois que o chamado tem responsável atribuído) que leva para `/acesso-remoto?ticket_id=<id>&asset_id=<id>` — o `asset_id` só é enviado quando o chamado já tem equipamento vinculado. A tela de acesso remoto lê esses parâmetros (`RemoteAccessContent`, envolvida em `SearchParamsSuspense`) e:
 
 - pré-preenche "Chamado relacionado" e "Equipamento no inventário" ao abrir o diálogo de conexão, dispensando digitação manual do número do chamado;
 - abre o diálogo automaticamente quando existe exatamente um computador do MeshCentral já vinculado ao equipamento do chamado e ele está online.
