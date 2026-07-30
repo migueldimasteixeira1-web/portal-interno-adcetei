@@ -67,23 +67,20 @@ export function manufacturerModel(asset: { manufacturer?: InventoryAssetCatalogR
   return value || "Não informado";
 }
 
-export type MovementAction = "move" | "stock" | "maintenance";
+export type MovementAction = "stock" | "maintenance";
 
 export type MovementDraft = {
-  sector_id: string;
-  assigned_user_id: string;
   movement_date: string;
   notes: string;
 };
 
 export const movementActionTitle: Record<MovementAction, string> = {
-  move: "Movimentar equipamento",
   stock: "Devolver ao estoque",
   maintenance: "Enviar para manutenção",
 };
 
 export function emptyMovementDraft(): MovementDraft {
-  return { sector_id: "", assigned_user_id: "", movement_date: todayInputValue(), notes: "" };
+  return { movement_date: todayInputValue(), notes: "" };
 }
 
 export const inventoryRetirementReasonOptions: Array<{ key: InventoryRetirementReason; label: string }> = [

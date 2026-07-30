@@ -12,8 +12,6 @@ import { InventoryAssetDetailsCard, InventoryAssetSummaryCard, InventoryMovement
 import InventoryMovementDialog from "@/features/inventory/InventoryMovementDialog";
 import InventoryRetireDialog from "@/features/inventory/InventoryRetireDialog";
 import {
-  activeByName,
-  emptyInventoryCatalogs,
   emptyMovementDraft,
   emptyRetireDraft,
   type MovementAction,
@@ -22,7 +20,7 @@ import {
 } from "@/features/inventory/inventory-utils";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
-import type { InventoryAsset, InventoryCatalogs, InventoryMovement, User } from "@/lib/types";
+import type { InventoryAsset, InventoryMovement } from "@/lib/types";
 
 export default function InventoryAssetDetailPage() {
   const params = useParams<{ id: string }>();
@@ -31,11 +29,8 @@ export default function InventoryAssetDetailPage() {
   const canView = hasPermission(user, "inventory.view");
   const canEdit = hasPermission(user, "inventory.edit");
   const canMove = hasPermission(user, "inventory.move");
-  const canViewUsers = hasPermission(user, "users.view");
   const [asset, setAsset] = useState<InventoryAsset | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
-  const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
-  const [users, setUsers] = useState<User[]>([]);
   const [activeAction, setActiveAction] = useState<MovementAction | null>(null);
   const [retireOpen, setRetireOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -48,16 +43,12 @@ export default function InventoryAssetDetailPage() {
 
   const load = async () => {
     try {
-      const [assetData, movementData, catalogData, userData] = await Promise.all([
+      const [assetData, movementData] = await Promise.all([
         api.inventoryAsset(params.id),
         api.inventoryAssetMovements(params.id),
-        canMove ? api.inventoryCatalogs() : Promise.resolve(emptyInventoryCatalogs),
-        canMove && canViewUsers ? api.users() : Promise.resolve([]),
       ]);
       setAsset(assetData);
       setMovements(movementData);
-      setCatalogs(catalogData);
-      setUsers(userData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível carregar o equipamento.");
     } finally {
@@ -69,27 +60,23 @@ export default function InventoryAssetDetailPage() {
     if (!user) return;
     if (!canView) setLoading(false);
     else void load();
-  }, [canMove, canView, canViewUsers, params.id, user]);
+  }, [canView, params.id, user]);
 
   const openAction = (action: MovementAction) => {
     setError("");
     setMessage("");
     setActiveAction(action);
-    setDraft({
-      sector_id: action === "move" && asset?.sector_id ? String(asset.sector_id) : "",
-      assigned_user_id: action === "move" && asset?.assigned_user_id ? String(asset.assigned_user_id) : "",
-      movement_date: emptyMovementDraft().movement_date,
-      notes: "",
-    });
+    setDraft(emptyMovementDraft());
   };
 
-  const requiredMissing =
-    !draft.movement_date ||
-    (activeAction === "move" && !draft.sector_id);
+  const requiredMissing = !draft.movement_date;
 
   const retireRequiredMissing = !retireDraft.reason || !retireDraft.movement_date || !retireDraft.justification.trim();
   const retireJustificationTooShort = retireDraft.justification.trim().length > 0 && retireDraft.justification.trim().length < 10;
   const isRetired = asset?.status === "retired";
+  const isStock = asset?.status === "stock";
+  const isAllocated = asset?.status === "allocated";
+  const isMaintenance = asset?.status === "maintenance";
 
   const submitAction = async () => {
     if (!activeAction || requiredMissing) return;
@@ -97,14 +84,7 @@ export default function InventoryAssetDetailPage() {
     setError("");
     setMessage("");
     try {
-      if (activeAction === "move") {
-        await api.allocateInventoryAsset(params.id, {
-          sector_id: Number(draft.sector_id),
-          assigned_user_id: draft.assigned_user_id ? Number(draft.assigned_user_id) : null,
-          movement_date: draft.movement_date,
-          notes: draft.notes.trim(),
-        });
-      } else if (activeAction === "stock") {
+      if (activeAction === "stock") {
         await api.returnInventoryAssetToStock(params.id, {
           movement_date: draft.movement_date,
           notes: draft.notes.trim(),
@@ -123,6 +103,11 @@ export default function InventoryAssetDetailPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const goToTerm = (kind: "delivery" | "return") => {
+    if (!asset) return;
+    router.push(`/inventario/termos?tab=${kind}&asset_id=${asset.id}`);
   };
 
   const submitRetire = async () => {
@@ -179,8 +164,10 @@ export default function InventoryAssetDetailPage() {
               canMove={canMove}
               canEdit={canEdit}
               isRetired={isRetired}
-              onMove={() => openAction("move")}
-              onReturnToStock={() => openAction("stock")}
+              showMove={isStock}
+              showReturnToStock={isAllocated || isMaintenance}
+              onMove={() => goToTerm("delivery")}
+              onReturnToStock={() => (isAllocated ? goToTerm("return") : openAction("stock"))}
               onMaintenance={() => openAction("maintenance")}
               onRetire={() => {
                 setError("");
@@ -215,10 +202,7 @@ export default function InventoryAssetDetailPage() {
         action={activeAction}
         draft={draft}
         saving={saving}
-        canViewUsers={canViewUsers}
         requiredMissing={requiredMissing}
-        sectorOptions={activeByName(catalogs.sectors)}
-        userOptions={activeByName(users)}
         onOpenChange={(open) => !open && setActiveAction(null)}
         onConfirm={submitAction}
         onDraftChange={setDraft}

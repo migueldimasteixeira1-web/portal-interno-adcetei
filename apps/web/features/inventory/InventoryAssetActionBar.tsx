@@ -6,6 +6,8 @@ type Props = {
   canMove: boolean;
   canEdit: boolean;
   isRetired: boolean;
+  showMove: boolean;
+  showReturnToStock: boolean;
   onMove: () => void;
   onReturnToStock: () => void;
   onMaintenance: () => void;
@@ -17,6 +19,8 @@ export default function InventoryAssetActionBar({
   canMove,
   canEdit,
   isRetired,
+  showMove,
+  showReturnToStock,
   onMove,
   onReturnToStock,
   onMaintenance,
@@ -34,16 +38,20 @@ export default function InventoryAssetActionBar({
 
   return (
     <div className="flex flex-wrap gap-2">
+      {canMove && !isRetired && showMove && (
+        <Button variant="secondary" onClick={onMove}>
+          <Send size={16} />
+          Movimentar
+        </Button>
+      )}
+      {canMove && !isRetired && showReturnToStock && (
+        <Button variant="secondary" onClick={onReturnToStock}>
+          <PackageCheck size={16} />
+          Devolver ao estoque
+        </Button>
+      )}
       {canMove && !isRetired && (
         <>
-          <Button variant="secondary" onClick={onMove}>
-            <Send size={16} />
-            Movimentar
-          </Button>
-          <Button variant="secondary" onClick={onReturnToStock}>
-            <PackageCheck size={16} />
-            Devolver ao estoque
-          </Button>
           <Button variant="secondary" onClick={onMaintenance}>
             <Wrench size={16} />
             Manutenção
