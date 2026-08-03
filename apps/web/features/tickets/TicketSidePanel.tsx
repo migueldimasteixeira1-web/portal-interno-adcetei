@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 import { Clock3, Computer, LoaderCircle, MonitorCog } from "lucide-react";
 import { Button, buttonStyles, Card, DetailRow, Field, SectionHeader, Select } from "@/components/ui";
 import { assetTypeLabels, formatDate, priorityLabels, priorityOptions, roleLabels, statusLabels } from "@/lib/format";
-import type { Asset, Ticket, User } from "@/lib/types";
+import type { AssetTicketOption, Ticket, User } from "@/lib/types";
 
 export type TicketAction = {
   key: string;
@@ -17,7 +17,7 @@ export type TicketAction = {
 type Props = {
   ticket: Ticket;
   staff: User[];
-  assets: Asset[];
+  assets: AssetTicketOption[];
   draft: Record<string, string>;
   overdue: boolean;
   isUserProfile: boolean;

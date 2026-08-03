@@ -48,7 +48,7 @@ Portal Interno ADCETEI
 | `routers/auth.py` | Login, cadastro, verificação de e-mail |
 | `routers/tickets.py` | Chamados e dashboard |
 | `routers/chat.py` | Conversas diretas, contatos e contagem de não lidas |
-| `routers/users_assets.py` | Usuários, assets legados, opções para chamados |
+| `routers/users_assets.py` | Usuários e catálogo de serviços |
 | `routers/admin/` | Usuários admin, assets, catálogo, perfis, auditoria |
 | `routers/inventory/` | Meta, equipamentos modulares, cadastros base |
 | `routers/remote_access.py` | Dispositivos remotos, sessões e auditoria |
@@ -66,7 +66,7 @@ Portal Interno ADCETEI
 
 Rotas públicas principais:
 
-- `/api/auth/*`, `/api/tickets/*`, `/api/users`, `/api/assets/*`
+- `/api/auth/*`, `/api/tickets/*`, `/api/users`
 - `/api/chat/*`
 - `/api/admin/*`
 - `/api/inventory/*`
@@ -137,7 +137,7 @@ Padrão aceito: `usuario@secretaria.cabofrio.rj.gov.br`. Contas públicas nascem
 
 ## Inventário
 
-A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Rotas legadas de `/api/assets` coexistem com o contrato modular em `/api/inventory/assets`.
+A tabela `assets` permanece como base dos equipamentos (`asset_id` em chamados). Desde a Issue #28, `/api/inventory/assets` é a única superfície de leitura/escrita de equipamentos — a rota legada `/api/assets` foi removida (ver detalhes abaixo).
 
 - Cadastros base: `/api/inventory/catalogs` — secretarias, setores vinculados a secretaria, fornecedores, contratos vinculados a fornecedor, tipos, fabricantes e modelos (`inventory.view` / `inventory.manage_catalogs`)
 - Hierarquia conhecida: `Secretaria de Gestão e Inovação (SGI) → ADCETEI`; outros setores dependem de classificação administrativa
@@ -181,15 +181,11 @@ Os endpoints simples `/allocate` e `/return-to-stock` continuam existindo no bac
 
 Quando o cadastro administrativo não informa senha, o backend gera uma credencial aleatória que não é exibida nem registrada. A conta permanece bloqueada até uma futura redefinição administrativa.
 
-Duas superfícies para equipamentos:
+Uma única superfície de leitura para equipamentos (Issue #28): `GET /api/assets` e `GET /api/assets/ticket-options` (legado) foram removidos — o dropdown de "vincular equipamento" na triagem de chamados (`TicketSidePanel`) passou a consumir `GET /api/inventory/assets/ticket-options`, o mesmo contrato canônico já usado na abertura de chamado (`ticket_asset_options()` em `services/assets_service.py`, compartilhado pelos dois pontos de uso). Usuário comum só vê seu próprio vínculo; demais perfis veem todo o inventário não baixado.
 
-| Endpoint | Uso |
-|----------|-----|
-| `GET /api/assets` | Inventário administrativo completo (`assets.view`) |
-| `GET /api/inventory/assets/ticket-options` | Contrato canônico para seleção resumida na abertura de chamado; usuário comum só vê vínculos próprios |
-| `GET /api/assets/ticket-options` | Compatibilidade deprecated; delega para a mesma consulta e o mesmo payload do endpoint canônico |
+`services/assets_service.py` e os schemas `AssetOut`/`AssetTicketOptionOut` continuam existindo — são usados pela serialização de `Ticket.asset` e pelo próprio endpoint modular, mesmo sem mais ter uma rota HTTP `/api/assets` dedicada.
 
-A rota resumida antiga poderá ser removida depois que todas as instalações usarem o frontend modular e os logs confirmarem a ausência de integrações externas. `GET /api/assets` permanece separado porque a edição administrativa de chamados ainda consome seu contrato completo.
+Nota à parte: `POST/PATCH/DELETE /api/admin/assets` (CRUD legado, `routers/admin/assets.py`) não tem nenhum consumidor no frontend hoje — só é exercitado pelos scripts de self-check. Não fazia parte do escopo desta issue (que mirava especificamente `/api/assets`), mas é candidato a uma limpeza futura semelhante.
 
 ## Acesso remoto
 

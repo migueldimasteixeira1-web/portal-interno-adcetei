@@ -86,12 +86,6 @@ if [[ ! -x "$API_PYTHON" ]]; then
 fi
 
 "$API_PYTHON" -c "import uvicorn" >/dev/null
-GREP_EXCLUDES=(--exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.venv)
-if grep -rq "${GREP_EXCLUDES[@]}" -F '"/assets/ticket-options"' "$ROOT_DIR/apps/web" \
-  || grep -rq "${GREP_EXCLUDES[@]}" -F "'/assets/ticket-options'" "$ROOT_DIR/apps/web"; then
-  echo "Frontend ainda consome a rota legada /assets/ticket-options."
-  exit 1
-fi
 
 echo "[1/8] Validando helpers de formulário, e-mail e inventário..."
 ENVIRONMENT=test "$API_PYTHON" - <<'PY'
@@ -322,13 +316,10 @@ with sqlite3.connect(DB_PATH) as connection:
     connection.commit()
 
 # Inventário completo é restrito; opções de abertura são mínimas e do próprio usuário.
-status, _ = call("GET", "/assets", requester)
+status, _ = call("GET", "/inventory/assets", requester)
 expect(status, 403, "usuário sem inventário completo")
-status, legacy_options = call("GET", "/assets/ticket-options", requester)
-expect(status, 200, "opções resumidas pela rota legada")
 status, options = call("GET", "/inventory/assets/ticket-options", requester)
 expect(status, 200, "opções resumidas pela rota modular")
-expect(options, legacy_options, "rotas modular e legada retornam o mesmo conteúdo")
 if not options:
     raise AssertionError("usuário deveria possuir equipamentos vinculados")
 allowed_keys = {"id", "name", "asset_type", "patrimony"}
@@ -351,11 +342,14 @@ status, admin_options = call("GET", "/inventory/assets/ticket-options", admin)
 expect(status, 200, "administrador consulta opções modulares")
 expect({option["id"] for option in admin_options}, expected_staff_asset_ids, "administrador vê equipamentos disponíveis")
 
-status, full_inventory = call("GET", "/assets", operator)
-expect(status, 200, "técnico consulta inventário completo")
-if not full_inventory or "ip_address" not in full_inventory[0]:
-    raise AssertionError("inventário administrativo não contém os dados completos")
-foreign_asset = next(item for item in full_inventory if item.get("assigned_user_id") != requester_user["id"])
+with sqlite3.connect(DB_PATH) as connection:
+    foreign_asset_id = next(
+        row[0]
+        for row in connection.execute(
+            "select id from assets where (assigned_user_id is null or assigned_user_id != ?) and status != 'retired'",
+            (requester_user["id"],),
+        )
+    )
 
 status, _ = call("GET", "/inventory/meta", requester)
 expect(status, 403, "metadados do inventário exigem inventory.view")
@@ -890,9 +884,6 @@ expect(retired_asset["retirement_justification"], "Equipamento com placa-mãe qu
 assert_explicit_zone(retired_asset["retired_at"], "inventário.retired_at")
 status, options_after_retire = call("GET", "/inventory/assets/ticket-options", admin)
 expect(status, 200, "opções refletem baixa no inventário")
-status, legacy_options_after_retire = call("GET", "/assets/ticket-options", admin)
-expect(status, 200, "rota legada permanece disponível durante depreciação")
-expect(options_after_retire, legacy_options_after_retire, "rotas permanecem equivalentes após mudança de status")
 if any(option["id"] == modular_asset["id"] for option in options_after_retire):
     raise AssertionError("equipamento baixado permaneceu nas opções de chamado")
 
@@ -955,10 +946,11 @@ status, _ = call(
 )
 expect(status, 403, "correção administrativa restrita ao administrador")
 
-status, legacy_inventory = call("GET", "/assets", operator)
-expect(status, 200, "rota antiga de assets segue funcionando")
-if not any(item["id"] == allocated_asset["id"] and item["status"] == "active" for item in legacy_inventory):
-    raise AssertionError("rota antiga não preservou status active para equipamento alocado")
+with sqlite3.connect(DB_PATH) as connection:
+    persisted_status = connection.execute(
+        "select status from assets where id = ?", (allocated_asset["id"],)
+    ).fetchone()[0]
+expect(persisted_status, "active", "equipamento alocado preserva o status legado 'active' na tabela assets")
 
 status, catalog = call("GET", "/catalog", requester)
 expect(status, 200, "catálogo")
@@ -975,7 +967,7 @@ status, _ = call(
     {
         "service_id": general_service["id"],
         "description": "Tentativa de vincular equipamento de outro usuário.",
-        "asset_id": foreign_asset["id"],
+        "asset_id": foreign_asset_id,
         "form_data": {},
     },
 )

@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..catalog_forms import catalog_payload
 from ..database import get_db
-from ..models import Asset, ServiceCatalog, User
+from ..models import ServiceCatalog, User
 from ..permissions import has_permission, require_permission
-from ..schemas import AssetOut, AssetTicketOptionOut, CatalogOut, UserOut
+from ..schemas import CatalogOut, UserOut
 from ..serializers.users import serialize_user
-from ..services.assets_service import ticket_asset_options
 
 router = APIRouter(prefix="/api", tags=["listagens"])
 
@@ -29,40 +28,6 @@ def list_users(
         query = query.where(or_(User.full_name.ilike(like), User.username.ilike(like), User.email.ilike(like), User.registration.ilike(like)))
     users = list(db.scalars(query))
     return [serialize_user(user, db, include_permissions=True) for user in users]
-
-
-@router.get("/assets", response_model=list[AssetOut])
-def list_assets(
-    asset_type: str | None = None,
-    status_filter: str | None = Query(None, alias="status"),
-    search: str | None = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("assets.view")),
-):
-    query = select(Asset).options(joinedload(Asset.assigned_user)).order_by(Asset.name)
-    if asset_type:
-        query = query.where(Asset.asset_type == asset_type)
-    if status_filter:
-        query = query.where(Asset.status == status_filter)
-    if search:
-        like = f"%{search}%"
-        query = query.where(
-            or_(Asset.name.ilike(like), Asset.model.ilike(like), Asset.patrimony.ilike(like), Asset.ip_address.ilike(like))
-        )
-    return list(db.scalars(query).unique())
-
-
-@router.get(
-    "/assets/ticket-options",
-    response_model=list[AssetTicketOptionOut],
-    deprecated=True,
-    description="Compatibilidade temporária. Use GET /api/inventory/assets/ticket-options.",
-)
-def list_asset_ticket_options(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return ticket_asset_options(db, current_user)
 
 
 @router.get("/catalog", response_model=list[CatalogOut])
