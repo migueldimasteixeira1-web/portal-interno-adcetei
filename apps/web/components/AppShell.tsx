@@ -8,6 +8,7 @@ import { useAuth } from "./AuthProvider";
 import ChatUnreadBadge from "./ChatUnreadBadge";
 import CommandPalette from "./CommandPalette";
 import LoadingScreen from "./LoadingScreen";
+import NotificationBell from "./NotificationBell";
 import ThemeToggle from "./ThemeToggle";
 import UserAvatar from "./UserAvatar";
 import { Button, cn } from "./ui";
@@ -126,6 +127,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
               {environmentLabel}
             </span>}
+            <NotificationBell />
             <ThemeToggle />
             <UserAvatar name={user.full_name} size="sm" className="hidden sm:flex" />
           </div>

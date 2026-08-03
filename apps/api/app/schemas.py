@@ -968,3 +968,36 @@ class ChatConversationOut(BaseModel):
 
 class ChatUnreadCountOut(BaseModel):
     unread_count: int
+
+
+class NotificationOut(BaseModel):
+    id: int
+    event_type: str
+    sound_kind: str
+    message: str
+    ticket_id: Optional[int] = None
+    created_at: datetime
+    read_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "read_at")
+    def serialize_notification_dates(self, value: datetime | None) -> str | None:
+        return iso_utc(value)
+
+
+class NotificationUnreadCountOut(BaseModel):
+    unread_count: int
+
+
+class NotificationPreferencesOut(BaseModel):
+    master_muted: bool
+    voice_muted: bool
+    standard_sound_muted: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationPreferencesUpdate(BaseModel):
+    master_muted: Optional[bool] = None
+    voice_muted: Optional[bool] = None
+    standard_sound_muted: Optional[bool] = None
+    model_config = ConfigDict(extra="forbid")

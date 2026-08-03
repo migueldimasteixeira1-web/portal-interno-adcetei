@@ -12,6 +12,7 @@ from ..models import Asset, ServiceCatalog, Ticket, TicketComment, User
 from ..permissions import has_permission
 from ..schemas import CommentCreate, CommentOut, DashboardOut, TicketCreate, TicketDetailOut, TicketPageOut, TicketUpdate
 from ..serializers.tickets import serialize_ticket
+from ..services.notifications_service import notify_ticket_assigned, notify_ticket_comment, notify_ticket_created, notify_ticket_status_changed
 from ..services.tickets_service import (
     FINAL_TICKET_STATUSES,
     NON_NULLABLE_UPDATE_FIELDS,
@@ -160,6 +161,7 @@ def create_ticket(
             event_type="event",
         )
     )
+    notify_ticket_created(db, ticket, current_user)
     db.commit()
     return get_ticket(ticket.id, db, current_user)
 
@@ -196,6 +198,7 @@ def update_ticket(
         requested_status = data.get("status")
         if set(data) <= {"status"} and requested_status in OPEN_STATUSES and can_reopen(ticket):
             reopen_ticket(ticket, current_user, db, target_status=requested_status)
+            notify_ticket_status_changed(db, ticket, current_user, ticket.status)
             db.commit()
             return get_ticket(ticket_id, db, current_user)
         raise HTTPException(status_code=409, detail="Chamado finalizado não pode ser alterado")
@@ -259,6 +262,11 @@ def update_ticket(
                 )
             )
         db.add_all(update_comments)
+        for field, _old, new in changes:
+            if field == "assignee_id":
+                notify_ticket_assigned(db, ticket, current_user, new)
+            elif field == "status":
+                notify_ticket_status_changed(db, ticket, current_user, new)
     db.commit()
     return get_ticket(ticket_id, db, current_user)
 
@@ -280,9 +288,11 @@ def add_comment(
     comment = TicketComment(ticket_id=ticket_id, author_id=current_user.id, body=payload.body.strip(), internal=payload.internal)
     ticket.updated_at = now_utc()
     db.add(comment)
+    notify_ticket_comment(db, ticket, comment, current_user)
 
     if not payload.internal and current_user.id == ticket.requester_id and can_reopen(ticket):
         reopen_ticket(ticket, current_user, db, auto=True)
+        notify_ticket_status_changed(db, ticket, current_user, ticket.status)
 
     db.commit()
     db.refresh(comment)

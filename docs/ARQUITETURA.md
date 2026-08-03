@@ -265,6 +265,22 @@ Conversas diretas (1:1) entre qualquer par de usuários ativos do portal, sem ex
 
 Sem WebSocket: o frontend busca mensagens novas por polling (a cada 4s na conversa aberta, a cada 10s na lista de conversas; o selo de não lidas no menu lateral verifica a cada 15s). Optou-se por esse caminho por ser consistente com o restante do portal (que já é 100% REST/polling) e por não introduzir gerenciamento de conexão persistente para um volume de uso interno pequeno; migrar pontos específicos para WebSocket depois é incremental caso o uso justifique.
 
+## Notificações in-app
+
+Escopo inicial (Issue #27): notificações in-app para o ciclo de vida de chamados, com som opcional. E-mail foi descartado como canal principal (uso baixo, Zimbra com problemas recorrentes de armazenamento) e fica fora de escopo por ora.
+
+- Tabelas `notifications` (`user_id`, `event_type`, `sound_kind`, `message`, `ticket_id`, `read_at`) e `notification_preferences` (mute por usuário, criada sob demanda no primeiro acesso);
+- eventos cobertos, gerados em `app/services/notifications_service.py` e disparados a partir de `routers/tickets.py`: novo chamado (`ticket_created`), atribuição (`ticket_assigned`), mudança de status incluindo reabertura (`ticket_status_changed`), nova resposta/comentário público ou nota interna (`ticket_comment`);
+- quem nunca é notificado da própria ação: todo evento exclui o autor (`actor`) da lista de destinatários — regra aplicada no service, não no frontend;
+- `ticket_created` vai para todos os usuários ativos com a permissão `tickets.view_all` (por padrão `admin` e `technician`) — é o único evento com `sound_kind = "voice"`; os demais usam `sound_kind = "standard"`;
+- notas internas (`internal=true`) nunca notificam o solicitante, só o responsável pelo chamado (quando o autor da nota é outra pessoa);
+- `GET /api/notifications`, `GET /api/notifications/unread-count`, `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all`, `GET`/`PATCH /api/notifications/preferences`;
+- preferências têm três chaves independentes: `master_muted` (silencia tudo), `voice_muted` (só a voz de novo chamado) e `standard_sound_muted` (só o som padrão) — permitindo, por exemplo, manter o som padrão mas desligar a voz;
+- frontend: `components/NotificationBell.tsx` faz polling da lista a cada 15s (mesmo padrão do `ChatUnreadBadge`), guarda o último id já processado em `localStorage` por usuário (evita tocar som de notificações antigas ao entrar ou ao recarregar a página) e suprime o som quando o usuário já está na tela do chamado em questão;
+- os dois áudios (`public/sounds/new-ticket.mp3` para a voz, `public/sounds/notification.mp3` para o som padrão) são arquivos estáticos, não sintetizados em tempo real — garante experiência idêntica em qualquer navegador/máquina, ao custo de precisar regravar o arquivo se o texto ou a voz mudarem;
+- a voz de novo chamado tem debounce de 25s por aba (rajada de vários chamados toca a voz uma vez só, o resto cai no som padrão) e um lock via `localStorage` de ~3s evita que múltiplas abas do mesmo usuário toquem o mesmo som simultaneamente;
+- terceiro áudio "crítico" avaliado e propositalmente fora de escopo — não há hoje um critério objetivo do que é urgente o suficiente para justificá-lo.
+
 Tabela: `chat_messages` (`sender_id`, `recipient_id`, `body`, `created_at`, `read_at`).
 
 ## Schema do banco

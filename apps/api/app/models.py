@@ -442,6 +442,34 @@ class ChatMessage(Base):
     recipient: Mapped[User] = relationship(foreign_keys=[recipient_id])
 
 
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(40), index=True)
+    sound_kind: Mapped[str] = mapped_column(String(20), default="standard")
+    message: Mapped[str] = mapped_column(String(400))
+    ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship(foreign_keys=[user_id])
+    ticket: Mapped[Optional[Ticket]] = relationship(foreign_keys=[ticket_id])
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    master_muted: Mapped[bool] = mapped_column(Boolean, default=False)
+    voice_muted: Mapped[bool] = mapped_column(Boolean, default=False)
+    standard_sound_muted: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    user: Mapped[User] = relationship(foreign_keys=[user_id])
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
