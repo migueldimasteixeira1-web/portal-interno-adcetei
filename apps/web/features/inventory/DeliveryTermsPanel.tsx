@@ -84,12 +84,17 @@ function termDownloadFilename(term: InventoryDeliveryTerm) {
   return `${clean(term.term_number) || term.id} - Termo de Recebimento - ${clean(term.recipient_name) || "Recebedor"}.docx`;
 }
 
-export default function DeliveryTermsPanel() {
+type Props = {
+  initialAssetId?: number;
+};
+
+export default function DeliveryTermsPanel({ initialAssetId }: Props) {
   const { user } = useAuth();
   const canView = hasPermission(user, "inventory.view");
   const canMove = hasPermission(user, "inventory.move");
   const canManageUsers = hasPermission(user, "users.manage");
   const inputRef = useRef<HTMLInputElement>(null);
+  const prefilledAssetRef = useRef(false);
   const [terms, setTerms] = useState<InventoryDeliveryTerm[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [catalogs, setCatalogs] = useState<InventoryCatalogs>(emptyInventoryCatalogs);
@@ -224,6 +229,14 @@ export default function DeliveryTermsPanel() {
   const addAsset = (asset: InventoryAsset) => {
     addSerial(asset.serial_number);
   };
+
+  useEffect(() => {
+    if (!canMove || !initialAssetId || prefilledAssetRef.current) return;
+    prefilledAssetRef.current = true;
+    api.inventoryAsset(String(initialAssetId))
+      .then((asset) => addAsset(asset))
+      .catch(() => undefined);
+  }, [canMove, initialAssetId]);
 
   const removeSerial = (serial: string) => {
     setSerials((current) => current.filter((item) => item !== serial));

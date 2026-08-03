@@ -168,6 +168,17 @@ Simétrico ao termo de recebimento — mesma engrenagem (modelo, numeração seq
 - Geração de DOCX reaproveita os utilitários OOXML genéricos extraídos para `docx_utils.py` (manipulação de parágrafos/tabelas, paginação, reflow em duas páginas) — `delivery_terms_docx.py` e `return_terms_docx.py` só têm a lógica específica de cada template
 - Tela `/inventario/termos` tem um alternador no topo ("Recebimento"/"Devolução"); cada lado é um componente próprio (`features/inventory/DeliveryTermsPanel.tsx` e `ReturnTermsPanel.tsx`). Na devolução, o servidor devolvedor é selecionado antes da busca de equipamento, que já vem filtrada aos itens alocados a ele
 
+### Ações rápidas do detalhe do equipamento ↔ termos
+
+A tela `/inventario/[id]` não chama mais `POST /api/inventory/assets/{id}/allocate` nem `.../return-to-stock` para as transições que envolvem uma pessoa. Os botões da barra de ações mudam de significado conforme o status do equipamento:
+
+- Equipamento em `stock`: só aparece "Movimentar", que navega para `/inventario/termos?tab=delivery&asset_id={id}` com o equipamento já adicionado ao termo de recebimento — a entrega só se efetiva quando o termo é confirmado.
+- Equipamento em `allocated`: só aparece "Devolver ao estoque", que navega para `/inventario/termos?tab=return&asset_id={id}` com o devolvedor (usuário atualmente vinculado) e o equipamento já pré-selecionados — a devolução só se efetiva quando o termo de devolução é confirmado.
+- Equipamento em `maintenance`: "Devolver ao estoque" continua chamando a movimentação simples (`return-to-stock`) direto, sem termo — não existe pessoa/responsabilidade envolvida nessa transição (equipamento que sai de manutenção volta ao estoque), e nenhum dos dois tipos de termo cobre esse caso hoje.
+- Realocar um equipamento já `allocated` para outra pessoa/setor deixou de ser uma ação direta de um clique: o caminho passa a ser devolver ao estoque (termo de devolução) e emitir um novo termo de recebimento para o novo responsável, preservando o rastro documental nas duas pontas.
+
+Os endpoints simples `/allocate` e `/return-to-stock` continuam existindo no backend (usados por `scripts/regression-test.sh` e mantidos como via de correção administrativa), mas deixaram de ser o caminho principal da tela de equipamento — ver auditoria de arquitetura, item de conexão inventário↔termo.
+
 Quando o cadastro administrativo não informa senha, o backend gera uma credencial aleatória que não é exibida nem registrada. A conta permanece bloqueada até uma futura redefinição administrativa.
 
 Duas superfícies para equipamentos:

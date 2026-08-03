@@ -59,11 +59,17 @@ function termDownloadFilename(term: InventoryReturnTerm) {
   return `${clean(term.term_number) || term.id} - Termo de Devolução - ${clean(term.returner_name) || "Devolvedor"}.docx`;
 }
 
-export default function ReturnTermsPanel() {
+type Props = {
+  initialAssetId?: number;
+};
+
+export default function ReturnTermsPanel({ initialAssetId }: Props) {
   const { user } = useAuth();
   const canView = hasPermission(user, "inventory.view");
   const canMove = hasPermission(user, "inventory.move");
   const inputRef = useRef<HTMLInputElement>(null);
+  const prefilledReturnerRef = useRef(false);
+  const pendingAssetIdRef = useRef<number | undefined>(initialAssetId);
   const [terms, setTerms] = useState<InventoryReturnTerm[]>([]);
   const [deliveryTerms, setDeliveryTerms] = useState<InventoryDeliveryTerm[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -219,6 +225,26 @@ export default function ReturnTermsPanel() {
     setSerials([]);
     setAssetSearch("");
   };
+
+  useEffect(() => {
+    if (!canMove || !initialAssetId || prefilledReturnerRef.current || !users.length) return;
+    prefilledReturnerRef.current = true;
+    api.inventoryAsset(String(initialAssetId))
+      .then((asset) => {
+        const returner = users.find((item) => item.id === asset.assigned_user_id);
+        if (returner) selectReturner(returner);
+      })
+      .catch(() => undefined);
+  }, [canMove, initialAssetId, users]);
+
+  useEffect(() => {
+    if (!pendingAssetIdRef.current || !returnerAssets.length) return;
+    const asset = returnerAssets.find((item) => item.id === pendingAssetIdRef.current);
+    if (asset) {
+      addAsset(asset);
+      pendingAssetIdRef.current = undefined;
+    }
+  }, [returnerAssets]);
 
   const submitAssetSearch = () => {
     if (visibleReturnerAssets.length) addAsset(visibleReturnerAssets[0]);

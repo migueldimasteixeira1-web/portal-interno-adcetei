@@ -1,15 +1,21 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import SearchParamsSuspense from "@/components/SearchParamsSuspense";
 import { Button } from "@/components/ui";
 import DeliveryTermsPanel from "@/features/inventory/DeliveryTermsPanel";
 import ReturnTermsPanel from "@/features/inventory/ReturnTermsPanel";
 
 type TermsKind = "delivery" | "return";
 
-export default function InventoryTermsPage() {
-  const [kind, setKind] = useState<TermsKind>("delivery");
+function InventoryTermsContent() {
+  const searchParams = useSearchParams();
+  const initialKind = searchParams.get("tab") === "return" ? "return" : "delivery";
+  const assetIdParam = searchParams.get("asset_id");
+  const initialAssetId = assetIdParam ? Number(assetIdParam) : undefined;
+  const [kind, setKind] = useState<TermsKind>(initialKind);
 
   return (
     <>
@@ -28,7 +34,19 @@ export default function InventoryTermsPage() {
         </Button>
       </div>
 
-      {kind === "delivery" ? <DeliveryTermsPanel /> : <ReturnTermsPanel />}
+      {kind === "delivery" ? (
+        <DeliveryTermsPanel initialAssetId={kind === initialKind ? initialAssetId : undefined} />
+      ) : (
+        <ReturnTermsPanel initialAssetId={kind === initialKind ? initialAssetId : undefined} />
+      )}
     </>
+  );
+}
+
+export default function InventoryTermsPage() {
+  return (
+    <SearchParamsSuspense>
+      <InventoryTermsContent />
+    </SearchParamsSuspense>
   );
 }
