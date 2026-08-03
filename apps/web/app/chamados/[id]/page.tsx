@@ -18,7 +18,7 @@ import TicketRequestCard from "@/features/tickets/TicketRequestCard";
 import TicketSidePanel, { type TicketAction } from "@/features/tickets/TicketSidePanel";
 import { api } from "@/lib/api";
 import { priorityLabels } from "@/lib/format";
-import type { Asset, Ticket, User } from "@/lib/types";
+import type { AssetTicketOption, Ticket, User } from "@/lib/types";
 
 const REOPEN_WINDOW_DAYS = 7;
 
@@ -35,7 +35,7 @@ export default function TicketDetailPage() {
   const { user } = useAuth();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [staff, setStaff] = useState<User[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assets, setAssets] = useState<AssetTicketOption[]>([]);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [comment, setComment] = useState("");
   const [internal, setInternal] = useState(false);
@@ -65,7 +65,7 @@ export default function TicketDetailPage() {
       if (user?.permissions.includes("tickets.triage")) {
         const [users, assetList] = await Promise.all([
           user.permissions.includes("users.view") ? api.users() : Promise.resolve([]),
-          user.permissions.includes("assets.view") ? api.assets() : Promise.resolve([]),
+          api.assetTicketOptions(),
         ]);
         setStaff(users.filter((item) => item.role !== "user"));
         setAssets(assetList);
