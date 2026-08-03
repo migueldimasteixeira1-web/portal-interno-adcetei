@@ -51,4 +51,11 @@ export type { CatalogFormField, CatalogIconOption, CatalogOptions, CatalogServic
 export type { TicketComment, Ticket, TicketPage, DashboardData } from "./types/tickets";
 export type { RoleConfig, PermissionDefinition, AuditLog } from "./types/admin";
 export type { ChatContact, ChatMessage, ChatConversation } from "./types/chat";
+export type {
+  NotificationEventType,
+  NotificationSoundKind,
+  Notification,
+  NotificationPreferences,
+  NotificationPreferencesUpdate,
+} from "./types/notifications";
 export type { RemoteAccessMode, RemoteAccessSessionStatus, RemoteAccessAssetRef, RemoteAccessDevice, RemoteAccessSummary, RemoteAccessDevicePage, RemoteAccessSessionPayload, RemoteAccessSession, RemoteAccessLaunch, RemoteAccessHealth } from "./types/remote-access";
